@@ -1,0 +1,21 @@
+{
+  "name": "the-compound-bushwick",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static marketing site for The Compound Bushwick with availability search and lead forms.",
+  "scripts": {
+    "lint:js": "eslint js/*.js",
+    "lint:css": "stylelint \"css/**/*.css\"",
+    "lint:html": "htmlhint \"*.html\"",
+    "lint": "npm-run-all lint:js lint:css lint:html",
+    "serve": "php -S localhost:8080",
+    "a11y": "pa11y-ci"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "htmlhint": "^1.1.4",
+    "npm-run-all": "^4.1.5",
+    "pa11y-ci": "^3.0.1",
+    "stylelint": "^15.11.0"
+  }
+}

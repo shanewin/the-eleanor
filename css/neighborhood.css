@@ -1,0 +1,243 @@
+/* Neighborhood Section Styles */
+
+/* Override section title and subtitle for neighborhood */
+.neighborhood-tabs .section-subtitle {
+    color: #b95c47 !important;
+    font-size: 24px !important;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    position: relative;
+    letter-spacing: 5px;
+    margin-bottom: 15px !important;
+}
+
+.neighborhood-tabs .section-title {
+    font-size: 45px;
+    font-family: 'Rustico', serif;
+    font-weight: 400;
+    color: #593630;
+    position: relative;
+    margin-bottom: 20px;
+}
+
+/* Tabs */
+.neighborhood-tabs .tab-navigation {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+    border-bottom: 3px solid #e9ecef;
+    background: white;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.neighborhood-tabs .tab-btn {
+    padding: 18px 30px;
+    cursor: pointer;
+    background: #593630;
+    border: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    color: white;
+    border-bottom: 3px solid transparent;
+    flex: 1;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.neighborhood-tabs .tab-btn:hover {
+    background: #f8f9fa;
+    color: #593630;
+}
+
+.neighborhood-tabs .tab-btn.active {
+    background: white;
+    color: #593630;
+    border-bottom-color: #b95c47;
+}
+
+/* Tab Content */
+.neighborhood-tabs .tab-content {
+    display: none;
+    padding: 40px;
+    background: white;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    margin-bottom: 40px;
+}
+
+.neighborhood-tabs .tab-content.active {
+    display: block;
+    animation: fadeInUp 0.6s ease;
+}
+
+.neighborhood-tabs .tab-content h2 {
+    font-family: 'Rustico', serif;
+    font-size: 2.5rem;
+    color: #593630;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.neighborhood-tabs .tab-content h3 {
+    font-family: 'Rustico', serif;
+    color: #b95c47;
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+}
+
+.neighborhood-tabs .tab-content p {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin-bottom: 20px;
+    color: #555;
+}
+
+@keyframes fadeInUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0);
+    }
+}
+
+/* Location Cards */
+.neighborhood-tabs .location-card {
+    display: flex;
+    margin-bottom: 25px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    background: white;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.neighborhood-tabs .location-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+}
+
+.neighborhood-tabs .card-image {
+    flex: 0 0 150px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.neighborhood-tabs .card-image::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(89, 54, 48, 0.2), rgba(185, 92, 71, 0.2));
+}
+
+.neighborhood-tabs .card-details {
+    padding: 25px;
+    flex: 1;
+}
+
+.neighborhood-tabs .card-details h3 {
+    color: #b95c47;
+    margin-bottom: 12px;
+    font-size: 1.4rem;
+}
+
+.neighborhood-tabs .card-details p {
+    margin-bottom: 12px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.neighborhood-tabs .distance-info {
+    color: #999;
+    font-style: italic;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Map Container */
+.neighborhood-tabs .map-section {
+    height: 450px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 40px 0;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Transit Lines */
+.neighborhood-tabs .transit-lines {
+    margin-bottom: 15px;
+}
+
+.neighborhood-tabs .transit-item {
+    background: rgba(89, 54, 48, 0.08);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 12px 15px;
+    transition: background 0.3s ease;
+}
+
+.neighborhood-tabs .transit-item:hover {
+    background: rgba(89, 54, 48, 0.15);
+}
+
+.neighborhood-tabs .transit-item div {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.neighborhood-tabs .transit-item span:not(.subway-icon) {
+    color: #666;
+}
+
+.neighborhood-tabs .transit-note {
+    color: #b95c47;
+    text-align: center;
+    font-style: italic;
+    margin-top: 15px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .neighborhood-tabs .location-card {
+        flex-direction: column;
+    }
+    
+    .neighborhood-tabs .card-image {
+        height: 180px;
+        flex: 0 0 auto;
+    }
+    
+    .neighborhood-tabs .tab-navigation {
+        flex-direction: column;
+    }
+    
+    .neighborhood-tabs .tab-btn {
+        width: 100%;
+        border-radius: 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .neighborhood-tabs .tab-content {
+        padding: 25px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .neighborhood-tabs .tab-content h2 {
+        font-size: 2rem;
+    }
+} 
