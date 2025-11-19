@@ -192,31 +192,38 @@ body::after {
     min-height: 100vh;
 }
 
-/* ======= HORIZONTAL SLIDE-IN SECTIONS ======= */
+/* ======= HORIZONTAL SLIDE-IN/OUT SECTIONS (Option B) ======= */
 .slide-panel {
     position: relative;
-    margin: 60px auto;
+    margin: 100vh auto; /* Space between panels to show building */
     max-width: 1400px;
     padding: 0 30px;
+    min-height: 60vh; /* Ensure panels have presence */
 }
 
-/* Inner content that actually animates */
+/* Hero panel should not have margin */
+header .slide-panel {
+    margin: 0 auto;
+}
+
+/* Inner content that animates based on scroll position */
 .slide-panel .glass-panel {
     opacity: 0;
     transform: translateX(100vw);
-    transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* Smooth transition for JS-controlled animations */
+    transition: transform 0.05s linear, opacity 0.1s linear;
     will-change: transform, opacity;
-}
-
-.slide-panel.slide-in .glass-panel {
-    opacity: 1;
-    transform: translateX(0);
 }
 
 /* Ensure sections don't clip the animation */
 section {
     overflow: visible !important;
     position: relative;
+}
+
+/* Add more space between sections to show building backdrop */
+.section-padding {
+    padding: 20vh 0;
 }
 
 /* Glass Panel Styling */
