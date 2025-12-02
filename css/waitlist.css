@@ -1,0 +1,289 @@
+/* ======================
+   WAITLIST SECTION
+   ====================== */
+
+/* Base Section - Matching Availability/Neighborhood */
+#waitlist {
+  padding-top: 60px;
+  /* Inherit background from page */
+}
+
+
+
+/* Typography - Matching Other Sections */
+#waitlist .section-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4vw, 3.75rem);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--eleanor-charcoal);
+  margin-bottom: 1.5rem;
+}
+
+#waitlist .section-subtitle {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 10px;
+}
+
+#waitlist .waitlist-intro {
+  max-width: 760px;
+  margin: 0 auto 2.5rem;
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: rgba(0, 0, 0, 0.58);
+}
+
+/* Form Container - Matching Availability Card Style */
+#waitlist .apply-form {
+  background: rgba(255, 255, 255, 0.60);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+/* Form Labels - Matching Typography */
+#waitlist .form1 label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.70rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 8px;
+}
+
+#waitlist .form1 label span {
+  color: var(--eleanor-pink, #f6d2d6);
+  letter-spacing: normal;
+  margin-left: 4px;
+}
+
+/* Form Inputs - Matching Availability Style */
+#waitlist .form1 .form-control,
+#waitlist .form1 input[type="text"],
+#waitlist .form1 input[type="email"],
+#waitlist .form1 input[type="tel"],
+#waitlist .form1 input[type="date"],
+#waitlist .form1 textarea {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.50);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: var(--eleanor-charcoal);
+  backdrop-filter: blur(6px);
+  transition: all 0.2s ease;
+}
+
+#waitlist .form1 textarea {
+  border-radius: 16px;
+  min-height: 120px;
+  resize: vertical;
+}
+
+#waitlist .form1 .form-control:hover,
+#waitlist .form1 input:hover,
+#waitlist .form1 textarea:hover {
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+#waitlist .form1 .form-control:focus,
+#waitlist .form1 input:focus,
+#waitlist .form1 textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* Custom Dropdown - Matching Filter Style */
+#waitlist .custom-dropdown-wrapper {
+  position: relative;
+}
+
+#waitlist .custom-dropdown {
+  position: relative;
+  cursor: pointer;
+}
+
+#waitlist .custom-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.50);
+  min-height: 44px;
+  backdrop-filter: blur(6px);
+  transition: all 0.2s ease;
+}
+
+#waitlist .custom-dropdown-trigger:hover {
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+#waitlist .dropdown-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: var(--eleanor-charcoal);
+}
+
+#waitlist .dropdown-arrow {
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+#waitlist .dropdown-arrow svg path {
+  stroke: var(--eleanor-charcoal);
+}
+
+#waitlist .custom-dropdown.active .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+#waitlist .custom-dropdown-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+  max-height: 220px;
+  overflow-y: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+  z-index: 30;
+  backdrop-filter: blur(10px);
+}
+
+#waitlist .custom-dropdown.active .custom-dropdown-options {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+#waitlist .dropdown-option {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: var(--eleanor-charcoal);
+  transition: background 0.2s ease;
+}
+
+#waitlist .dropdown-option:last-child {
+  border-bottom: none;
+}
+
+#waitlist .dropdown-option:first-child {
+  border-radius: 16px 16px 0 0;
+}
+
+#waitlist .dropdown-option:last-child {
+  border-radius: 0 0 16px 16px;
+}
+
+#waitlist .dropdown-option:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Submit Button - Matching Primary Button Style */
+.btn-form1-submit {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: var(--eleanor-charcoal);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.btn-form1-submit:hover {
+  background: #151515;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+/* Thank You Message */
+#waitlistThankYou {
+  display: none;
+  padding: 48px;
+  text-align: center;
+}
+
+.waitlist-thankyou {
+  background: rgba(255, 255, 255, 0.60);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.waitlist-thankyou h4 {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--eleanor-charcoal);
+  margin-bottom: 16px;
+}
+
+.waitlist-thankyou i {
+  color: var(--eleanor-green, #c9d7d0);
+  margin-right: 10px;
+  font-size: 1.2rem;
+}
+
+.waitlist-thankyou p {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: var(--font-body-size);
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.75);
+  margin-bottom: 10px;
+}
+
+/* Row and Column Spacing */
+#waitlist .row.g-4 {
+  margin-bottom: 20px;
+}
+
+#waitlist .row.g-4:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Responsive styles moved to main styles.css */

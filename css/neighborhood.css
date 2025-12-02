@@ -1,243 +1,413 @@
-/* Neighborhood Section Styles */
+/* ======================
+   NEIGHBORHOOD SECTION
+   ====================== */
 
-/* Override section title and subtitle for neighborhood */
-.neighborhood-tabs .section-subtitle {
-    color: #b95c47 !important;
-    font-size: 24px !important;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700 !important;
-    text-transform: uppercase;
-    position: relative;
-    letter-spacing: 5px;
-    margin-bottom: 15px !important;
+/* Base Section - Matching Availability */
+#neighborhood {
+  padding-top: 0; /* let the bridge image kiss the glass container */
+  margin-top: -20px;
+  /* Inherit background from page */
 }
 
-.neighborhood-tabs .section-title {
-    font-size: 45px;
-    font-family: 'Rustico', serif;
-    font-weight: 400;
-    color: #593630;
-    position: relative;
-    margin-bottom: 20px;
+
+
+/* Typography - Matching Availability */
+#neighborhood .section-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4vw, 3.75rem);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--eleanor-charcoal);
+  margin-bottom: 1.5rem;
+  white-space: nowrap;
 }
 
-/* Tabs */
-.neighborhood-tabs .tab-navigation {
-    display: flex;
-    flex-wrap: wrap;
-    margin-bottom: 0;
-    border-bottom: 3px solid #e9ecef;
-    background: white;
-    border-radius: 8px 8px 0 0;
-    overflow: hidden;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+#neighborhood .section-subtitle {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 10px;
 }
 
-.neighborhood-tabs .tab-btn {
-    padding: 18px 30px;
-    cursor: pointer;
-    background: #593630;
-    border: none;
-    font-weight: 600;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
-    color: white;
-    border-bottom: 3px solid transparent;
-    flex: 1;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+.neighborhood-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
 }
 
-.neighborhood-tabs .tab-btn:hover {
-    background: #f8f9fa;
-    color: #593630;
+.neighborhood-header {
+  max-width: 760px;
+  margin: 0 auto 24px;
+  text-align: center;
 }
 
-.neighborhood-tabs .tab-btn.active {
-    background: white;
-    color: #593630;
-    border-bottom-color: #b95c47;
+.neighborhood-intro {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: rgba(0, 0, 0, 0.58);
+  max-width: 680px;
+  margin: 0 auto;
 }
 
-/* Tab Content */
-.neighborhood-tabs .tab-content {
-    display: none;
-    padding: 40px;
-    background: white;
-    border-radius: 0 0 8px 8px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-    margin-bottom: 40px;
+/* Tab Navigation - Matching Availability Filter Style */
+.tab-navigation {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.60);
+  margin-bottom: 32px;
 }
 
-.neighborhood-tabs .tab-content.active {
-    display: block;
-    animation: fadeInUp 0.6s ease;
+.tab-btn {
+  padding: 14px 20px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.70rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
 
-.neighborhood-tabs .tab-content h2 {
-    font-family: 'Rustico', serif;
-    font-size: 2.5rem;
-    color: #593630;
-    margin-bottom: 20px;
-    text-align: center;
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.75);
 }
 
-.neighborhood-tabs .tab-content h3 {
-    font-family: 'Rustico', serif;
-    color: #b95c47;
-    font-size: 1.5rem;
-    margin-bottom: 15px;
+.tab-btn.active {
+  background: var(--eleanor-charcoal);
+  color: #fff;
 }
 
-.neighborhood-tabs .tab-content p {
-    font-size: 1.1rem;
-    line-height: 1.7;
-    margin-bottom: 20px;
-    color: #555;
+/* Tab Content - Matching Availability Card Style */
+.tab-content {
+  display: none;
+  border-radius: 16px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.60);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-@keyframes fadeInUp {
-    from { 
-        opacity: 0; 
-        transform: translateY(20px);
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0);
-    }
+.tab-content.active {
+  display: block;
+  animation: neighborhoodFadeUp 0.5s ease;
 }
 
-/* Location Cards */
-.neighborhood-tabs .location-card {
-    display: flex;
-    margin-bottom: 25px;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-    background: white;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+@keyframes neighborhoodFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.neighborhood-tabs .location-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+/* Content Typography - Matching Availability */
+.tab-content h3 {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 1rem;
 }
 
-.neighborhood-tabs .card-image {
-    flex: 0 0 150px;
-    background-size: cover;
-    background-position: center;
-    position: relative;
+.tab-content h4 {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  color: var(--eleanor-charcoal);
+  margin-bottom: 0.75rem;
 }
 
-.neighborhood-tabs .card-image::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(45deg, rgba(89, 54, 48, 0.2), rgba(185, 92, 71, 0.2));
+.tab-content p {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: var(--font-body-size);
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.75);
+  margin-bottom: 1.25rem;
 }
 
-.neighborhood-tabs .card-details {
-    padding: 25px;
-    flex: 1;
+/* Living Grid */
+.living-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 32px;
 }
 
-.neighborhood-tabs .card-details h3 {
-    color: #b95c47;
-    margin-bottom: 12px;
-    font-size: 1.4rem;
+/* Cards - Glass Card Style from Availability */
+.living-benefits-card,
+.why-card {
+  background: rgba(255, 255, 255, 0.50);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  padding: 24px;
+  backdrop-filter: blur(6px);
 }
 
-.neighborhood-tabs .card-details p {
-    margin-bottom: 12px;
-    color: #666;
-    line-height: 1.6;
+.living-benefits-card {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-.neighborhood-tabs .distance-info {
-    color: #999;
-    font-style: italic;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.benefit-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: var(--font-body-size);
+  color: rgba(0, 0, 0, 0.75);
 }
 
-/* Map Container */
-.neighborhood-tabs .map-section {
-    height: 450px;
-    border-radius: 12px;
-    overflow: hidden;
-    margin: 40px 0;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+.benefit-item i {
+  color: var(--eleanor-pink, #f6d2d6);
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.why-card h4 {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 1rem;
+}
+
+.why-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.why-list i {
+  color: var(--eleanor-green, #c9d7d0);
+  margin-right: 10px;
+}
+
+.why-list p {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: var(--font-body-size);
+  color: rgba(0, 0, 0, 0.75);
+}
+
+/* Map Section */
+.map-section {
+  height: 420px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 32px;
+}
+
+.map-section iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* Transit Lines */
-.neighborhood-tabs .transit-lines {
-    margin-bottom: 15px;
+.transit-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.neighborhood-tabs .transit-item {
-    background: rgba(89, 54, 48, 0.08);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    padding: 12px 15px;
-    transition: background 0.3s ease;
+.transit-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.50);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(6px);
+  flex-wrap: wrap;
 }
 
-.neighborhood-tabs .transit-item:hover {
-    background: rgba(89, 54, 48, 0.15);
+.transit-line {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--eleanor-charcoal);
 }
 
-.neighborhood-tabs .transit-item div {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+.transit-distance {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.55);
 }
 
-.neighborhood-tabs .transit-item span:not(.subway-icon) {
-    color: #666;
+.transit-note {
+  margin-top: 12px;
+  font-style: italic;
+  color: var(--eleanor-pink, #f6d2d6);
+  font-size: 0.9rem;
 }
 
-.neighborhood-tabs .transit-note {
-    color: #b95c47;
-    text-align: center;
-    font-style: italic;
-    margin-top: 15px;
+/* Subway Icons */
+.subway-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #fff;
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .neighborhood-tabs .location-card {
-        flex-direction: column;
-    }
-    
-    .neighborhood-tabs .card-image {
-        height: 180px;
-        flex: 0 0 auto;
-    }
-    
-    .neighborhood-tabs .tab-navigation {
-        flex-direction: column;
-    }
-    
-    .neighborhood-tabs .tab-btn {
-        width: 100%;
-        border-radius: 0;
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .neighborhood-tabs .tab-content {
-        padding: 25px 20px;
-    }
+/* Number lines */
+.subway-1 { background: #ee352e; color: #fff; }
+.subway-2 { background: #ee352e; color: #fff; }
+.subway-3 { background: #ee352e; color: #fff; }
+.subway-4 { background: #00933c; color: #fff; }
+.subway-5 { background: #00933c; color: #fff; }
+.subway-6 { background: #00933c; color: #fff; }
+.subway-7 { background: #b933ad; color: #fff; }
+
+/* Letter lines */
+.subway-a { background: #0039a6; color: #fff; }
+.subway-c { background: #0039a6; color: #fff; }
+.subway-e { background: #0039a6; color: #fff; }
+.subway-b { background: #ff6319; color: #fff; }
+.subway-d { background: #ff6319; color: #fff; }
+.subway-f { background: #ff6319; color: #fff; }
+.subway-m { background: #ff6319; color: #fff; }
+.subway-g { background: #6cbe45; color: #fff; }
+.subway-j { background: #996633; color: #fff; }
+.subway-z { background: #996633; color: #fff; }
+.subway-l { background: #a7a9ac; color: #fff; }
+.subway-n { background: #fccc0a; color: #000; }
+.subway-q { background: #fccc0a; color: #000; }
+.subway-r { background: #fccc0a; color: #000; }
+.subway-w { background: #fccc0a; color: #000; }
+.subway-s { background: #808183; color: #fff; }
+
+/* Location Cards */
+.location-card {
+  display: flex;
+  gap: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.60);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-@media (max-width: 480px) {
-    .neighborhood-tabs .tab-content h2 {
-        font-size: 2rem;
-    }
-} 
+.card-image {
+  flex: 0 0 200px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.card-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.15));
+}
+
+.card-details {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-details h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--eleanor-charcoal);
+}
+
+.distance-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.55);
+  font-style: italic;
+}
+
+.distance-info i {
+  color: var(--eleanor-green, #c9d7d0);
+}
+
+/* Park Grid */
+.park-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.park-card {
+  position: relative;
+  border-radius: 16px;
+  min-height: 320px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.park-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.65) 100%);
+}
+
+.park-content {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 24px;
+  color: #fff;
+  z-index: 1;
+}
+
+.park-content h4 {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.park-content p {
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: var(--font-body-size);
+  line-height: 1.5;
+}
+
+/* Responsive styles moved to main styles.css */
