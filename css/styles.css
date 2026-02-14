@@ -2037,3 +2037,63 @@ body.nav-open {
     font-size: 1.45rem;
   }
 }
+
+/* ======================
+   MICRO-FOOTER
+   ====================== */
+.micro-footer {
+  /* Glass Card Styles */
+  background: var(--glass-bg);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+
+  /* Floating Layout */
+  width: 100%;
+  max-width: 1200px;
+  margin: 60px auto;
+  padding: 24px 40px;
+  
+  /* Typography & Color */
+  color: var(--eleanor-charcoal); /* Dark text for light background */
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  
+  position: relative;
+  z-index: 10;
+  scroll-snap-align: start; /* Fixes unnatural bottom snap */
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-logo {
+  height: 24px;
+  width: auto;
+  /* filter: brightness(0) invert(1); REMOVED: Logo should be dark on light glass */
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.footer-logo:hover {
+  opacity: 1;
+}
+
+/* Mobile Stacking */
+@media (max-width: 768px) {
+  .footer-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 24px;
+  }
+}

@@ -1060,6 +1060,15 @@ endif;
       </div>
   </section>
 
+  <footer class="micro-footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-address">The Eleanor | 52 4th Avenue, Brooklyn, NY</div>
+        <img src="/img/doorway-logo.png" alt="Doorway Logo" class="footer-logo">
+      </div>
+    </div>
+  </footer>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/cferdinandi/smooth-scroll/dist/smooth-scroll.polyfills.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
