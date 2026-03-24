@@ -123,12 +123,17 @@ function linkedinScraperRequest($linkedinUrl) {
 
 function deepEnrichment($email, $firstName, $lastName, $phone = null) {
     error_log("Triggering Scraper-Assisted Deep Enrichment for: $email ($firstName $lastName)");
-    
-    $likelyCountry = getLikelyCountry($phone);
+
+    // Extract company from email domain for better search
+    $emailDomain = strtolower(substr($email, strpos($email, '@') + 1));
+    $personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'live.com', 'msn.com', 'protonmail.com', 'mail.com'];
+    $isCorpEmail = !in_array($emailDomain, $personalDomains);
+    $companyHint = $isCorpEmail ? str_replace(['.com', '.org', '.net', '.io', '.co'], '', $emailDomain) : '';
+
     $likelyState = getLikelyState($phone);
-    
-    // 1. Find LinkedIn URL via Tavily (with location-aware selection)
-    $query = "\"$firstName $lastName\" $likelyState LinkedIn";
+
+    // 1. Find LinkedIn URL via Tavily (using company domain for accuracy)
+    $query = "\"$firstName $lastName\" " . ($companyHint ? "$companyHint " : "") . "LinkedIn";
     $resLinkedIn = tavilyRequest($query, [
         'include_domains' => ['linkedin.com/in'],
         'search_depth' => 'advanced',
@@ -138,28 +143,32 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
     $linkedinUrl = null;
     $results = $resLinkedIn['data']['results'] ?? [];
     
-    // Selection Strategy: Pick the first LinkedIn URL that mentions the state/city in its snippet
+    // Selection Strategy: Prefer LinkedIn profiles that mention the company/domain
     foreach ($results as $item) {
         if (strpos($item['url'], 'linkedin.com/in/') !== false) {
-            $snippet = strtolower($item['content'] ?? '');
-            $locationMatch = false;
-            if ($likelyState && strpos($snippet, strtolower($likelyState)) !== false) $locationMatch = true;
-            if ($likelyState === 'New York' && strpos($snippet, 'nyc') !== false) $locationMatch = true;
-            
-            if ($locationMatch) {
+            $snippet = strtolower($item['content'] ?? '' . ' ' . ($item['title'] ?? ''));
+            $companyMatch = false;
+
+            // Check for company name from email domain
+            if ($companyHint && strpos($snippet, strtolower($companyHint)) !== false) $companyMatch = true;
+            // Also check location as secondary signal
+            if ($likelyState && strpos($snippet, strtolower($likelyState)) !== false) $companyMatch = true;
+            if ($likelyState === 'New York' && strpos($snippet, 'nyc') !== false) $companyMatch = true;
+
+            if ($companyMatch) {
                 $linkedinUrl = $item['url'];
-                error_log("Found location-matching LinkedIn URL: $linkedinUrl");
+                error_log("Found company/location-matching LinkedIn URL: $linkedinUrl");
                 break;
             }
         }
     }
 
-    // Fallback: If no location match found, use the very first LinkedIn result but with caution
+    // Fallback: use the first LinkedIn result
     if (!$linkedinUrl && !empty($results)) {
         foreach ($results as $item) {
             if (strpos($item['url'], 'linkedin.com/in/') !== false) {
                 $linkedinUrl = $item['url'];
-                error_log("No exact location match in snippets. Falling back to first LinkedIn URL: $linkedinUrl");
+                error_log("No company match in snippets. Falling back to first LinkedIn URL: $linkedinUrl");
                 break;
             }
         }
@@ -185,19 +194,22 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
     $profileJson = json_encode($profileData, JSON_PRETTY_PRINT);
 
     // 3. Normalize and Verify via Anthropic
-    $prompt = "You are a professional background investigator. 
+    $domainNote = $isCorpEmail ? "The target uses a corporate email at domain '$emailDomain'. The matched profile MUST work at a company associated with this domain." : "The target uses a personal email, so company verification is not possible via domain.";
+
+    $prompt = "You are a professional background investigator.
     TARGET IDENTITY:
     Name: $firstName $lastName
     Email: $email
-    Required State: $likelyState
+    Email Domain: $emailDomain
 
     SCRAPED LINKEDIN PROFILE:
     $profileJson
 
     STRICT VERIFICATION PROTOCOL:
-    - LOCATION IS A FATAL DISQUALIFIER: If the profile is located in a different state (e.g., Missouri vs New York), it is NOT the same person. You MUST set identity_confidence to 0 and return null values for job/company.
+    - DOMAIN IS A KEY VERIFIER: $domainNote If the profile's company domain does not match '$emailDomain', reduce confidence significantly.
     - EMAIL MATCH: If the email $email is mentioned in the profile, that is 100% confidence.
-    - REASONING: Be honest. If the location mismatches, state 'Location mismatch: Target is in $likelyState but profile is in ' . [Profile Location] . '. Rejected.'
+    - NAME MATCH: Verify the name matches. Common names require additional signals (company, email) to confirm.
+    - REASONING: Be honest. If the company domain mismatches, state 'Domain mismatch: Target email is @$emailDomain but profile works at [Company Domain]. Rejected.'
 
     OUTPUT JSON:
     {
@@ -262,8 +274,10 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
         return ['status' => 'already_enriched'];
     }
 
-    $likelyCountry = getLikelyCountry($phone);
-    $likelyState = getLikelyState($phone);
+    // Extract email domain for verification (ignore common personal email providers)
+    $emailDomain = strtolower(substr($email, strpos($email, '@') + 1));
+    $personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'live.com', 'msn.com', 'protonmail.com', 'mail.com'];
+    $isCorpEmail = !in_array($emailDomain, $personalDomains);
 
     // 2. Try Standard Match with Webhook
     $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
@@ -281,52 +295,62 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
     $person = $matchRes['data']['person'] ?? null;
     $finalResponseRaw = $matchRes['raw'];
 
-    // 3. Disambiguation & Fallback Strategy (Location-Aware)
+    // 3. Disambiguation — verify Apollo match against email domain
     $isSuspicious = false;
-    if ($person) {
-        $personCountry = $person['country'] ?? '';
-        $personState = $person['state'] ?? '';
-        
-        // Handle ISO codes (US, NZ, etc.) vs Names
-        if ($likelyCountry === 'United States' && !in_array($personCountry, ['United States', 'US', 'USA'])) {
-            $isSuspicious = true;
-        }
-        
-        // State hint check (very strong for namesakes)
-        if ($likelyState && !empty($personState) && strpos(strtolower($personState), strtolower($likelyState)) === false) {
-             // If we have a state hint and it doesn't match, it's highly suspicious for namesakes
-             $isSuspicious = true;
+    if ($person && $isCorpEmail) {
+        $personDomain = strtolower($person['organization']['primary_domain'] ?? '');
+        $personEmail = strtolower($person['email'] ?? '');
+
+        // If lead used a corporate email, the matched person's company domain should match
+        if ($personDomain && $personDomain !== $emailDomain) {
+            // Also check if the person's email domain matches (they might have multiple domains)
+            $personEmailDomain = $personEmail ? strtolower(substr($personEmail, strpos($personEmail, '@') + 1)) : '';
+            if ($personEmailDomain !== $emailDomain) {
+                $isSuspicious = true;
+                error_log("Domain mismatch: Lead email domain '$emailDomain' != Apollo company domain '$personDomain'. Flagging as suspicious.");
+            }
         }
     }
 
     if (!$person || $isSuspicious) {
         if ($isSuspicious) {
-            error_log("Apollo Collision Detected: Identity match found in '" . ($person['city'] ?? '') . ", " . ($person['country'] ?? '') . "', but target is likely in '$likelyState, $likelyCountry'. Triggering fallbacks.");
+            error_log("Apollo Collision Detected: Matched person's domain doesn't match lead email domain '$emailDomain'. Triggering fallbacks.");
         } else {
             error_log("Apollo No Match Found: Triggering search fallback.");
         }
-        
-        // Try Apollo Search as middle step
-        $searchPayload = ['q_person_name' => trim("$firstName $lastName"), 'page' => 1, 'per_page' => 1];
-        if ($likelyCountry) $searchPayload['person_locations'] = [$likelyCountry];
+
+        // Try Apollo Search — use email domain as company filter for corp emails
+        $searchPayload = ['q_person_name' => trim("$firstName $lastName"), 'page' => 1, 'per_page' => 5];
+        if ($isCorpEmail) {
+            $searchPayload['q_organization_domains'] = $emailDomain;
+        }
         $searchRes = apolloRequest("https://api.apollo.io/api/v1/mixed_people/api_search", $searchPayload);
-        
-        $searchPerson = $searchRes['data']['people'][0] ?? null;
-        if ($searchPerson) {
-            $hydratePayload = ['person_ids' => [$searchPerson['id']], 'reveal_personal_emails' => true, 'webhook_url' => APOLLO_WEBHOOK_URL];
+
+        $searchPeople = $searchRes['data']['people'] ?? [];
+        $bestMatch = null;
+
+        // Find the best match: prioritize email match, then domain match
+        foreach ($searchPeople as $candidate) {
+            if (strtolower($candidate['email'] ?? '') === strtolower($email)) {
+                $bestMatch = $candidate;
+                break;
+            }
+            $candidateDomain = strtolower($candidate['organization']['primary_domain'] ?? '');
+            if ($isCorpEmail && $candidateDomain === $emailDomain && !$bestMatch) {
+                $bestMatch = $candidate;
+            }
+        }
+
+        if ($bestMatch) {
+            $hydratePayload = ['person_ids' => [$bestMatch['id']], 'reveal_personal_emails' => true, 'webhook_url' => APOLLO_WEBHOOK_URL];
             $hydrateRes = apolloRequest("https://api.apollo.io/api/v1/people/bulk_match", $hydratePayload);
             $hydratedPerson = $hydrateRes['data']['people'][0] ?? null;
-            
-            if ($hydratedPerson && ($hydratedPerson['email'] ?? '') === $email) {
-                // If search found someone with the same email, check their location too
-                $hCity = $hydratedPerson['city'] ?? '';
-                if ($likelyState && strpos(strtolower($hCity), strtolower($likelyState)) === false && strpos(strtolower($hydratedPerson['state'] ?? ''), strtolower($likelyState)) === false) {
-                    error_log("Apollo Search also returned a location mismatch. Rejecting Apollo completely.");
-                } else {
-                    $person = $hydratedPerson;
-                    $isSuspicious = false; // We found a better match
-                    $finalResponseRaw = json_encode(['person' => $person]); 
-                }
+
+            if ($hydratedPerson) {
+                $person = $hydratedPerson;
+                $isSuspicious = false;
+                $finalResponseRaw = json_encode(['person' => $person]);
+                error_log("Apollo Search found verified match for $email via domain '$emailDomain'.");
             }
         }
     }
