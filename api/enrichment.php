@@ -405,29 +405,17 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
 
         if ($liRes['code'] === 200 && !empty($liRes['data']['data'])) {
             $li = $liRes['data']['data'];
-            error_log("LinkedIn Scraper: Got profile for " . ($li['full_name'] ?? 'unknown'));
+            error_log("LinkedIn Scraper: Got fresh profile for " . ($li['full_name'] ?? 'unknown'));
 
-            // Fill in any gaps with fresh LinkedIn data
-            if (empty($person['title']) && !empty($li['headline'])) {
-                $person['title'] = $li['headline'];
-            }
-            if (empty($person['headline']) && !empty($li['headline'])) {
-                $person['headline'] = $li['headline'];
-            }
-            if (empty($person['photo_url']) && !empty($li['profile_photo'])) {
-                $person['photo_url'] = $li['profile_photo'];
-            }
-            if (empty($person['city']) && !empty($li['city'])) {
-                $person['city'] = $li['city'];
-            }
-            if (empty($person['state']) && !empty($li['state'])) {
-                $person['state'] = $li['state'];
-            }
-            if (empty($person['country']) && !empty($li['country'])) {
-                $person['country'] = $li['country'];
-            }
+            // LinkedIn is the source of truth — overwrite with fresh data
+            if (!empty($li['headline'])) $person['headline'] = $li['headline'];
+            if (!empty($li['profile_photo'])) $person['photo_url'] = $li['profile_photo'];
+            if (!empty($li['city'])) $person['city'] = $li['city'];
+            if (!empty($li['state'])) $person['state'] = $li['state'];
+            if (!empty($li['country'])) $person['country'] = $li['country'];
+            if (!empty($li['full_name'])) $person['name'] = $li['full_name'];
 
-            // Get current company from experience
+            // Get current job from experience — this is the most up-to-date
             $currentJob = null;
             foreach (($li['experiences'] ?? []) as $exp) {
                 if (!empty($exp['is_current'])) {
@@ -436,11 +424,8 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
                 }
             }
             if ($currentJob) {
-                if (empty($person['title'])) {
-                    $person['title'] = $currentJob['title'] ?? null;
-                }
-                $orgName = $person['organization']['name'] ?? null;
-                if (empty($orgName) && !empty($currentJob['company'])) {
+                if (!empty($currentJob['title'])) $person['title'] = $currentJob['title'];
+                if (!empty($currentJob['company'])) {
                     $person['organization']['name'] = $currentJob['company'];
                 }
             }
