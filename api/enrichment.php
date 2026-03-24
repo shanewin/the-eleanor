@@ -317,12 +317,45 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
     $person = null;
     $finalResponseRaw = null;
 
-    // 2. FullContact — send email + phone + name for best match
+    // 2. FullContact — send email + phone + name to identify the person
     error_log("FullContact: Enriching $email ($firstName $lastName, $phone)");
     $fcRes = fullContactRequest($email, $phone, $firstName, $lastName);
+    $fc = ($fcRes['code'] === 200) ? $fcRes['data'] : null;
 
-    if ($fcRes['code'] === 200 && !empty($fcRes['data']['fullName'])) {
-        $fc = $fcRes['data'];
+    // 3. Extract work email from FullContact to use with Apollo
+    $workEmail = null;
+    if ($fc && !empty($fc['details']['emails'])) {
+        foreach ($fc['details']['emails'] as $fcEmail) {
+            $fcEmailVal = strtolower($fcEmail['value'] ?? '');
+            // Skip if it's the same email they submitted
+            if ($fcEmailVal && $fcEmailVal !== strtolower($email)) {
+                $workEmail = $fcEmailVal;
+                error_log("FullContact: Found additional email: $workEmail");
+                break;
+            }
+        }
+    }
+
+    // 4. Try Apollo — first with work email from FullContact, then with submitted email
+    $emailsToTry = array_filter([$workEmail, $email]);
+    foreach ($emailsToTry as $tryEmail) {
+        error_log("Apollo: Trying match with email=$tryEmail");
+        $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
+            'email' => $tryEmail,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'reveal_personal_emails' => true
+        ]);
+        $person = $matchRes['data']['person'] ?? null;
+        if ($person) {
+            $finalResponseRaw = $matchRes['raw'];
+            error_log("Apollo: Found match via $tryEmail");
+            break;
+        }
+    }
+
+    // 5. If Apollo found nothing but FullContact had data, use FullContact data
+    if (!$person && $fc && !empty($fc['fullName'])) {
         $person = [
             'name' => $fc['fullName'] ?? "$firstName $lastName",
             'title' => $fc['title'] ?? null,
@@ -344,7 +377,6 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
                 'logo_url' => null
             ]
         ];
-        // Parse location string like "Denver, CO, United States"
         if (!empty($fc['location'])) {
             $parts = array_map('trim', explode(',', $fc['location']));
             if (count($parts) >= 3) {
@@ -357,27 +389,67 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
             }
         }
         $finalResponseRaw = json_encode(['source' => 'fullcontact', 'data' => $fc]);
-        error_log("FullContact: Found " . $person['name'] . " at " . ($person['organization']['name'] ?? 'N/A'));
-    }
-
-    // 3. If FullContact didn't find anything, try Apollo
-    if (!$person) {
-        error_log("FullContact: No match. Trying Apollo for $email");
-        $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
-            'email' => $email,
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'phone_number' => $phone,
-            'reveal_personal_emails' => true,
-            'reveal_phone_number' => true
-        ]);
-        $person = $matchRes['data']['person'] ?? null;
-        $finalResponseRaw = $matchRes['raw'];
+        error_log("Using FullContact data for " . $person['name']);
     }
 
     if (!$person) {
         error_log("Enrichment: No match found for $email ($firstName $lastName)");
         return ['status' => 'no_match'];
+    }
+
+    // 6. If we have a LinkedIn URL, scrape fresh data to fill gaps
+    $linkedinUrl = $person['linkedin_url'] ?? null;
+    if ($linkedinUrl) {
+        error_log("LinkedIn Scraper: Fetching fresh data from $linkedinUrl");
+        $liRes = linkedinScraperRequest($linkedinUrl);
+
+        if ($liRes['code'] === 200 && !empty($liRes['data']['data'])) {
+            $li = $liRes['data']['data'];
+            error_log("LinkedIn Scraper: Got profile for " . ($li['full_name'] ?? 'unknown'));
+
+            // Fill in any gaps with fresh LinkedIn data
+            if (empty($person['title']) && !empty($li['headline'])) {
+                $person['title'] = $li['headline'];
+            }
+            if (empty($person['headline']) && !empty($li['headline'])) {
+                $person['headline'] = $li['headline'];
+            }
+            if (empty($person['photo_url']) && !empty($li['profile_photo'])) {
+                $person['photo_url'] = $li['profile_photo'];
+            }
+            if (empty($person['city']) && !empty($li['city'])) {
+                $person['city'] = $li['city'];
+            }
+            if (empty($person['state']) && !empty($li['state'])) {
+                $person['state'] = $li['state'];
+            }
+            if (empty($person['country']) && !empty($li['country'])) {
+                $person['country'] = $li['country'];
+            }
+
+            // Get current company from experience
+            $currentJob = null;
+            foreach (($li['experiences'] ?? []) as $exp) {
+                if (!empty($exp['is_current'])) {
+                    $currentJob = $exp;
+                    break;
+                }
+            }
+            if ($currentJob) {
+                if (empty($person['title'])) {
+                    $person['title'] = $currentJob['title'] ?? null;
+                }
+                $orgName = $person['organization']['name'] ?? null;
+                if (empty($orgName) && !empty($currentJob['company'])) {
+                    $person['organization']['name'] = $currentJob['company'];
+                }
+            }
+
+            // Append LinkedIn data to raw response
+            $existingRaw = json_decode($finalResponseRaw, true) ?? [];
+            $existingRaw['linkedin_scraper'] = $li;
+            $finalResponseRaw = json_encode($existingRaw);
+        }
     }
 
     // 4. Store the Enriched Data
