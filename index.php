@@ -487,11 +487,6 @@ endif;
       </div>
     </section>
 
-    <div class="section-bridge section-bridge--rooftop">
-      <div class="section-bridge__image">
-        <img src="img/bridge-rooftop.jpg" alt="The Eleanor Rooftop Terrace">
-      </div>
-    </div>
 
     <section id="availability" class="section-padding full-section">
       <div class="container">
@@ -642,11 +637,6 @@ endif;
       </div>
       </div>
     </section>
-    <div class="section-bridge">
-      <div class="section-bridge__image">
-        <img src="img/slider-pics/design_to_flow.jpg" alt="Textured architectural detail at The Eleanor">
-      </div>
-    </div>
   </main>
 
 
@@ -1046,12 +1036,6 @@ endif;
     </div>
     </div>
   </section>
-
-  <div class="section-bridge">
-    <div class="section-bridge__image">
-      <img src="img/bridge-living.jpeg" alt="The Eleanor Living Space">
-    </div>
-  </div>
 
   <section id="waitlist" class="section-padding full-section">
         <div class="container">
