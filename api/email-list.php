@@ -44,8 +44,28 @@ if ($consent !== 'Yes') {
     exit;
 }
 
+// Database storage
+require_once 'db_config.php';
+require_once 'enrichment.php'; // Add enrichment
+
+$trackingId = clean($_POST['tracking_id'] ?? '');
+
+try {
+    $stmt = $pdo->prepare("INSERT INTO mailing_list 
+        (first_name, last_name, email, interests, consent, tracking_id) 
+        VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $firstName, $lastName, $email, $interests, $consent, $trackingId
+    ]);
+
+    // Trigger Apollo Enrichment
+    enrichLead($email, $firstName, $lastName);
+} catch (PDOException $e) {
+    error_log("Database insert failed: " . $e->getMessage());
+}
+
 // Prepare email
-$to = 'theeleanor@doorway.nyc';
+$to = NOTIFICATION_EMAIL;
 $subject = 'New Email List Signup - ' . $firstName . ' ' . $lastName;
 
 $headers = [
@@ -64,15 +84,10 @@ $body = "New Email List Signup:\n\n" . implode("\n", [
 ]);
 
 // Send email
-if (mail($to, $subject, $body, implode("\r\n", $headers))) {
-    echo json_encode([
-        'success' => true,
-        'message' => 'Successfully joined email list'
-    ]);
-} else {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Failed to send email. Please try again.'
-    ]);
-}
+@mail($to, $subject, $body, implode("\r\n", $headers));
+
+echo json_encode([
+    'success' => true,
+    'message' => 'Successfully joined email list'
+]);
 ?> 

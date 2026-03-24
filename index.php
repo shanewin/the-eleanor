@@ -1,6 +1,12 @@
 <?php
 session_start();
 
+// Initialize CSRF Token for forms
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
+
 $previewPassword = 'glasskey';
 $errorMessage = '';
 
@@ -555,7 +561,7 @@ endif;
           <h4>Description</h4>
           <ul id="unitDescription"></ul>
           <form id="unitInterestForm" action="api/unit-interest.php" method="POST">
-            <input type="hidden" name="csrf_token" class="csrf_token" value="">
+            <input type="hidden" name="csrf_token" class="csrf_token" value="<?php echo $csrfToken; ?>">
             <input type="hidden" id="unitInput" name="unit" />
             <h4>Interested?</h4>
             <div class="row">
@@ -588,13 +594,18 @@ endif;
             </div>
             <button type="submit" class="btn btn-primary w-100">Submit Interest</button>
           </form>
-          <div id="unitThankYou" style="display: none;" class="text-center">
-            <div class="alert alert-success">
-              <h4><i class="fas fa-check-circle"></i> Thank You!</h4>
-              <p>Your interest in <span id="unitThankYouName">this unit</span> has been submitted successfully.</p>
-              <p>We'll be in touch within 24 hours to discuss availability and next steps.</p>
+          <div id="unitThankYou" style="display: none;" class="thankyou-section text-center">
+            <div class="thankyou-icon">
+              <i class="fas fa-check"></i>
             </div>
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <h3 class="thankyou-title">Inquiry Received</h3>
+            <div class="thankyou-body">
+              <p>Your interest in <strong><span id="unitThankYouName">this unit</span></strong> has been successfully submitted.</p>
+              <p>Our leasing team will review your details and reach out within 24 hours to schedule a viewing or discuss next steps.</p>
+            </div>
+            <div class="thankyou-footer">
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
           </div>
         </div>
       </div>
@@ -948,7 +959,7 @@ endif;
           <div>
               <div class="apply-form">
                 <form id="waitlistForm" action="api/form-handler.php" method="POST" class="form1 clearfix">
-                  <input type="hidden" name="csrf_token" id="csrf_token" value="">
+                  <input type="hidden" name="csrf_token" id="csrf_token" value="<?php echo $csrfToken; ?>">
                   <input type="hidden" id="unit" name="unit">
 
                   <div class="row g-4">
@@ -1078,5 +1089,6 @@ endif;
   <script src="js/main.js"></script>
   <script src="js/section-scroller.js"></script>
   <script src="js/slider.js"></script>
+  <script src="js/tracking.js"></script>
 </body>
 </html>

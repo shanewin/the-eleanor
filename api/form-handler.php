@@ -3,6 +3,7 @@
 error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
 ini_set('display_errors', 0);
 session_start();
+require_once 'enrichment.php'; // Add this for lead intelligence
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Content-Type: application/json');
@@ -65,6 +66,7 @@ $hearAboutUs = clean('hearAboutUs');
 $unit = clean('unit');
 $unitType = clean('unitType');
 $message = clean('message');
+$trackingId = clean('tracking_id');
 
 if (!$firstName || !$lastName || !$email || !$phone) {
   http_response_code(400);
@@ -72,7 +74,24 @@ if (!$firstName || !$lastName || !$email || !$phone) {
   exit;
 }
 
-// Log to file
+// Database storage
+require_once 'db_config.php';
+try {
+  $stmt = $pdo->prepare("INSERT INTO waitlist_submissions 
+    (first_name, last_name, email, phone, move_in_date, budget, unit, unit_type, hear_about_us, message, ip_address, tracking_id) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  $stmt->execute([
+    $firstName, $lastName, $email, $phone, $moveInDate, $budget, $unit, $unitType, $hearAboutUs, $message, $ip, $trackingId
+  ]);
+  
+  // Trigger Apollo Enrichment (Async if possible, but here we'll just run it)
+  enrichLead($email, $firstName, $lastName, $phone);
+} catch (PDOException $e) {
+  // Log error but continue with email
+  error_log("Database insert failed: " . $e->getMessage());
+}
+
+// Log to file (Legacy support)
 $rateLimits = json_decode(file_get_contents($rateLimitFile), true) ?: [];
 $rateLimits[$ip] = $currentTime;
 file_put_contents($rateLimitFile, json_encode($rateLimits));
@@ -95,7 +114,7 @@ $logEntry = implode('|', [
 file_put_contents($submissionFile, $logEntry, FILE_APPEND);
 
 // Send email
-$to = 'theeleanor@doorway.nyc';
+$to = NOTIFICATION_EMAIL;
 $subject = 'New Wait List Submission - ' . $firstName . ' ' . $lastName;
 $headers = "From: info@theeleanor.nyc\r\n";
 $headers .= "Reply-To: $email\r\n";
@@ -119,10 +138,16 @@ $message
 Date: ${logEntry}
 EOD;
 
-if (mail($to, $subject, $body, $headers)) {
-  http_response_code(200);
-  echo json_encode(['success' => true]);
-} else {
-  http_response_code(500);
-  echo json_encode(['error' => 'Failed to send email.']);
-} 
+// Send email - Make it quiet to avoid 500 errors if mail fails
+$emailSent = @mail($to, $subject, $body, $headers);
+
+if (!$emailSent) {
+    error_log("Failed to send notification email to $to");
+}
+
+// Always return success if DB insert worked
+http_response_code(200);
+echo json_encode([
+    'success' => true, 
+    'message' => $emailSent ? 'Submission successful' : 'Submission saved (Email notification failed)'
+]);

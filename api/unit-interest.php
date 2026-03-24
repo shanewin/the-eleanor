@@ -1,31 +1,35 @@
 <?php
-// Reduce error verbosity in production; use server logs for debugging
+// Reduce error verbosity in production
 error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
 ini_set('display_errors', 0);
+
 session_start([
     'cookie_secure' => isset($_SERVER['HTTPS']),
     'cookie_httponly' => true,
     'cookie_samesite' => 'Lax'
 ]);
 
+require_once 'enrichment.php';
+require_once 'db_config.php';
+require_once 'config.php'; // Explicitly include for NOTIFICATION_EMAIL
+
 // Security headers
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Content-Type: application/json');
-header('Cache-Control: no-store, no-cache, must-revalidate');
-header('Pragma: no-cache');
 
-// Initialize CSRF Token
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+// Validate POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Method Not Allowed']);
+    exit;
 }
 
 // Validate CSRF Token
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-        http_response_code(403);
-        die(json_encode(['error' => 'Invalid CSRF token']));
-    }
+if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Invalid CSRF token']);
+    exit;
 }
 
 // Input validation
@@ -37,7 +41,8 @@ $required = ['firstName', 'lastName', 'email', 'phone'];
 foreach ($required as $field) {
     if (empty($_POST[$field])) {
         http_response_code(400);
-        die(json_encode(['error' => "Missing required field: $field"]));
+        echo json_encode(['error' => "Missing required field: $field"]);
+        exit;
     }
 }
 
@@ -45,30 +50,40 @@ foreach ($required as $field) {
 $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
 if (!$email) {
     http_response_code(400);
-    die(json_encode(['error' => 'Invalid email address']));
+    echo json_encode(['error' => 'Invalid email address']);
+    exit;
 }
 
 // Prepare data
-$data = [
-    date('Y-m-d H:i:s'),
-    $_SERVER['REMOTE_ADDR'],
-    clean('unit'),
-    clean('firstName'),
-    clean('lastName'),
-    $email,
-    clean('phone'),
-    clean('moveInDate'),
-    clean('budget'),
-    clean('hearAboutUs'),
-    clean('message')
-];
+$unitValue = clean('unit');
+$firstName = clean('firstName');
+$lastName = clean('lastName');
+$phone = clean('phone');
+$moveInDate = clean('moveInDate');
+$budget = clean('budget');
+$hearAboutUs = clean('hearAboutUs');
+$message = clean('message');
+$trackingId = clean('tracking_id');
+$ip_address = $_SERVER['REMOTE_ADDR'];
 
-// Store submission (secure file handling)
-$file = 'submissions.txt';
-file_put_contents($file, implode('|', $data) . PHP_EOL, FILE_APPEND | LOCK_EX);
-chmod($file, 0640);
+// Database storage
+try {
+    $stmt = $pdo->prepare("INSERT INTO unit_inquiries 
+        (unit, first_name, last_name, email, phone, move_in_date, budget, hear_about_us, message, ip_address, tracking_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $unitValue, $firstName, $lastName, $email, $phone, $moveInDate, $budget, $hearAboutUs, $message, $ip_address, $trackingId
+    ]);
 
-// Send email
+    // Trigger Apollo Enrichment (Non-blocking as it might take time)
+    enrichLead($email, $firstName, $lastName, $phone);
+} catch (PDOException $e) {
+    error_log("Database insert failed (Unit Inquiry): " . $e->getMessage());
+}
+
+// Send email notification
+$to = NOTIFICATION_EMAIL;
+$subject = "New Unit Inquiry: " . $unitValue;
 $headers = [
     'From: info@theeleanor.nyc',
     'Reply-To: ' . $email,
@@ -76,21 +91,25 @@ $headers = [
     'X-Mailer: PHP/' . phpversion()
 ];
 
-$body = "New Unit Inquiry:\n\n" . implode("\n", [
-    "Unit: " . clean('unit'),
-    "Name: " . clean('firstName') . " " . clean('lastName'),
+$body = "New Unit Inquiry details:\n\n" . implode("\n", [
+    "Unit: " . $unitValue,
+    "Name: " . $firstName . " " . $lastName,
     "Email: " . $email,
-    "Phone: " . clean('phone'),
-    "Move-in Date: " . clean('moveInDate'),
-    "Message: " . clean('message')
+    "Phone: " . $phone,
+    "Move-in Date: " . $moveInDate,
+    "Message:\n" . $message
 ]);
 
-if (mail('theeleanor@doorway.nyc', "New Unit Inquiry: " . clean('unit'), $body, implode("\r\n", $headers))) {
-    // Regenerate CSRF token after successful submission
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    echo json_encode(['success' => true]);
-} else {
-    error_log("Failed to send email for unit inquiry");
-    http_response_code(500);
-    echo json_encode(['error' => 'Failed to send email.']);
+$emailSent = @mail($to, $subject, $body, implode("\r\n", $headers));
+
+if (!$emailSent) {
+    error_log("Failed to send unit inquiry notification to $to");
 }
+
+// Regenerate CSRF token after successful submission (prevent reuse)
+$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
+echo json_encode([
+    'success' => true,
+    'message' => 'Thank you for your interest!'
+]);

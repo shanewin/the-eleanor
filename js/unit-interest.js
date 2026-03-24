@@ -49,6 +49,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Show thank you section
         thankYouSection.style.display = 'block';
+
+        // Update Modal Title
+        const modalTitle = document.getElementById('unitModalLabel');
+        if (modalTitle) {
+          modalTitle.textContent = 'Thank You';
+        }
       }
       
       unitForm.reset();

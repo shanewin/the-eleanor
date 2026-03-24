@@ -671,3 +671,50 @@
     opacity: 0.9;
   }
   
+  /* Thank You Section in Modal */
+  .thankyou-section {
+    padding: 20px 0;
+    animation: modal-fade-in 0.5s ease-out;
+  }
+  
+  .thankyou-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--eleanor-green);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    font-size: 1.5rem;
+    box-shadow: 0 10px 25px rgba(174, 187, 181, 0.4);
+  }
+  
+  .thankyou-title {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--eleanor-charcoal);
+    margin-bottom: 20px;
+  }
+  
+  .thankyou-body p {
+    font-family: var(--font-body);
+    font-weight: 300;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: rgba(0, 0, 0, 0.65);
+    margin-bottom: 16px;
+  }
+  
+  .thankyou-footer {
+    margin-top: 32px;
+  }
+  
+  @keyframes modal-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  

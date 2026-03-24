@@ -1,0 +1,14 @@
+# 1. Protect config.php from being seen by the public
+<Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# 2. Protect log files from being seen by the public
+<Files "*.log">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# 3. Prevent people from seeing a list of all your files
+Options -Indexes

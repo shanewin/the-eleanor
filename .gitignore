@@ -1,0 +1,4 @@
+.DS_Store
+.claude/
+api/config.php
+api/db_config.php
