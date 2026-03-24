@@ -1,5 +1,20 @@
-# 1. Protect config.php from being seen by the public
+# 1. Protect config files from being seen by the public
 <Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "db_config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "config.example.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "db_config.example.php">
     Order Allow,Deny
     Deny from all
 </Files>
@@ -10,5 +25,11 @@
     Deny from all
 </Files>
 
-# 3. Prevent people from seeing a list of all your files
+# 3. Protect SQL files
+<Files "*.sql">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# 4. Prevent people from seeing a list of all your files
 Options -Indexes

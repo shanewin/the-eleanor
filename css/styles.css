@@ -585,10 +585,10 @@ body.nav-open {
   margin: 40px 0;
 }
 
-/* Reduce gap between explore and availability sections */
+/* Sections next to a bridge: bridge handles all spacing */
 #explore.section-padding,
 #explore.portfolio-section {
-  margin-bottom: 10px !important;
+  margin-bottom: 0 !important;
 }
 
 #availability.section-padding {
@@ -807,29 +807,35 @@ body.nav-open {
   }
 
  .section-bridge {
-   position: relative;
-   width: 100%;
    display: flex;
-   justify-content: flex-start;
-   margin: -70px auto -60px;
-   padding-left: clamp(20px, 5vw, 100px);
-   pointer-events: none;
+   justify-content: center;
+   margin: 0;
+   padding: 0;
+   isolation: isolate;
    z-index: 2;
  }
 
- .section-bridge__image {
-   width: clamp(200px, 30vw, 340px);
-   border-radius: 18px;
+.section-bridge__image {
+   width: clamp(200px, 40vw, 400px);
+   aspect-ratio: 4 / 3;
+   border-radius: 16px;
    overflow: hidden;
-   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14);
-   background: rgba(255, 255, 255, 0.45);
-   backdrop-filter: blur(10px);
-   -webkit-backdrop-filter: blur(10px);
+   padding: 4px;
+   background: linear-gradient(135deg, var(--eleanor-pink-accent), rgba(255,255,255,0.6), var(--eleanor-green-accent));
+   box-shadow:
+     0 8px 30px rgba(0, 0, 0, 0.08),
+     0 0 40px rgba(235, 212, 212, 0.3);
  }
+
 .section-bridge__image img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  filter: none;
 }
 
 /* Subtle float animations for “wow” factor */
@@ -1402,9 +1408,8 @@ body.nav-open {
     margin: 32px 0;
   }
 
-  /* Reduce gap between explore and availability */
   #explore.section-padding {
-    margin-bottom: 16px;
+    margin-bottom: 0 !important;
   }
 
   #availability,
@@ -1655,10 +1660,6 @@ body.nav-open {
     height: 200px;
   }
 
-  .section-bridge {
-    margin: -30px auto -10px;
-    padding: 0 20px;
-  }
 
   #neighborhood .content-container,
   #waitlist .content-container {
@@ -1794,9 +1795,6 @@ body.nav-open {
     bottom: -120px;
   }
 
-  .section-bridge {
-    display: none;
-  }
 
   .section-subtitle,
   .hero-eyebrow {

@@ -305,12 +305,30 @@ endif;
                                 <h3>Elevated Living</h3>
                                 <div class="slide-divider"></div>
                                 <p>Homes shaped by The Eleanor’s refined materials—warm oak flooring, sculpted stone surfaces, and expansive windows that bring natural light deep into the space. Designed with a modern, effortless layout, it reflects the calm, contemporary character found throughout the building.</p>
-                                <a href="#" class="slide-button">Join the Wait List</a>
+                                <a href="#waitlist" class="slide-button">Join the Wait List</a>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Slide 2 -->
+                    <!-- Slide 2: Work, Refined -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image">
+                                <img src="img/slider-pics/work_refined.jpg" alt="The Eleanor Work, Refined">
+                            </div>
+                            <div class="slide-overlay">
+                                <div class="slide-title">Work, Refined</div>
+                            </div>
+                            <div class="slide-content">
+                                <h3>Work, Refined</h3>
+                                <div class="slide-divider"></div>
+                                <p>Warm lighting, curated shelving, and living greenery create a workspace that feels more private library than conventional office. The Eleanor's co-working lounge pairs rich materials—oak flooring, leather seating, and soft acoustic partitions—with thoughtful design, offering residents a polished setting to focus, collaborate, and create.</p>
+                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide 3 -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image">
@@ -323,12 +341,48 @@ endif;
                                 <h3>Light-Filled Living</h3>
                                 <div class="slide-divider"></div>
                                 <p>Expansive glass brings The Eleanor’s design ethos to life—natural light, warm oak flooring, and refined stone surfaces shaping a calm, modern environment. Every residence reflects the building’s commitment to crafted materials, soft textures, and elevated city living..</p>
-                                <a href="#" class="slide-button">Check Availability</a>
+                                <a href="#availability" class="slide-button">Check Availability</a>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Slide 3 -->
+                    <!-- Slide 4: Your Move -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image">
+                                <img src="img/slider-pics/your_move.jpg" alt="The Eleanor Your Move">
+                            </div>
+                            <div class="slide-overlay">
+                                <div class="slide-title">Your Move</div>
+                            </div>
+                            <div class="slide-content">
+                                <h3>Your Move</h3>
+                                <div class="slide-divider"></div>
+                                <p>A landscaped terrace with oversized chess, lounge seating, and lush greenery offers residents a private outdoor retreat without leaving home. The Eleanor's courtyard blends playful detail with considered design—mature plantings, natural stone, and shaded gathering spots that invite you to slow down and stay awhile.</p>
+                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide 5: Room to Unwind -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image">
+                                <img src="img/slider-pics/room_to_unwind.jpg" alt="The Eleanor Room to Unwind">
+                            </div>
+                            <div class="slide-overlay">
+                                <div class="slide-title">Room to Unwind</div>
+                            </div>
+                            <div class="slide-content">
+                                <h3>Room to Unwind</h3>
+                                <div class="slide-divider"></div>
+                                <p>Floor-to-ceiling glass, a modern fireplace, and rich leather seating shape a residents' library designed for slow mornings and easy evenings. With curated shelving, warm oak millwork, and views onto the courtyard, The Eleanor's lounge is a shared living room that feels unmistakably personal.</p>
+                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide 5 -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image">
@@ -341,7 +395,7 @@ endif;
                                 <h3>Rest Well</h3>
                                 <div class="slide-divider"></div>
                                 <p>Soft textures, warm neutrals, and natural light reflect The Eleanor’s commitment to quiet luxury—spaces crafted for balance, comfort, and a sense of calm at the end of each day.</p>
-                                <a href="#" class="slide-button">Join the Wait List</a>
+                                <a href="#waitlist" class="slide-button">Join the Wait List</a>
                             </div>
                         </div>
                     </div>
@@ -359,7 +413,7 @@ endif;
                                 <h3>Crafted with Intention</h3>
                                 <div class="slide-divider"></div>
                                 <p>Refined materials and modern craftsmanship define The Eleanor’s kitchens—marble-look surfaces, warm oak flooring, and considered cabinetry creating spaces designed for connection, creativity, and everyday ease.</p>
-                                <a href="#" class="slide-button">Join the Wait List</a>
+                                <a href="#waitlist" class="slide-button">Join the Wait List</a>
                             </div>
                         </div>
                     </div>
@@ -377,7 +431,43 @@ endif;
                                 <h3>Designed to Flow</h3>
                                 <div class="slide-divider"></div>
                                 <p>Generous glazing, warm oak flooring, and refined stone elements embody The Eleanor’s modern architectural identity. A calm palette and thoughtful detailing shape spaces that feel open, airy, and quietly elevated—designed with light, materiality, and intention at the forefront.</p>
-                                <a href="#" class="slide-button">Check Availability</a>
+                                <a href="#availability" class="slide-button">Check Availability</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Slide 6 -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image">
+                                <img src="img/slider-pics/a_considered_welcome.jpg" alt="The Eleanor A Considered Welcome">
+                            </div>
+                            <div class="slide-overlay">
+                                <div class="slide-title">A Considered Welcome</div>
+                            </div>
+                            <div class="slide-content">
+                                <h3>A Considered Welcome</h3>
+                                <div class="slide-divider"></div>
+                                <p>Textured metallic screens, warm panel detailing, and terrazzo flooring set the tone from the moment you arrive. The Eleanor's lobby reflects the building's design philosophy—refined materials, intentional craft, and a quiet sense of arrival that feels both modern and timeless.</p>
+                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Slide 7 -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image">
+                                <img src="img/slider-pics/strength_on_your_terms.jpg" alt="The Eleanor Strength, On Your Terms">
+                            </div>
+                            <div class="slide-overlay">
+                                <div class="slide-title">Strength, On Your Terms</div>
+                            </div>
+                            <div class="slide-content">
+                                <h3>Strength, On Your Terms</h3>
+                                <div class="slide-divider"></div>
+                                <p>A fully equipped fitness center with free weights, cable machines, and cardio—designed with the same intentional aesthetic found throughout The Eleanor. Clean lines, concrete textures, and open sightlines create a focused, no-frills environment built for residents who take their routine seriously.</p>
+                                <a href="#availability" class="slide-button">Schedule a Tour</a>
                             </div>
                         </div>
                     </div>
@@ -396,6 +486,12 @@ endif;
         </div>
       </div>
     </section>
+
+    <div class="section-bridge section-bridge--rooftop">
+      <div class="section-bridge__image">
+        <img src="img/bridge-rooftop.jpg" alt="The Eleanor Rooftop Terrace">
+      </div>
+    </div>
 
     <section id="availability" class="section-padding full-section">
       <div class="container">
@@ -552,6 +648,7 @@ endif;
       </div>
     </div>
   </main>
+
 
   <div class="modal fade" id="unitModal" tabindex="-1" aria-labelledby="unitModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -949,6 +1046,12 @@ endif;
     </div>
     </div>
   </section>
+
+  <div class="section-bridge">
+    <div class="section-bridge__image">
+      <img src="img/bridge-living.jpeg" alt="The Eleanor Living Space">
+    </div>
+  </div>
 
   <section id="waitlist" class="section-padding full-section">
         <div class="container">

@@ -405,6 +405,8 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
             $finalResponseRaw
         ]);
 
+        sendEnrichmentEmail($email, $firstName, $lastName, $person);
+
         return [
             'status' => 'success', 
             'data' => $person
@@ -413,4 +415,119 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
         error_log("Database error in enrichment: " . $e->getMessage());
         return ['status' => 'db_error', 'message' => $e->getMessage()];
     }
+}
+
+function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
+    global $pdo;
+
+    $stmt = $pdo->prepare("
+        SELECT event_type, event_name, event_data, created_at 
+        FROM activity_logs 
+        WHERE session_id IN (
+            SELECT tracking_id FROM waitlist_submissions WHERE email = ?
+            UNION SELECT tracking_id FROM unit_inquiries WHERE email = ?
+            UNION SELECT tracking_id FROM mailing_list WHERE email = ?
+        )
+        ORDER BY created_at ASC
+    ");
+    $stmt->execute([$email, $email, $email]);
+    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $totalEvents = count($logs);
+    $sectionsViewed = [];
+    $buttonsClicked = [];
+
+    foreach ($logs as $log) {
+        if ($log['event_type'] === 'visibility' && $log['event_name'] === 'section_leave') {
+            $data = json_decode($log['event_data'], true);
+            if ($data && isset($data['section'])) {
+                $sec = $data['section'];
+                $time = $data['secondsSpent'] ?? 0;
+                if (!isset($sectionsViewed[$sec])) $sectionsViewed[$sec] = 0;
+                $sectionsViewed[$sec] += $time;
+            }
+        }
+        if ($log['event_type'] === 'click' && $log['event_name'] === 'button_click') {
+            $data = json_decode($log['event_data'], true);
+            if ($data && !empty($data['text'])) {
+                $buttonsClicked[] = $data['text'];
+            }
+        }
+    }
+
+    $behavioralRaw = "BEHAVIORAL JOURNEY (WEBSITE ANALYTICS)\n";
+    $behavioralRaw .= "----------------------------------------\n";
+    $behavioralRaw .= "Total Tracking Events: $totalEvents\n\n";
+
+    if (!empty($sectionsViewed)) {
+        arsort($sectionsViewed);
+        $behavioralRaw .= "Sections Viewed (Total Time):\n";
+        $count = 0;
+        foreach ($sectionsViewed as $sec => $time) {
+            if ($count++ >= 5) break;
+            $behavioralRaw .= "  - $sec (" . round($time) . " seconds)\n";
+        }
+        $behavioralRaw .= "\n";
+    }
+
+    if (!empty($buttonsClicked)) {
+        $counts = array_count_values($buttonsClicked);
+        arsort($counts);
+        $behavioralRaw .= "Buttons/Links Clicked:\n";
+        foreach ($counts as $btn => $clk) {
+            $behavioralRaw .= "  - $btn ($clk" . ($clk > 1 ? " clicks" : " click") . ")\n";
+        }
+        $behavioralRaw .= "\n";
+    }
+
+    if (empty($sectionsViewed) && empty($buttonsClicked)) {
+        $behavioralRaw .= "No significant behavioral data logged prior to submission.\n";
+    }
+
+    $name = $person['name'] ?? trim("$firstName $lastName");
+    $title = $person['title'] ?? 'Not found';
+    $company = $person['organization']['name'] ?? 'Not found';
+    $industry = $person['organization']['industry'] ?? 'Not found';
+    $employees = $person['organization']['estimated_num_employees'] ?? 'Not found';
+    $revenue = $person['organization']['annual_revenue_printed'] ?? 'Not found';
+    $linkedin = $person['linkedin_url'] ?? 'Not found';
+
+    $isDeepSearch = isset($person['_deep_data']) && isset($person['_deep_data']['identity_confidence']);
+    $verificationRaw = "";
+    if ($isDeepSearch) {
+        $conf = $person['_deep_data']['identity_confidence'];
+        $reason = $person['_deep_data']['reasoning'];
+        $verificationRaw = "\nDEEP SEARCH VERIFICATION\n----------------------------------------\nAI Confidence Score: $conf%\nReasoning: $reason\n";
+    }
+
+    $to = defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : 'admin@theeleanor.nyc';
+    $subject = "Enrichment Profile: $name";
+    $headers = [
+        'From: info@theeleanor.nyc',
+        'Reply-To: ' . $email,
+        'Content-Type: text/plain; charset=UTF-8',
+        'X-Mailer: PHP/' . phpversion()
+    ];
+
+    $body = <<<EOD
+LEAD INTELLIGENCE PROFILE
+----------------------------------------
+Identity
+- Name: $name
+- Email: $email
+- Title: $title
+- Company: $company
+
+Firmographics
+- Industry: $industry
+- Employees: $employees
+- Revenue: $revenue
+
+Social & Links
+- LinkedIn: $linkedin
+$verificationRaw
+$behavioralRaw
+EOD;
+
+    @mail($to, $subject, $body, implode("\r\n", $headers));
 }

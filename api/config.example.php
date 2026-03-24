@@ -18,7 +18,8 @@ define('RAPIDAPI_HOST', 'fresh-linkedin-profile-data.p.rapidapi.com');
 
 // --- Admin Dashboard Credentials ---
 // Change this to a secure password! 
-define('ADMIN_PASSWORD_HASH', password_hash('YOUR_SECURE_PASSWORD', PASSWORD_DEFAULT));
+// Generate hash with: php -r "echo password_hash('YOUR_PASSWORD', PASSWORD_DEFAULT);"
+define('ADMIN_PASSWORD_HASH', 'PASTE_YOUR_BCRYPT_HASH_HERE');
 
 // --- Notification Settings ---
 define('NOTIFICATION_EMAIL', 'YOUR_EMAIL@example.com');

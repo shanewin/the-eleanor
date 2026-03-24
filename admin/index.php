@@ -7,14 +7,14 @@ requireAdmin();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aurelian | Dashboard</title> <!-- Original: The Eleanor | Dashboard -->
+    <title>The Eleanor | Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="admin.css">
 </head>
 <body>
 
     <aside>
-        <span class="logo">AURELIAN</span> <!-- THE ELEANOR -->
+        <span class="logo">THE ELEANOR</span>
         <nav id="mainNav">
             <a href="#" class="nav-link active" data-view="overview">
                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -358,10 +358,19 @@ requireAdmin();
                 // Fetch Stats
                 const statsResponse = await fetch('../api/admin-api.php?action=stats');
                 const stats = await statsResponse.json();
-                document.getElementById('statSessions').innerText = stats.totalSessions;
-                document.getElementById('statLeads').innerText = stats.totalLeads;
-                document.getElementById('statConv').innerText = stats.conversionRate;
-                document.getElementById('statHot').innerText = stats.hottestSection;
+                
+                if (stats.error) {
+                    console.error("Stats API Error:", stats.error);
+                    document.getElementById('statSessions').innerText = 'API Error';
+                    document.getElementById('statLeads').innerText = 'API Error';
+                    document.getElementById('statConv').innerText = 'API Error';
+                    document.getElementById('statHot').innerText = 'API Error';
+                } else {
+                    document.getElementById('statSessions').innerText = stats.totalSessions !== undefined ? stats.totalSessions : '-';
+                    document.getElementById('statLeads').innerText = stats.totalLeads !== undefined ? stats.totalLeads : '-';
+                    document.getElementById('statConv').innerText = stats.conversionRate !== undefined ? stats.conversionRate : '-';
+                    document.getElementById('statHot').innerText = stats.hottestSection !== undefined ? stats.hottestSection : '-';
+                }
 
                 // Fetch Leads
                 const leadsResponse = await fetch('../api/admin-api.php?action=leads');
