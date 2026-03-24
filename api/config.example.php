@@ -11,6 +11,9 @@ define('APOLLO_WEBHOOK_URL', 'https://eleanorbk.com/api/apollo-webhook.php');
 // --- Anthropic Configuration ---
 define('ANTHROPIC_API_KEY', 'YOUR_ANTHROPIC_API_KEY_HERE');
 
+// --- FullContact Configuration ---
+define('FULLCONTACT_API_KEY', 'YOUR_FULLCONTACT_API_KEY_HERE');
+
 // --- Tavily Configuration ---
 define('TAVILY_API_KEY', 'YOUR_TAVILY_API_KEY_HERE');
 define('RAPIDAPI_KEY', 'YOUR_RAPIDAPI_KEY_HERE');

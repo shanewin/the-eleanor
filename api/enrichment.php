@@ -36,6 +36,36 @@ function getLikelyState($phone) {
     return $map[$areaCode] ?? null;
 }
 
+function fullContactRequest($email, $phone = null, $firstName = null, $lastName = null) {
+    $payload = [];
+    if ($email) $payload['emails'] = [$email];
+    if ($phone) {
+        // Ensure phone has + prefix and country code
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($cleanPhone) === 10) $cleanPhone = '1' . $cleanPhone;
+        $payload['phones'] = ['+' . $cleanPhone];
+    }
+    if ($firstName && $lastName) {
+        $payload['name'] = ['given' => $firstName, 'family' => $lastName];
+    }
+
+    $ch = curl_init('https://api.fullcontact.com/v3/person.enrich');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . FULLCONTACT_API_KEY
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    error_log("FullContact response ($httpCode): " . substr($response, 0, 500));
+    return ['code' => $httpCode, 'data' => $data, 'raw' => $response];
+}
+
 function apolloRequest($url, $payload) {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -284,71 +314,69 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
         return ['status' => 'already_enriched'];
     }
 
-    // 2. Determine if corporate or personal email
-    $emailDomain = strtolower(substr($email, strpos($email, '@') + 1));
-    $personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'live.com', 'msn.com', 'protonmail.com', 'mail.com'];
-    $isPersonalEmail = in_array($emailDomain, $personalDomains);
-
     $person = null;
     $finalResponseRaw = null;
 
-    // Step 1: Always try Apollo match with all available data (email + name + phone)
-    error_log("Apollo: Trying match with email=$email, name=$firstName $lastName, phone=$phone");
-    $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
-        'email' => $email,
-        'first_name' => $firstName,
-        'last_name' => $lastName,
-        'phone_number' => $phone,
-        'reveal_personal_emails' => true,
-        'reveal_phone_number' => true
-    ]);
-    $person = $matchRes['data']['person'] ?? null;
-    $finalResponseRaw = $matchRes['raw'];
+    // 2. FullContact — send email + phone + name for best match
+    error_log("FullContact: Enriching $email ($firstName $lastName, $phone)");
+    $fcRes = fullContactRequest($email, $phone, $firstName, $lastName);
 
-    // Step 2: If no match and personal email, try searching by name + phone
-    if (!$person && $isPersonalEmail) {
-        error_log("Apollo: No email match. Trying name+phone search for $firstName $lastName.");
-
-        // Try match by phone number directly
-        if ($phone) {
-            $phoneMatchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'phone_number' => $phone,
-                'reveal_personal_emails' => true,
-                'reveal_phone_number' => true
-            ]);
-            $person = $phoneMatchRes['data']['person'] ?? null;
-            if ($person) {
-                $finalResponseRaw = $phoneMatchRes['raw'];
-                error_log("Apollo: Found match via phone number for $firstName $lastName.");
+    if ($fcRes['code'] === 200 && !empty($fcRes['data']['fullName'])) {
+        $fc = $fcRes['data'];
+        $person = [
+            'name' => $fc['fullName'] ?? "$firstName $lastName",
+            'title' => $fc['title'] ?? null,
+            'linkedin_url' => $fc['linkedin'] ?? null,
+            'twitter_url' => $fc['twitter'] ?? null,
+            'city' => null,
+            'state' => null,
+            'country' => null,
+            'seniority' => null,
+            'photo_url' => $fc['avatar'] ?? null,
+            'headline' => $fc['bio'] ?? null,
+            'organization' => [
+                'name' => $fc['organization'] ?? null,
+                'primary_domain' => null,
+                'industry' => null,
+                'short_description' => null,
+                'estimated_num_employees' => null,
+                'annual_revenue_printed' => null,
+                'logo_url' => null
+            ]
+        ];
+        // Parse location string like "Denver, CO, United States"
+        if (!empty($fc['location'])) {
+            $parts = array_map('trim', explode(',', $fc['location']));
+            if (count($parts) >= 3) {
+                $person['city'] = $parts[0];
+                $person['state'] = $parts[1];
+                $person['country'] = $parts[2];
+            } elseif (count($parts) === 2) {
+                $person['city'] = $parts[0];
+                $person['state'] = $parts[1];
             }
         }
+        $finalResponseRaw = json_encode(['source' => 'fullcontact', 'data' => $fc]);
+        error_log("FullContact: Found " . $person['name'] . " at " . ($person['organization']['name'] ?? 'N/A'));
+    }
 
-        // If still no match, try name search as last resort
-        if (!$person) {
-            error_log("Apollo: No phone match. Trying name-only search.");
-            $searchRes = apolloRequest("https://api.apollo.io/api/v1/mixed_people/api_search", [
-                'q_person_name' => trim("$firstName $lastName"),
-                'page' => 1,
-                'per_page' => 1
-            ]);
-            $searchPerson = $searchRes['data']['people'][0] ?? null;
-
-            if ($searchPerson) {
-                $hydrateRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
-                    'id' => $searchPerson['id'],
-                    'reveal_personal_emails' => true,
-                    'reveal_phone_number' => true
-                ]);
-                $person = $hydrateRes['data']['person'] ?? $searchPerson;
-                $finalResponseRaw = json_encode(['source' => 'name_search', 'person' => $person]);
-            }
-        }
+    // 3. If FullContact didn't find anything, try Apollo
+    if (!$person) {
+        error_log("FullContact: No match. Trying Apollo for $email");
+        $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
+            'email' => $email,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'phone_number' => $phone,
+            'reveal_personal_emails' => true,
+            'reveal_phone_number' => true
+        ]);
+        $person = $matchRes['data']['person'] ?? null;
+        $finalResponseRaw = $matchRes['raw'];
     }
 
     if (!$person) {
-        error_log("Apollo: No match found for $email ($firstName $lastName)");
+        error_log("Enrichment: No match found for $email ($firstName $lastName)");
         return ['status' => 'no_match'];
     }
 
