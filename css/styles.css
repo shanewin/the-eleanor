@@ -806,38 +806,6 @@ body.nav-open {
     object-fit: cover;
   }
 
- .section-bridge {
-   display: flex;
-   justify-content: center;
-   margin: 0;
-   padding: 0;
-   isolation: isolate;
-   z-index: 2;
- }
-
-.section-bridge__image {
-   width: clamp(200px, 40vw, 400px);
-   aspect-ratio: 4 / 3;
-   border-radius: 16px;
-   overflow: hidden;
-   padding: 4px;
-   background: linear-gradient(135deg, var(--eleanor-pink-accent), rgba(255,255,255,0.6), var(--eleanor-green-accent));
-   box-shadow:
-     0 8px 30px rgba(0, 0, 0, 0.08),
-     0 0 40px rgba(235, 212, 212, 0.3);
- }
-
-.section-bridge__image img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 12px;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  filter: none;
-}
-
 /* Subtle float animations for “wow” factor */
 @keyframes hero-float {
   0%, 100% { transform: translateY(0); }
