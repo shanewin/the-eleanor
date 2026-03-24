@@ -284,20 +284,50 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
         return ['status' => 'already_enriched'];
     }
 
-    // 2. Apollo match — simple, direct lookup by email
-    $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
-        'email' => $email,
-        'first_name' => $firstName,
-        'last_name' => $lastName,
-        'reveal_personal_emails' => true,
-        'reveal_phone_number' => true
-    ]);
+    // 2. Determine if corporate or personal email
+    $emailDomain = strtolower(substr($email, strpos($email, '@') + 1));
+    $personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'live.com', 'msn.com', 'protonmail.com', 'mail.com'];
+    $isPersonalEmail = in_array($emailDomain, $personalDomains);
 
-    $person = $matchRes['data']['person'] ?? null;
-    $finalResponseRaw = $matchRes['raw'];
+    $person = null;
+    $finalResponseRaw = null;
+
+    if (!$isPersonalEmail) {
+        // Corporate email — direct match by email (most reliable)
+        error_log("Apollo: Corporate email detected ($emailDomain). Using email match.");
+        $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
+            'email' => $email,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'reveal_personal_emails' => true,
+            'reveal_phone_number' => true
+        ]);
+        $person = $matchRes['data']['person'] ?? null;
+        $finalResponseRaw = $matchRes['raw'];
+    } else {
+        // Personal email — search by name
+        error_log("Apollo: Personal email detected. Using name search for $firstName $lastName.");
+        $searchRes = apolloRequest("https://api.apollo.io/api/v1/mixed_people/api_search", [
+            'q_person_name' => trim("$firstName $lastName"),
+            'page' => 1,
+            'per_page' => 1
+        ]);
+        $searchPerson = $searchRes['data']['people'][0] ?? null;
+
+        if ($searchPerson) {
+            // Hydrate the result to get full details
+            $hydrateRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
+                'id' => $searchPerson['id'],
+                'reveal_personal_emails' => true,
+                'reveal_phone_number' => true
+            ]);
+            $person = $hydrateRes['data']['person'] ?? $searchPerson;
+            $finalResponseRaw = json_encode(['source' => 'name_search', 'person' => $person]);
+        }
+    }
 
     if (!$person) {
-        error_log("Apollo: No match found for $email");
+        error_log("Apollo: No match found for $email ($firstName $lastName)");
         return ['status' => 'no_match'];
     }
 
