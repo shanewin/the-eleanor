@@ -250,9 +250,18 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
         return ['error' => 'Anthropic could not normalize data', 'raw_ai_response' => $anthropicRes['data']['content'][0]['text'] ?? 'EMPTY'];
     }
 
-    if (($extractedData['identity_confidence'] ?? 0) < 50) {
+    if (($extractedData['identity_confidence'] ?? 0) < 70) {
         error_log("DEEP_ENRICH_FAIL: Low identity confidence for $email: " . ($extractedData['reasoning'] ?? 'N/A'));
         return ['error' => 'Identity confidence too low', 'reasoning' => $extractedData['reasoning'] ?? 'N/A'];
+    }
+
+    // Hard domain check: if corporate email, the extracted company domain must match
+    if ($isCorpEmail && !empty($extractedData['company_domain'])) {
+        $extractedDomain = strtolower($extractedData['company_domain']);
+        if ($extractedDomain !== $emailDomain && strpos($extractedDomain, $emailDomain) === false && strpos($emailDomain, $extractedDomain) === false) {
+            error_log("DEEP_ENRICH_FAIL: Domain mismatch for $email: extracted '$extractedDomain' != '$emailDomain'");
+            return ['error' => 'Company domain mismatch in deep search', 'extracted_domain' => $extractedDomain, 'expected_domain' => $emailDomain];
+        }
     }
 
     $extractedData['_source'] = 'linkedin_scraper';
