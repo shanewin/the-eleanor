@@ -259,7 +259,7 @@ requireAdmin();
             }
 
             // 1. Career Seniority (Primary Signal)
-            const title = (person.title || lead.job_title || '').toLowerCase();
+            const title = (lead.job_title || person.title || '').toLowerCase();
             if (['chief', 'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cpo', 'founder', 'owner', 'president'].some(k => title.includes(k))) {
                 insights.push({ label: "Executive Leadership", type: "success", icon: "👑", points: 40 });
             } else if (['vice president', 'vp', 'director', 'head of'].some(k => title.includes(k))) {
@@ -769,7 +769,7 @@ requireAdmin();
                 <div class="profile-header">
                     <img src="${primaryAvatar}" class="profile-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${name}&background=3b82f6&color=fff&size=128'">
                     <div class="profile-name">${name}</div>
-                    <div class="profile-title">${person.title || intel.job_title || 'Private Individual'}</div>
+                    <div class="profile-title">${intel.job_title || person.title || 'Private Individual'}</div>
                     
                     <div class="action-bar">
                         <div class="action-item">
