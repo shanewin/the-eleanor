@@ -1,13 +1,17 @@
 <?php
 session_start();
 
+if (file_exists(__DIR__ . '/api/config.php')) {
+    require_once __DIR__ . '/api/config.php';
+}
+
 // Initialize CSRF Token for forms
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrfToken = $_SESSION['csrf_token'];
 
-$previewPassword = 'glasskey';
+$previewPassword = defined('PREVIEW_PASSWORD') ? PREVIEW_PASSWORD : 'glasskey';
 $errorMessage = '';
 
 if (isset($_GET['clear_access'])) {

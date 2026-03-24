@@ -22,3 +22,6 @@ define('ADMIN_PASSWORD_HASH', password_hash('YOUR_SECURE_PASSWORD', PASSWORD_DEF
 
 // --- Notification Settings ---
 define('NOTIFICATION_EMAIL', 'YOUR_EMAIL@example.com');
+
+// --- Frontend Preview Setting ---
+define('PREVIEW_PASSWORD', 'YOUR_PREVIEW_PASSWORD_HERE');
