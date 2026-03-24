@@ -1,88 +1,149 @@
 # The Eleanor | Luxury Residences in Boerum Hill, Brooklyn
 
-The Eleanor is a high-end residential project located at 52 4th Avenue, Brooklyn. This repository contains the source code for the project's web application, which includes a private preview landing page, availability tracking, and a sophisticated lead enrichment and management system.
+The Eleanor is a luxury residential building at 52 4th Avenue, Brooklyn. This repository contains the marketing website, lead capture system, enrichment pipeline, and admin dashboard.
 
 ---
 
-## 🚀 Core Features
+## Core Features
 
-- **Luxury Landing Page**: A premium, mobile-responsive design featuring smooth animations, video background, and interactive carousels.
-- **Lead Capture & Tracking**: Real-time monitoring of visitor activity (`api/track.php`) and seamless capture of inquiries through multiple entry points (waitlist, unit inquiries, mailing list).
-- **Intelligent Lead Enrichment**: A multi-tier fallback engine that hydrates prospects with professional data using Apollo.io, Tavily, and LinkedIn scraping, verified by Claude 3 AI.
-- **Admin Intelligence Dashboard**: A powerful backend for managing leads, featuring a real-time grading algorithm and on-demand AI-generated prospect summaries.
-- **Unit Availability Management**: Real-time filtering and status tracking for residential units.
-
----
-
-## 🛠 Tech Stack
-
-- **Backend**: PHP 8+
-- **Frontend**: Vanilla JS (ES6+), Modern CSS3 (with Glassmorphism), Bootstrap 5, Swiper.js, FontAwesome
-- **Database**: MySQL (PDO)
-- **AI/APIs**: 
-  - **Anthropic Claude 3 Haiku**: Synthesis of professional summaries and data normalization.
-  - **Apollo.io**: Primary professional person/company search.
-  - **Tavily AI**: Search engine for identity discovery.
-  - **LinkedIn Scraper API**: Professional profile extraction.
+- **Marketing Website**: Mobile-responsive landing page with smooth animations, video background, image sliders, neighborhood guide, and unit availability browser.
+- **Lead Capture**: Waitlist form, unit interest popup, and mailing list — all with real-time behavioral tracking (sections viewed, buttons clicked, time spent).
+- **Lead Enrichment Pipeline**: Chains FullContact, Apollo.io, and a LinkedIn scraper to build rich prospect profiles from just a name, personal email, and phone number.
+- **Admin Dashboard**: Lead management with A+ to F grading, enrichment data, behavioral journey timeline, and AI-generated prospect summaries.
+- **Email Notifications**: SMTP delivery via Hostinger for form submissions and enrichment profiles.
 
 ---
 
-## 📂 Project Structure
+## Tech Stack
 
-```text
-├── admin/               # Administrative dashboard source
-│   ├── index.php        # Main lead management interface
-│   └── auth.php         # Authentication gate
-├── api/                 # Backend API handlers and logic
-│   ├── config.php       # API keys and global constants
-│   ├── db_config.php    # Database connection parameters
-│   ├── enrichment.php   # Core enrichment engine logic
-│   └── setup_db.sql     # Database schema and initial seed
-├── assets/              # Reusable design assets
-├── css/                 # Modern, modular CSS system
-├── js/                  # Frontend logic & interactions
-├── img/                 # Optimized image assets
-└── index.php            # Main public entry point (password-gated)
+- **Backend**: PHP 8+, MySQL (PDO)
+- **Frontend**: Vanilla JS (ES6+), CSS3 (Glassmorphism), Bootstrap 5, Swiper.js
+- **APIs**:
+  - **FullContact**: Identity resolution from email + phone + name. Discovers work emails for personal email leads.
+  - **Apollo.io**: Professional enrichment by email. Returns job title, company, firmographics, LinkedIn URL.
+  - **Fresh LinkedIn Profile Data (RapidAPI)**: Scrapes live LinkedIn data. Used as the final source of truth for title, company, photo, and location.
+  - **Anthropic Claude**: On-demand AI prospect summaries in the admin dashboard.
+
+---
+
+## Enrichment Pipeline
+
+The system chains three services to accurately identify leads, even when they submit personal emails:
+
+```
+Form Submission (name + email + phone)
+        │
+        ▼
+   FullContact ──→ Identifies person, discovers work email
+        │
+        ▼
+     Apollo ──→ Matches on work email for professional profile + LinkedIn URL
+        │
+        ▼
+  LinkedIn Scraper ──→ Fetches live profile data (source of truth)
+        │
+        ▼
+   Database ──→ Stores enriched data, triggers email notification
+```
+
+- **Corporate email** (e.g. `name@company.com`): Apollo matches directly. FullContact and LinkedIn scraper enhance the data.
+- **Personal email** (e.g. `name@gmail.com`): FullContact resolves identity via phone + name, finds work email. Apollo matches on work email. LinkedIn scraper provides fresh data.
+- **No match found**: Lead is saved with submitted form data only. No incorrect guesses.
+
+---
+
+## Project Structure
+
+```
+├── admin/                # Admin dashboard
+│   ├── index.php         # Lead management interface
+│   ├── login.php         # Password login
+│   ├── auth.php          # Session authentication
+│   └── admin.css         # Dashboard styles
+├── api/                  # Backend API
+│   ├── config.php        # API keys and constants (not in git)
+│   ├── config.example.php# Template for config.php
+│   ├── db_config.php     # Database connection (not in git)
+│   ├── db_config.example.php
+│   ├── enrichment.php    # Enrichment pipeline (FullContact → Apollo → LinkedIn)
+│   ├── smtp-mail.php     # SMTP email sender
+│   ├── form-handler.php  # Waitlist form handler
+│   ├── unit-interest.php # Unit inquiry handler
+│   ├── email-list.php    # Mailing list handler
+│   ├── track.php         # Behavioral tracking endpoint
+│   ├── admin-api.php     # Admin dashboard API
+│   ├── ai-summary.php    # Claude AI prospect summaries
+│   ├── apollo-webhook.php# Apollo webhook receiver
+│   ├── setup_db.sql      # Database schema
+│   └── .htaccess         # Protects config files from public access
+├── assets/floor-plans/   # Unit floor plan images
+├── css/                  # Stylesheets
+├── js/                   # Frontend scripts
+├── img/                  # Site images
+├── video/                # Background video
+└── index.php             # Main site (password-gated)
 ```
 
 ---
 
-## ⚙️ Setup & Configuration
+## Setup
 
-### 1. Database Initialization
-Run the SQL script found in `api/setup_db.sql` to create the necessary tables:
-- `visitor_activity`: Behavioral logs.
-- `lead_enrichment`: Enriched professional data.
-- `waitlist_submissions`: General inquiries.
-- `unit_inquiries`: Unit-specific leads.
+### 1. Database
 
-### 2. Environment Configuration
-Update the following files with your credentials:
+Create a MySQL database and import the schema:
 
-- **`api/db_config.php`**: Set your MySQL database host, name, user, and password.
-- **`api/config.php`**: Add your API keys for Apollo, Anthropic, and Tavily. You can also update the `ADMIN_PASSWORD_HASH` here.
+```sql
+mysql -u username -p database_name < api/setup_db.sql
+```
+
+This creates 6 tables: `waitlist_submissions`, `unit_inquiries`, `mailing_list`, `tracking_sessions`, `activity_logs`, `lead_enrichment`.
+
+### 2. Configuration
+
+Copy the example files and fill in your credentials:
+
+```bash
+cp api/config.example.php api/config.php
+cp api/db_config.example.php api/db_config.php
+```
+
+**`api/config.php`** requires:
+| Constant | Description |
+|---|---|
+| `FULLCONTACT_API_KEY` | FullContact API key for identity resolution |
+| `APOLLO_API_KEY` | Apollo.io API key for professional enrichment |
+| `RAPIDAPI_KEY` | RapidAPI key for LinkedIn scraper |
+| `ANTHROPIC_API_KEY` | Anthropic API key for AI summaries |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | SMTP credentials for email delivery |
+| `NOTIFICATION_EMAIL` | Email address to receive lead notifications |
+| `ADMIN_PASSWORD_HASH` | Admin dashboard password |
+| `PREVIEW_PASSWORD` | Frontend preview gate password |
+
+**`api/db_config.php`** requires: `$db_host`, `$db_name`, `$db_user`, `$db_pass`
+
+### 3. Deployment (Hostinger)
+
+1. Connect the GitHub repo via **Advanced → Git** in hPanel
+2. Click **Deploy** to pull files to `public_html`
+3. Create `api/config.php` and `api/db_config.php` manually on the server (they are gitignored)
+4. Import `api/setup_db.sql` via phpMyAdmin
+
+### 4. Verify
+
+- Visit the site URL — should show the password gate
+- Submit a test waitlist entry — check email delivery and admin dashboard
+- Visit `/admin/` — log in and verify lead data
 
 ---
 
-## 🧠 Prospect Enrichment Flow
+## Security
 
-The system employs a multi-tiered approach to ensure every lead is deeply understood:
-
-1. **Identity Capture**: Visitor interaction triggers an immediate `tracking_id` link.
-2. **Tier 1 (Apollo Match)**: Instant match by email for professional data.
-3. **Tier 2 (Apollo Search)**: Fallback search by name and location (parsed from phone number).
-4. **Tier 3 (Deep Search)**: Tavily finds the LinkedIn URL → Scraper extracts profile → Claude 3 normalizes the data.
-5. **Final Intelligence**: Data is presented in the Admin Dash with a dynamic **A+ to F** grade based on seniority, company revenue, and elite signals.
-
-For an indepth look at the data flow, see [PROSPECT_ENRICHMENT_FLOW.md](PROSPECT_ENRICHMENT_FLOW.md).
+- **Config files** (`config.php`, `db_config.php`) are gitignored and protected by `.htaccess`
+- **CSRF tokens** protect all form submissions
+- **Password gate** on the public site and admin dashboard
+- **No test/debug endpoints** in production
+- **SQL files** blocked from public access
 
 ---
 
-## 🔒 Security
-- **Password Gate**: The public site is protected by a session-based password gate.
-- **CSRF Protection**: All form submissions are protected via CSRF tokens.
-- **Credential Safety**: Sensitive keys are centralized in `api/config.php`. Ensure this file is never publicly accessible (e.g., via `.htaccess` rules).
-
----
-
-&copy; 2026 The Eleanor Brooklyn. All rights reserved.
+© 2026 The Eleanor Brooklyn. All rights reserved.
