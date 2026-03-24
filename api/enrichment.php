@@ -296,44 +296,6 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
     $person = $matchRes['data']['person'] ?? null;
     $finalResponseRaw = $matchRes['raw'];
 
-    // 3. If Apollo found nothing, try deep search for personal emails only
-    $emailDomain = strtolower(substr($email, strpos($email, '@') + 1));
-    $personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'live.com', 'msn.com', 'protonmail.com', 'mail.com'];
-    $isPersonalEmail = in_array($emailDomain, $personalDomains);
-
-    if (!$person && $isPersonalEmail && $firstName && $lastName) {
-        error_log("Apollo: No match for personal email $email. Trying deep search.");
-        $deepData = deepEnrichment($email, $firstName, $lastName, $phone);
-
-        if ($deepData && !isset($deepData['error'])) {
-            $person = [
-                'name' => $deepData['full_name'] ?? "$firstName $lastName",
-                'title' => $deepData['job_title'] ?? null,
-                'linkedin_url' => $deepData['linkedin_url'] ?? null,
-                'twitter_url' => $deepData['twitter_url'] ?? null,
-                'github_url' => $deepData['github_url'] ?? null,
-                'facebook_url' => $deepData['facebook_url'] ?? null,
-                'city' => $deepData['city'] ?? null,
-                'state' => $deepData['state'] ?? null,
-                'country' => $deepData['country'] ?? null,
-                'seniority' => $deepData['seniority'] ?? null,
-                'photo_url' => $deepData['photo_url'] ?? null,
-                'headline' => $deepData['headline'] ?? null,
-                'organization' => [
-                    'name' => $deepData['company'] ?? null,
-                    'primary_domain' => $deepData['company_domain'] ?? null,
-                    'industry' => $deepData['industry'] ?? null,
-                    'short_description' => $deepData['company_description'] ?? null,
-                    'estimated_num_employees' => $deepData['employee_count'] ?? null,
-                    'annual_revenue_printed' => $deepData['annual_revenue'] ?? null,
-                    'logo_url' => null
-                ],
-                '_deep_data' => $deepData
-            ];
-            $finalResponseRaw = json_encode(['source' => 'deep_search', 'person' => $person]);
-        }
-    }
-
     if (!$person) {
         error_log("Apollo: No match found for $email");
         return ['status' => 'no_match'];
