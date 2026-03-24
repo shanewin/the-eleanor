@@ -3,7 +3,8 @@
 error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
 ini_set('display_errors', 0);
 session_start();
-require_once 'enrichment.php'; // Add this for lead intelligence
+require_once 'enrichment.php';
+require_once 'smtp-mail.php';
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Content-Type: application/json');
@@ -113,14 +114,9 @@ $logEntry = implode('|', [
 
 file_put_contents($submissionFile, $logEntry, FILE_APPEND);
 
-// Send email
+// Send email via SMTP
 $to = NOTIFICATION_EMAIL;
 $subject = 'New Wait List Submission - ' . $firstName . ' ' . $lastName;
-$headers = "From: info@theeleanor.nyc\r\n";
-$headers .= "Reply-To: $email\r\n";
-$headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-$headers .= "X-Mailer: PHP/" . phpversion() . "\r\n";
-
 $body = <<<EOD
 New Wait List Inquiry for The Eleanor:
 
@@ -138,8 +134,7 @@ $message
 Date: ${logEntry}
 EOD;
 
-// Send email - Make it quiet to avoid 500 errors if mail fails
-$emailSent = @mail($to, $subject, $body, $headers);
+$emailSent = smtpSend($to, $subject, $body, $email);
 
 if (!$emailSent) {
     error_log("Failed to send notification email to $to");

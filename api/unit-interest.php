@@ -11,7 +11,8 @@ session_start([
 
 require_once 'enrichment.php';
 require_once 'db_config.php';
-require_once 'config.php'; // Explicitly include for NOTIFICATION_EMAIL
+require_once 'config.php';
+require_once 'smtp-mail.php';
 
 // Security headers
 header('X-Content-Type-Options: nosniff');
@@ -81,16 +82,9 @@ try {
     error_log("Database insert failed (Unit Inquiry): " . $e->getMessage());
 }
 
-// Send email notification
+// Send email notification via SMTP
 $to = NOTIFICATION_EMAIL;
 $subject = "New Unit Inquiry: " . $unitValue;
-$headers = [
-    'From: info@theeleanor.nyc',
-    'Reply-To: ' . $email,
-    'Content-Type: text/plain; charset=UTF-8',
-    'X-Mailer: PHP/' . phpversion()
-];
-
 $body = "New Unit Inquiry details:\n\n" . implode("\n", [
     "Unit: " . $unitValue,
     "Name: " . $firstName . " " . $lastName,
@@ -100,7 +94,7 @@ $body = "New Unit Inquiry details:\n\n" . implode("\n", [
     "Message:\n" . $message
 ]);
 
-$emailSent = @mail($to, $subject, $body, implode("\r\n", $headers));
+$emailSent = smtpSend($to, $subject, $body, $email);
 
 if (!$emailSent) {
     error_log("Failed to send unit inquiry notification to $to");

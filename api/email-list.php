@@ -46,7 +46,8 @@ if ($consent !== 'Yes') {
 
 // Database storage
 require_once 'db_config.php';
-require_once 'enrichment.php'; // Add enrichment
+require_once 'enrichment.php';
+require_once 'smtp-mail.php';
 
 $trackingId = clean($_POST['tracking_id'] ?? '');
 
@@ -67,14 +68,6 @@ try {
 // Prepare email
 $to = NOTIFICATION_EMAIL;
 $subject = 'New Email List Signup - ' . $firstName . ' ' . $lastName;
-
-$headers = [
-    'From: info@theeleanor.nyc',
-    'Reply-To: ' . $email,
-    'Content-Type: text/plain; charset=UTF-8',
-    'X-Mailer: PHP/' . phpversion()
-];
-
 $body = "New Email List Signup:\n\n" . implode("\n", [
     "Name: " . $firstName . " " . $lastName,
     "Email: " . $email,
@@ -83,8 +76,7 @@ $body = "New Email List Signup:\n\n" . implode("\n", [
     "Date: " . date('Y-m-d H:i:s')
 ]);
 
-// Send email
-@mail($to, $subject, $body, implode("\r\n", $headers));
+smtpSend($to, $subject, $body, $email);
 
 echo json_encode([
     'success' => true,

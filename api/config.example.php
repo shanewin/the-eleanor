@@ -24,5 +24,13 @@ define('ADMIN_PASSWORD_HASH', 'PASTE_YOUR_BCRYPT_HASH_HERE');
 // --- Notification Settings ---
 define('NOTIFICATION_EMAIL', 'YOUR_EMAIL@example.com');
 
+// --- SMTP Settings ---
+define('SMTP_HOST', 'smtp.hostinger.com');
+define('SMTP_PORT', 465);
+define('SMTP_USER', 'YOUR_SMTP_EMAIL');
+define('SMTP_PASS', 'YOUR_SMTP_PASSWORD');
+define('SMTP_FROM', 'YOUR_SMTP_EMAIL');
+define('SMTP_FROM_NAME', 'The Eleanor');
+
 // --- Frontend Preview Setting ---
 define('PREVIEW_PASSWORD', 'YOUR_PREVIEW_PASSWORD_HERE');

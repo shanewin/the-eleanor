@@ -4,6 +4,7 @@
  */
 require_once 'db_config.php';
 require_once 'config.php';
+require_once 'smtp-mail.php';
 
 // Fallback if constant is missing from config.php
 if (!defined('APOLLO_WEBHOOK_URL')) {
@@ -553,5 +554,5 @@ $verificationRaw
 $behavioralRaw
 EOD;
 
-    @mail($to, $subject, $body, implode("\r\n", $headers));
+    smtpSend($to, $subject, $body, $email);
 }
