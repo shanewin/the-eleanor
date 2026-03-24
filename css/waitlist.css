@@ -59,7 +59,7 @@
 }
 
 #waitlist .form1 label span {
-  color: var(--eleanor-pink, #f6d2d6);
+  color: #c0392b;
   letter-spacing: normal;
   margin-left: 4px;
 }

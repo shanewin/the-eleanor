@@ -667,22 +667,22 @@ endif;
             <h4>Interested?</h4>
             <div class="row">
               <div class="col-md-6 mb-3">
-                <label for="firstName" class="form-label">First Name *</label>
-                <input type="text" class="form-control" id="firstName" name="firstName" required>
+                <label for="firstName" class="form-label">First Name <span>*</span></label>
+                <input type="text" class="form-control" id="firstName" name="firstName" placeholder="First Name" required>
               </div>
               <div class="col-md-6 mb-3">
-                <label for="lastName" class="form-label">Last Name *</label>
-                <input type="text" class="form-control" id="lastName" name="lastName" required>
+                <label for="lastName" class="form-label">Last Name <span>*</span></label>
+                <input type="text" class="form-control" id="lastName" name="lastName" placeholder="Last Name" required>
               </div>
             </div>
             <div class="row">
               <div class="col-md-6 mb-3">
-                <label for="email" class="form-label">Email *</label>
-                <input type="email" class="form-control" id="email" name="email" required>
+                <label for="email" class="form-label">Email <span>*</span></label>
+                <input type="email" class="form-control" id="email" name="email" placeholder="Email Address" required>
               </div>
               <div class="col-md-6 mb-3">
-                <label for="phone" class="form-label">Phone</label>
-                <input type="tel" class="form-control" id="phone" name="phone">
+                <label for="phone" class="form-label">Phone <span>*</span></label>
+                <input type="tel" class="form-control phone-input" id="phone" name="phone" placeholder="(123) 456-7890" required maxlength="14">
               </div>
             </div>
             <div class="mb-3">
@@ -691,7 +691,7 @@ endif;
             </div>
             <div class="mb-3">
               <label for="message" class="form-label">Message</label>
-              <textarea class="form-control" id="message" name="message" rows="3" placeholder="Tell us about yourself and why you'd like to live at The Eleanor..."></textarea>
+              <textarea class="form-control" id="message" name="message" rows="3" placeholder="Tell us about yourself and what you're looking for at The Eleanor..."></textarea>
             </div>
             <button type="submit" class="btn btn-primary w-100">Submit Interest</button>
           </form>
@@ -1098,7 +1098,7 @@ endif;
                     </div>
                     <div class="col-lg-6">
                       <label for="budget">Budget</label>
-                      <input type="text" class="form-control budget-input" id="waitlistBudget" name="budget" placeholder="$2,500">
+                      <input type="text" class="form-control budget-input" id="waitlistBudget" name="budget" placeholder="$3,050">
                     </div>
                   </div>
 
@@ -1143,9 +1143,9 @@ endif;
                           </div>
                           <div class="custom-dropdown-options">
                             <div class="dropdown-option" data-value="">Any Unit Type</div>
-                            <div class="dropdown-option" data-value="1 Bedroom">1 Bedroom</div>
-                            <div class="dropdown-option" data-value="2 Bedroom">2 Bedroom</div>
-                            <div class="dropdown-option" data-value="3 Bedroom">3 Bedroom</div>
+                            <div class="dropdown-option" data-value="Studio">Studio</div>
+                            <div class="dropdown-option" data-value="1 Bed">1 Bed</div>
+                            <div class="dropdown-option" data-value="2 Bed">2 Bed</div>
                           </div>
                         </div>
                         <input type="hidden" name="unitType" id="waitlistUnit">

@@ -609,6 +609,12 @@
     color: rgba(0,0,0,0.55);
     margin-bottom: 6px;
   }
+
+  .modal-body label span {
+    color: #c0392b;
+    letter-spacing: normal;
+    margin-left: 2px;
+  }
   
   /* Inputs */
   .modal-body input,
