@@ -547,122 +547,120 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
     }
 
     $name = $person['name'] ?? trim("$firstName $lastName");
-    $title = $person['title'] ?? null;
-    $company = $person['organization']['name'] ?? null;
-    $industry = $person['organization']['industry'] ?? null;
-    $employees = $person['organization']['estimated_num_employees'] ?? null;
-    $revenue = $person['organization']['annual_revenue_printed'] ?? null;
+    $title = $person['title'] ?? '—';
+    $company = $person['organization']['name'] ?? '—';
+    $industry = $person['organization']['industry'] ?? '—';
+    $employees = $person['organization']['estimated_num_employees'] ?? '—';
+    $revenue = $person['organization']['annual_revenue_printed'] ?? '—';
     $linkedin = $person['linkedin_url'] ?? null;
     $photo = $person['photo_url'] ?? null;
-    $headline = $person['headline'] ?? null;
+    $headline = $person['headline'] ?? '—';
     $city = $person['city'] ?? null;
     $state = $person['state'] ?? null;
     $country = $person['country'] ?? null;
-    $location = implode(', ', array_filter([$city, $state, $country]));
+    $location = implode(', ', array_filter([$city, $state, $country])) ?: '—';
 
     $initials = strtoupper(substr($firstName ?? '', 0, 1) . substr($lastName ?? '', 0, 1));
-    $avatarHtml = $photo
-        ? "<img src=\"$photo\" style=\"width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #3b82f6\">"
-        : "<div style=\"width:80px;height:80px;border-radius:50%;background:#3b82f6;color:white;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:Arial\">$initials</div>";
+    $avatarUrl = $photo ?: "https://ui-avatars.com/api/?name=" . urlencode($name) . "&background=3b82f6&color=fff&size=120&bold=true";
+    $linkedinRow = $linkedin ? "<tr><td style=\"color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a\">LinkedIn</td><td style=\"padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a\"><a href=\"{$linkedin}\" style=\"color:#5b9bf6;text-decoration:none\">View Profile</a></td></tr>" : '';
 
-    $linkedinHtml = $linkedin
-        ? "<a href=\"$linkedin\" style=\"color:#3b82f6;text-decoration:none\">View LinkedIn Profile →</a>"
-        : '';
-
-    // Build behavioral section
-    $behaviorHtml = '';
+    // Build behavioral rows
+    $behaviorRows = '';
     if (!empty($sectionsViewed)) {
         arsort($sectionsViewed);
-        $behaviorHtml .= '<div style="margin-bottom:12px"><strong style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px">Sections Viewed</strong>';
         $count = 0;
         foreach ($sectionsViewed as $sec => $time) {
             if ($count++ >= 5) break;
-            $width = min(100, max(10, ($time / max(1, max($sectionsViewed))) * 100));
-            $behaviorHtml .= "<div style=\"margin:6px 0\"><div style=\"display:flex;justify-content:space-between;font-size:13px;color:#e2e8f0;margin-bottom:2px\"><span>" . ucfirst($sec) . "</span><span style=\"color:#94a3b8\">" . round($time) . "s</span></div><div style=\"background:#1e293b;border-radius:4px;height:6px\"><div style=\"background:linear-gradient(90deg,#3b82f6,#60a5fa);height:6px;border-radius:4px;width:{$width}%\"></div></div></div>";
+            $behaviorRows .= "<tr><td style=\"color:#999;padding:6px 12px;font-size:13px\">" . ucfirst($sec) . "</td><td style=\"padding:6px 12px;font-size:13px;color:#ccc\">" . round($time) . "s</td></tr>";
         }
-        $behaviorHtml .= '</div>';
     }
+    $actionTags = '';
     if (!empty($buttonsClicked)) {
         $counts = array_count_values($buttonsClicked);
         arsort($counts);
-        $behaviorHtml .= '<div><strong style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px">Actions Taken</strong>';
         foreach ($counts as $btn => $clk) {
-            $behaviorHtml .= "<div style=\"display:inline-block;margin:4px 4px 0 0;padding:4px 10px;background:#1e293b;border-radius:20px;font-size:12px;color:#e2e8f0\">{$btn} <span style=\"color:#3b82f6;font-weight:600\">×{$clk}</span></div>";
+            $actionTags .= "<span style=\"display:inline-block;margin:3px;padding:4px 12px;background:#2a2a2a;border-radius:12px;font-size:12px;color:#ccc\">{$btn} ({$clk})</span>";
         }
-        $behaviorHtml .= '</div>';
     }
 
     $to = defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : 'admin@theeleanor.nyc';
-    $subject = "New Lead: $name" . ($company ? " @ $company" : '');
+    $subject = "New Lead: $name" . ($company !== '—' ? " @ $company" : '');
 
     $body = <<<EOD
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
-<div style="max-width:600px;margin:0 auto;background:#0f172a;color:#e2e8f0">
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#111;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#111111"><tr><td align="center" style="padding:20px 10px">
+<table width="560" cellpadding="0" cellspacing="0" bgcolor="#1a1a1a" style="border-radius:8px;overflow:hidden">
 
   <!-- Header -->
-  <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:32px 24px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06)">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#64748b;margin-bottom:4px">The Eleanor</div>
-    <div style="font-size:20px;font-weight:300;color:white;letter-spacing:1px">Lead Intelligence Report</div>
-  </div>
+  <tr><td bgcolor="#1a1a1a" style="padding:28px 30px 0;text-align:center">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:4px;color:#666">The Eleanor</div>
+    <div style="font-size:20px;color:#fff;margin-top:4px;font-weight:300;letter-spacing:1px">Lead Intelligence Report</div>
+    <div style="width:40px;height:2px;background:#5b9bf6;margin:16px auto 0"></div>
+  </td></tr>
 
-  <!-- Profile Card -->
-  <div style="padding:32px 24px;text-align:center;background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%)">
-    <div style="margin-bottom:16px">$avatarHtml</div>
-    <div style="font-size:24px;font-weight:600;color:white;margin-bottom:4px">$name</div>
-    <div style="font-size:14px;color:#3b82f6;margin-bottom:4px">{$title}</div>
-    <div style="font-size:13px;color:#64748b">{$company}</div>
-  </div>
+  <!-- Avatar + Name -->
+  <tr><td style="padding:28px 30px 20px;text-align:center">
+    <img src="{$avatarUrl}" width="90" height="90" style="border-radius:50%;border:3px solid #333;display:block;margin:0 auto" />
+    <div style="font-size:22px;font-weight:700;color:#fff;margin-top:14px">{$name}</div>
+    <div style="font-size:14px;color:#5b9bf6;margin-top:4px">{$title}</div>
+    <div style="font-size:13px;color:#888;margin-top:2px">{$company}</div>
+  </td></tr>
 
-  <!-- Contact Info -->
-  <div style="padding:0 24px 24px;display:flex;gap:16px">
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="background:#1e293b;border-radius:10px;padding:14px 16px;width:50%">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px">Email</div>
-        <div style="font-size:13px;color:white;word-break:break-all">$email</div>
-      </td>
-      <td width="12"></td>
-      <td style="background:#1e293b;border-radius:10px;padding:14px 16px;width:50%">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px">Phone</div>
-        <div style="font-size:13px;color:white">{$phone}</div>
-      </td>
-    </tr></table>
-  </div>
+  <!-- Divider -->
+  <tr><td style="padding:0 30px"><div style="height:1px;background:#2a2a2a"></div></td></tr>
 
-  <!-- Professional Details -->
-  <div style="padding:0 24px 24px">
-    <div style="background:#1e293b;border-radius:12px;padding:20px">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:16px;font-weight:600">Professional Intel</div>
-      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px">
-        <tr><td style="color:#94a3b8;padding:6px 0;width:110px">Industry</td><td style="color:white;padding:6px 0">{$industry}</td></tr>
-        <tr><td style="color:#94a3b8;padding:6px 0">Employees</td><td style="color:white;padding:6px 0">{$employees}</td></tr>
-        <tr><td style="color:#94a3b8;padding:6px 0">Revenue</td><td style="color:white;padding:6px 0">{$revenue}</td></tr>
-        <tr><td style="color:#94a3b8;padding:6px 0">Location</td><td style="color:white;padding:6px 0">{$location}</td></tr>
-        <tr><td style="color:#94a3b8;padding:6px 0">Headline</td><td style="color:white;padding:6px 0">{$headline}</td></tr>
-      </table>
-      <div style="margin-top:16px">$linkedinHtml</div>
-    </div>
-  </div>
+  <!-- Contact -->
+  <tr><td style="padding:20px 30px">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="50%" style="padding:10px 12px;background:#222;border-radius:6px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#666">Email</div>
+          <div style="font-size:13px;color:#fff;margin-top:3px">{$email}</div>
+        </td>
+        <td width="10"></td>
+        <td width="50%" style="padding:10px 12px;background:#222;border-radius:6px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#666">Phone</div>
+          <div style="font-size:13px;color:#fff;margin-top:3px">{$phone}</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Professional Intel -->
+  <tr><td style="padding:0 30px 20px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#666;margin-bottom:10px;font-weight:700">Professional Intel</div>
+    <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#222" style="border-radius:6px;overflow:hidden">
+      <tr><td style="color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a">Title</td><td style="padding:8px 12px;font-size:13px;color:#fff;border-bottom:1px solid #2a2a2a">{$title}</td></tr>
+      <tr><td style="color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a">Company</td><td style="padding:8px 12px;font-size:13px;color:#fff;border-bottom:1px solid #2a2a2a">{$company}</td></tr>
+      <tr><td style="color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a">Industry</td><td style="padding:8px 12px;font-size:13px;color:#fff;border-bottom:1px solid #2a2a2a">{$industry}</td></tr>
+      <tr><td style="color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a">Employees</td><td style="padding:8px 12px;font-size:13px;color:#fff;border-bottom:1px solid #2a2a2a">{$employees}</td></tr>
+      <tr><td style="color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a">Location</td><td style="padding:8px 12px;font-size:13px;color:#fff;border-bottom:1px solid #2a2a2a">{$location}</td></tr>
+      <tr><td style="color:#999;padding:8px 12px;font-size:13px;border-bottom:1px solid #2a2a2a">Headline</td><td style="padding:8px 12px;font-size:13px;color:#fff;border-bottom:1px solid #2a2a2a">{$headline}</td></tr>
+      {$linkedinRow}
+    </table>
+  </td></tr>
 
   <!-- Behavioral Journey -->
-  <div style="padding:0 24px 24px">
-    <div style="background:#1e293b;border-radius:12px;padding:20px">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:4px;font-weight:600">Behavioral Journey</div>
-      <div style="font-size:12px;color:#475569;margin-bottom:16px">$totalEvents tracking events captured</div>
-      $behaviorHtml
-    </div>
-  </div>
+  <tr><td style="padding:0 30px 20px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#666;margin-bottom:10px;font-weight:700">Behavioral Journey</div>
+    <div style="font-size:12px;color:#555;margin-bottom:10px">{$totalEvents} events tracked</div>
+    <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#222" style="border-radius:6px;overflow:hidden">
+      {$behaviorRows}
+    </table>
+    <div style="margin-top:10px">{$actionTags}</div>
+  </td></tr>
 
   <!-- Footer -->
-  <div style="padding:24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06)">
-    <div style="font-size:11px;color:#475569">The Eleanor Intelligence System · <a href="https://eleanorbk.com/admin/" style="color:#3b82f6;text-decoration:none">Open Dashboard</a></div>
-  </div>
+  <tr><td style="padding:20px 30px;text-align:center;border-top:1px solid #2a2a2a">
+    <a href="https://eleanorbk.com/admin/" style="color:#5b9bf6;font-size:13px;text-decoration:none;font-weight:600">Open Dashboard →</a>
+    <div style="font-size:10px;color:#444;margin-top:8px">The Eleanor Intelligence System</div>
+  </td></tr>
 
-</div>
-</body>
-</html>
+</table>
+</td></tr></table>
+</body></html>
 EOD;
 
     smtpSend($to, $subject, $body, $email, true);
