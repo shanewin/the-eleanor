@@ -277,136 +277,29 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
 function enrichLead($email, $firstName = null, $lastName = null, $phone = null) {
     global $pdo;
 
-    // 1. Check if we already have data for this email (Case-insensitive)
+    // 1. Check if we already have data for this email
     $stmt = $pdo->prepare("SELECT id FROM lead_enrichment WHERE TRIM(LOWER(email)) = ?");
     $stmt->execute([trim(strtolower($email))]);
     if ($stmt->fetch()) {
         return ['status' => 'already_enriched'];
     }
 
-    // Extract email domain for verification (ignore common personal email providers)
-    $emailDomain = strtolower(substr($email, strpos($email, '@') + 1));
-    $personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'me.com', 'live.com', 'msn.com', 'protonmail.com', 'mail.com'];
-    $isCorpEmail = !in_array($emailDomain, $personalDomains);
-
-    // 2. Try Standard Match with Webhook
+    // 2. Apollo match — simple, direct lookup by email
     $matchRes = apolloRequest("https://api.apollo.io/api/v1/people/match", [
         'email' => $email,
         'first_name' => $firstName,
         'last_name' => $lastName,
-        'phone_number' => $phone,
         'reveal_personal_emails' => true,
-        'reveal_phone_number' => true,
-        'webhook_url' => APOLLO_WEBHOOK_URL,
-        'run_waterfall_email' => true,
-        'run_waterfall_phone' => true
+        'reveal_phone_number' => true
     ]);
 
     $person = $matchRes['data']['person'] ?? null;
     $finalResponseRaw = $matchRes['raw'];
 
-    // 3. Disambiguation — verify Apollo match against email domain
-    $isSuspicious = false;
-    if ($person && $isCorpEmail) {
-        $personDomain = strtolower($person['organization']['primary_domain'] ?? '');
-        $personEmail = strtolower($person['email'] ?? '');
-
-        // If lead used a corporate email, the matched person's company domain should match
-        if ($personDomain && $personDomain !== $emailDomain) {
-            // Also check if the person's email domain matches (they might have multiple domains)
-            $personEmailDomain = $personEmail ? strtolower(substr($personEmail, strpos($personEmail, '@') + 1)) : '';
-            if ($personEmailDomain !== $emailDomain) {
-                $isSuspicious = true;
-                error_log("Domain mismatch: Lead email domain '$emailDomain' != Apollo company domain '$personDomain'. Flagging as suspicious.");
-            }
-        }
-    }
-
-    if (!$person || $isSuspicious) {
-        if ($isSuspicious) {
-            error_log("Apollo Collision Detected: Matched person's domain doesn't match lead email domain '$emailDomain'. Triggering fallbacks.");
-        } else {
-            error_log("Apollo No Match Found: Triggering search fallback.");
-        }
-
-        // Try Apollo Search — use email domain as company filter for corp emails
-        $searchPayload = ['q_person_name' => trim("$firstName $lastName"), 'page' => 1, 'per_page' => 5];
-        if ($isCorpEmail) {
-            $searchPayload['q_organization_domains'] = $emailDomain;
-        }
-        $searchRes = apolloRequest("https://api.apollo.io/api/v1/mixed_people/api_search", $searchPayload);
-
-        $searchPeople = $searchRes['data']['people'] ?? [];
-        $bestMatch = null;
-
-        // Find the best match: prioritize email match, then domain match
-        foreach ($searchPeople as $candidate) {
-            if (strtolower($candidate['email'] ?? '') === strtolower($email)) {
-                $bestMatch = $candidate;
-                break;
-            }
-            $candidateDomain = strtolower($candidate['organization']['primary_domain'] ?? '');
-            if ($isCorpEmail && $candidateDomain === $emailDomain && !$bestMatch) {
-                $bestMatch = $candidate;
-            }
-        }
-
-        if ($bestMatch) {
-            $hydratePayload = ['person_ids' => [$bestMatch['id']], 'reveal_personal_emails' => true, 'webhook_url' => APOLLO_WEBHOOK_URL];
-            $hydrateRes = apolloRequest("https://api.apollo.io/api/v1/people/bulk_match", $hydratePayload);
-            $hydratedPerson = $hydrateRes['data']['people'][0] ?? null;
-
-            if ($hydratedPerson) {
-                $person = $hydratedPerson;
-                $isSuspicious = false;
-                $finalResponseRaw = json_encode(['person' => $person]);
-                error_log("Apollo Search found verified match for $email via domain '$emailDomain'.");
-            }
-        }
-    }
-
-    // 4. DEEP SEARCH FALLBACK (LinkedIn Scraper)
-    // We run this if Apollo found nothing OR if Apollo is still suspicious (location mismatch)
-    if (!$person || $isSuspicious) {
-        // --- DEEP SEARCH FALLBACK ---
-        error_log("Apollo failed to find a match for $email. Triggering Deep Search fallback.");
-        $deepData = deepEnrichment($email, $firstName, $lastName, $phone);
-        
-        if ($deepData && !isset($deepData['error'])) {
-            // Remap deepData to match Apollo structure for the database insert
-            $person = [
-                'name' => $deepData['full_name'] ?? "$firstName $lastName",
-                'title' => $deepData['job_title'] ?? null,
-                'linkedin_url' => $deepData['linkedin_url'] ?? null,
-                'twitter_url' => $deepData['twitter_url'] ?? null,
-                'github_url' => $deepData['github_url'] ?? null,
-                'facebook_url' => $deepData['facebook_url'] ?? null,
-                'city' => $deepData['city'] ?? null,
-                'state' => $deepData['state'] ?? null,
-                'country' => $deepData['country'] ?? null,
-                'seniority' => $deepData['seniority'] ?? null,
-                'photo_url' => $deepData['photo_url'] ?? null,
-                'headline' => $deepData['headline'] ?? null,
-                'employment_history' => $deepData['employment_history'] ?? [],
-                'education_history' => $deepData['education_history'] ?? [],
-                'organization' => [
-                    'name' => $deepData['company'] ?? null,
-                    'primary_domain' => $deepData['company_domain'] ?? null,
-                    'industry' => $deepData['industry'] ?? null,
-                    'short_description' => $deepData['company_description'] ?? null,
-                    'estimated_num_employees' => $deepData['employee_count'] ?? null,
-                    'annual_revenue_printed' => $deepData['annual_revenue'] ?? null,
-                    'logo_url' => null
-                ],
-                '_deep_data' => $deepData
-            ];
-            $finalResponseRaw = json_encode([
-                'source' => 'tavily_fallback', 
-                'person' => $person
-            ]);
-        } else {
-            return ['status' => 'no_match'];
-        }
+    // 3. If no match, just save with no enrichment data
+    if (!$person) {
+        error_log("Apollo: No match found for $email");
+        return ['status' => 'no_match'];
     }
 
     // 4. Store the Enriched Data
