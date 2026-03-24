@@ -547,49 +547,123 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
     }
 
     $name = $person['name'] ?? trim("$firstName $lastName");
-    $title = $person['title'] ?? 'Not found';
-    $company = $person['organization']['name'] ?? 'Not found';
-    $industry = $person['organization']['industry'] ?? 'Not found';
-    $employees = $person['organization']['estimated_num_employees'] ?? 'Not found';
-    $revenue = $person['organization']['annual_revenue_printed'] ?? 'Not found';
-    $linkedin = $person['linkedin_url'] ?? 'Not found';
+    $title = $person['title'] ?? null;
+    $company = $person['organization']['name'] ?? null;
+    $industry = $person['organization']['industry'] ?? null;
+    $employees = $person['organization']['estimated_num_employees'] ?? null;
+    $revenue = $person['organization']['annual_revenue_printed'] ?? null;
+    $linkedin = $person['linkedin_url'] ?? null;
+    $photo = $person['photo_url'] ?? null;
+    $headline = $person['headline'] ?? null;
+    $city = $person['city'] ?? null;
+    $state = $person['state'] ?? null;
+    $country = $person['country'] ?? null;
+    $location = implode(', ', array_filter([$city, $state, $country]));
 
-    $isDeepSearch = isset($person['_deep_data']) && isset($person['_deep_data']['identity_confidence']);
-    $verificationRaw = "";
-    if ($isDeepSearch) {
-        $conf = $person['_deep_data']['identity_confidence'];
-        $reason = $person['_deep_data']['reasoning'];
-        $verificationRaw = "\nDEEP SEARCH VERIFICATION\n----------------------------------------\nAI Confidence Score: $conf%\nReasoning: $reason\n";
+    $initials = strtoupper(substr($firstName ?? '', 0, 1) . substr($lastName ?? '', 0, 1));
+    $avatarHtml = $photo
+        ? "<img src=\"$photo\" style=\"width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #3b82f6\">"
+        : "<div style=\"width:80px;height:80px;border-radius:50%;background:#3b82f6;color:white;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:Arial\">$initials</div>";
+
+    $linkedinHtml = $linkedin
+        ? "<a href=\"$linkedin\" style=\"color:#3b82f6;text-decoration:none\">View LinkedIn Profile →</a>"
+        : '';
+
+    // Build behavioral section
+    $behaviorHtml = '';
+    if (!empty($sectionsViewed)) {
+        arsort($sectionsViewed);
+        $behaviorHtml .= '<div style="margin-bottom:12px"><strong style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px">Sections Viewed</strong>';
+        $count = 0;
+        foreach ($sectionsViewed as $sec => $time) {
+            if ($count++ >= 5) break;
+            $width = min(100, max(10, ($time / max(1, max($sectionsViewed))) * 100));
+            $behaviorHtml .= "<div style=\"margin:6px 0\"><div style=\"display:flex;justify-content:space-between;font-size:13px;color:#e2e8f0;margin-bottom:2px\"><span>" . ucfirst($sec) . "</span><span style=\"color:#94a3b8\">" . round($time) . "s</span></div><div style=\"background:#1e293b;border-radius:4px;height:6px\"><div style=\"background:linear-gradient(90deg,#3b82f6,#60a5fa);height:6px;border-radius:4px;width:{$width}%\"></div></div></div>";
+        }
+        $behaviorHtml .= '</div>';
+    }
+    if (!empty($buttonsClicked)) {
+        $counts = array_count_values($buttonsClicked);
+        arsort($counts);
+        $behaviorHtml .= '<div><strong style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px">Actions Taken</strong>';
+        foreach ($counts as $btn => $clk) {
+            $behaviorHtml .= "<div style=\"display:inline-block;margin:4px 4px 0 0;padding:4px 10px;background:#1e293b;border-radius:20px;font-size:12px;color:#e2e8f0\">{$btn} <span style=\"color:#3b82f6;font-weight:600\">×{$clk}</span></div>";
+        }
+        $behaviorHtml .= '</div>';
     }
 
     $to = defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : 'admin@theeleanor.nyc';
-    $subject = "Enrichment Profile: $name";
-    $headers = [
-        'From: info@theeleanor.nyc',
-        'Reply-To: ' . $email,
-        'Content-Type: text/plain; charset=UTF-8',
-        'X-Mailer: PHP/' . phpversion()
-    ];
+    $subject = "New Lead: $name" . ($company ? " @ $company" : '');
 
     $body = <<<EOD
-LEAD INTELLIGENCE PROFILE
-----------------------------------------
-Identity
-- Name: $name
-- Email: $email
-- Title: $title
-- Company: $company
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<div style="max-width:600px;margin:0 auto;background:#0f172a;color:#e2e8f0">
 
-Firmographics
-- Industry: $industry
-- Employees: $employees
-- Revenue: $revenue
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:32px 24px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06)">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#64748b;margin-bottom:4px">The Eleanor</div>
+    <div style="font-size:20px;font-weight:300;color:white;letter-spacing:1px">Lead Intelligence Report</div>
+  </div>
 
-Social & Links
-- LinkedIn: $linkedin
-$verificationRaw
-$behavioralRaw
+  <!-- Profile Card -->
+  <div style="padding:32px 24px;text-align:center;background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%)">
+    <div style="margin-bottom:16px">$avatarHtml</div>
+    <div style="font-size:24px;font-weight:600;color:white;margin-bottom:4px">$name</div>
+    <div style="font-size:14px;color:#3b82f6;margin-bottom:4px">{$title}</div>
+    <div style="font-size:13px;color:#64748b">{$company}</div>
+  </div>
+
+  <!-- Contact Info -->
+  <div style="padding:0 24px 24px;display:flex;gap:16px">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="background:#1e293b;border-radius:10px;padding:14px 16px;width:50%">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px">Email</div>
+        <div style="font-size:13px;color:white;word-break:break-all">$email</div>
+      </td>
+      <td width="12"></td>
+      <td style="background:#1e293b;border-radius:10px;padding:14px 16px;width:50%">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px">Phone</div>
+        <div style="font-size:13px;color:white">{$phone}</div>
+      </td>
+    </tr></table>
+  </div>
+
+  <!-- Professional Details -->
+  <div style="padding:0 24px 24px">
+    <div style="background:#1e293b;border-radius:12px;padding:20px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:16px;font-weight:600">Professional Intel</div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px">
+        <tr><td style="color:#94a3b8;padding:6px 0;width:110px">Industry</td><td style="color:white;padding:6px 0">{$industry}</td></tr>
+        <tr><td style="color:#94a3b8;padding:6px 0">Employees</td><td style="color:white;padding:6px 0">{$employees}</td></tr>
+        <tr><td style="color:#94a3b8;padding:6px 0">Revenue</td><td style="color:white;padding:6px 0">{$revenue}</td></tr>
+        <tr><td style="color:#94a3b8;padding:6px 0">Location</td><td style="color:white;padding:6px 0">{$location}</td></tr>
+        <tr><td style="color:#94a3b8;padding:6px 0">Headline</td><td style="color:white;padding:6px 0">{$headline}</td></tr>
+      </table>
+      <div style="margin-top:16px">$linkedinHtml</div>
+    </div>
+  </div>
+
+  <!-- Behavioral Journey -->
+  <div style="padding:0 24px 24px">
+    <div style="background:#1e293b;border-radius:12px;padding:20px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:4px;font-weight:600">Behavioral Journey</div>
+      <div style="font-size:12px;color:#475569;margin-bottom:16px">$totalEvents tracking events captured</div>
+      $behaviorHtml
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="padding:24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06)">
+    <div style="font-size:11px;color:#475569">The Eleanor Intelligence System · <a href="https://eleanorbk.com/admin/" style="color:#3b82f6;text-decoration:none">Open Dashboard</a></div>
+  </div>
+
+</div>
+</body>
+</html>
 EOD;
 
-    smtpSend($to, $subject, $body, $email);
+    smtpSend($to, $subject, $body, $email, true);
 }

@@ -4,7 +4,7 @@
  * Uses SSL connection to smtp.hostinger.com:465.
  */
 
-function smtpSend($to, $subject, $body, $replyTo = null) {
+function smtpSend($to, $subject, $body, $replyTo = null, $isHtml = false) {
     $host = SMTP_HOST;
     $port = SMTP_PORT;
     $user = SMTP_USER;
@@ -65,7 +65,8 @@ function smtpSend($to, $subject, $body, $replyTo = null) {
         $message .= "Reply-To: $replyTo\r\n";
     }
     $message .= "MIME-Version: 1.0\r\n";
-    $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $contentType = $isHtml ? 'text/html' : 'text/plain';
+    $message .= "Content-Type: $contentType; charset=UTF-8\r\n";
     $message .= "Date: " . date('r') . "\r\n";
     $message .= "\r\n";
     // Escape dots at start of lines
