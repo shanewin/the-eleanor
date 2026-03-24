@@ -6,8 +6,8 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     
-    // Check against the hash in config.php
-    if (password_verify($password, ADMIN_PASSWORD_HASH)) {
+    // Check against password in config.php
+    if ($password === ADMIN_PASSWORD_HASH) {
         $_SESSION['admin_logged_in'] = true;
         header('Location: index.php');
         exit;
