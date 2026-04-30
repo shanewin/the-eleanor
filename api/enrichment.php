@@ -305,12 +305,11 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
 }
 
 function enrichLead($email, $firstName = null, $lastName = null, $phone = null) {
-    global $pdo;
+    global $sb;
 
     // 1. Check if we already have data for this email
-    $stmt = $pdo->prepare("SELECT id FROM lead_enrichment WHERE TRIM(LOWER(email)) = ?");
-    $stmt->execute([trim(strtolower($email))]);
-    if ($stmt->fetch()) {
+    $existing = $sb->selectOne('lead_enrichment', 'id', ['email=eq.' . urlencode(trim(strtolower($email)))]);
+    if ($existing) {
         return ['status' => 'already_enriched'];
     }
 
@@ -439,61 +438,64 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
 
     // 4. Store the Enriched Data
     try {
-        $stmt = $pdo->prepare("INSERT INTO lead_enrichment 
-            (email, full_name, job_title, company, company_domain, seniority, linkedin_url, twitter_url, github_url, facebook_url, city, state, country, employee_count, industry, annual_revenue, company_logo, company_description, headline, photo_url, raw_response) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        
-        $stmt->execute([
-            $email,
-            $person['name'] ?? null,
-            $person['title'] ?? null,
-            $person['organization']['name'] ?? null,
-            $person['organization']['primary_domain'] ?? null,
-            $person['seniority'] ?? null,
-            $person['linkedin_url'] ?? null,
-            $person['twitter_url'] ?? null,
-            $person['github_url'] ?? null,
-            $person['facebook_url'] ?? null,
-            $person['city'] ?? null,
-            $person['state'] ?? null,
-            $person['country'] ?? null,
-            $person['organization']['estimated_num_employees'] ?? null,
-            $person['organization']['industry'] ?? null,
-            $person['organization']['annual_revenue_printed'] ?? null,
-            $person['organization']['logo_url'] ?? null,
-            $person['organization']['short_description'] ?? null,
-            $person['headline'] ?? null,
-            $person['photo_url'] ?? null,
-            $finalResponseRaw
+        $rawJson = json_decode($finalResponseRaw, true);
+        $sb->insert('lead_enrichment', [
+            'email' => $email,
+            'full_name' => $person['name'] ?? null,
+            'job_title' => $person['title'] ?? null,
+            'company' => $person['organization']['name'] ?? null,
+            'company_domain' => $person['organization']['primary_domain'] ?? null,
+            'seniority' => $person['seniority'] ?? null,
+            'linkedin_url' => $person['linkedin_url'] ?? null,
+            'twitter_url' => $person['twitter_url'] ?? null,
+            'github_url' => $person['github_url'] ?? null,
+            'facebook_url' => $person['facebook_url'] ?? null,
+            'city' => $person['city'] ?? null,
+            'state' => $person['state'] ?? null,
+            'country' => $person['country'] ?? null,
+            'employee_count' => $person['organization']['estimated_num_employees'] ?? null,
+            'industry' => $person['organization']['industry'] ?? null,
+            'annual_revenue' => $person['organization']['annual_revenue_printed'] ?? null,
+            'company_logo' => $person['organization']['logo_url'] ?? null,
+            'company_description' => $person['organization']['short_description'] ?? null,
+            'headline' => $person['headline'] ?? null,
+            'photo_url' => $person['photo_url'] ?? null,
+            'raw_response' => $rawJson
         ]);
 
         sendEnrichmentEmail($email, $firstName, $lastName, $person);
 
         return [
-            'status' => 'success', 
+            'status' => 'success',
             'data' => $person
         ];
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         error_log("Database error in enrichment: " . $e->getMessage());
         return ['status' => 'db_error', 'message' => $e->getMessage()];
     }
 }
 
 function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
-    global $pdo;
+    global $sb;
 
-    $stmt = $pdo->prepare("
-        SELECT event_type, event_name, event_data, created_at 
-        FROM activity_logs 
-        WHERE session_id IN (
-            SELECT tracking_id FROM waitlist_submissions WHERE email = ?
-            UNION SELECT tracking_id FROM unit_inquiries WHERE email = ?
-            UNION SELECT tracking_id FROM mailing_list WHERE email = ?
-        )
-        ORDER BY created_at ASC
-    ");
-    $stmt->execute([$email, $email, $email]);
-    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get tracking IDs for this email from all submission tables
+    $trackingIds = [];
+    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+        $rows = $sb->select($table, 'tracking_id', ['email=eq.' . urlencode($email)]);
+        foreach ($rows as $r) {
+            if (!empty($r['tracking_id'])) $trackingIds[] = $r['tracking_id'];
+        }
+    }
+    $trackingIds = array_unique($trackingIds);
+
+    $logs = [];
+    if (!empty($trackingIds)) {
+        $idList = '(' . implode(',', array_map(function($id) { return '"' . $id . '"'; }, $trackingIds)) . ')';
+        $logs = $sb->select('activity_logs', 'event_type,event_name,event_data,created_at',
+            ['session_id=in.' . $idList],
+            'created_at.asc'
+        );
+    }
 
     $totalEvents = count($logs);
     $sectionsViewed = [];
@@ -501,7 +503,7 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
 
     foreach ($logs as $log) {
         if ($log['event_type'] === 'visibility' && $log['event_name'] === 'section_leave') {
-            $data = json_decode($log['event_data'], true);
+            $data = is_string($log['event_data']) ? json_decode($log['event_data'], true) : $log['event_data'];
             if ($data && isset($data['section'])) {
                 $sec = $data['section'];
                 $time = $data['secondsSpent'] ?? 0;
@@ -510,7 +512,7 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
             }
         }
         if ($log['event_type'] === 'click' && $log['event_name'] === 'button_click') {
-            $data = json_decode($log['event_data'], true);
+            $data = is_string($log['event_data']) ? json_decode($log['event_data'], true) : $log['event_data'];
             if ($data && !empty($data['text'])) {
                 $buttonsClicked[] = $data['text'];
             }

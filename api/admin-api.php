@@ -1,12 +1,11 @@
 <?php
 /**
- * Admin Data API
+ * Admin Data API — Supabase REST
  */
 header('Content-Type: application/json');
 require_once 'db_config.php';
 require_once '../admin/auth.php';
 
-// Security: Only allow logged-in admins
 if (!isAdmin()) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
@@ -16,113 +15,114 @@ if (!isAdmin()) {
 $action = $_GET['action'] ?? '';
 
 switch ($action) {
-    case 'stats':
-        getStats();
-        break;
-    case 'leads':
-        getLeads();
-        break;
-    case 'lead_detail':
-        getLeadDetail($_GET['email'] ?? '');
-        break;
-    case 'session_detail':
-        getSessionDetail($_GET['sessionId'] ?? '');
-        break;
-    case 'delete_lead':
-        deleteLead($_POST['email'] ?? '', $_POST['source'] ?? '');
-        break;
-    case 'lead_activity':
-        getLeadActivity($_GET['email'] ?? '');
-        break;
-    case 'analytics':
-        getAnalytics();
-        break;
-    default:
-        echo json_encode(['error' => 'Invalid action']);
+    case 'stats': getStats(); break;
+    case 'leads': getLeads(); break;
+    case 'lead_detail': getLeadDetail($_GET['email'] ?? ''); break;
+    case 'session_detail': getSessionDetail($_GET['sessionId'] ?? ''); break;
+    case 'delete_lead': deleteLead($_POST['email'] ?? '', $_POST['source'] ?? ''); break;
+    case 'lead_activity': getLeadActivity($_GET['email'] ?? ''); break;
+    case 'analytics': getAnalytics(); break;
+    default: echo json_encode(['error' => 'Invalid action']);
 }
 
 function getStats() {
-    global $pdo;
-    
-    // Total Unique Visitors (based on sessions)
-    $sessions = $pdo->query("SELECT COUNT(*) FROM tracking_sessions")->fetchColumn();
-    
-    // Total Unique Leads across all 3 sources
-    $leadsSql = "
-        SELECT COUNT(DISTINCT email) FROM (
-            SELECT email FROM waitlist_submissions
-            UNION ALL SELECT email FROM unit_inquiries
-            UNION ALL SELECT email FROM mailing_list
-        ) as all_emails";
-    $leads = $pdo->query($leadsSql)->fetchColumn();
-    
-    // Conversion Rate
-    $convRate = ($sessions > 0) ? round(($leads / $sessions) * 100, 1) : 0;
-    
-    // Top Interest (Most inquired unit)
-    $topUnitSql = "SELECT unit FROM unit_inquiries GROUP BY unit ORDER BY COUNT(*) DESC LIMIT 1";
-    $topUnit = $pdo->query($topUnitSql)->fetchColumn();
+    global $sb;
+
+    $sessions = $sb->select('tracking_sessions', 'id');
+    $sessionCount = count($sessions);
+
+    // Get unique emails across all 3 tables
+    $emails = [];
+    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+        $rows = $sb->select($table, 'email');
+        foreach ($rows as $r) $emails[strtolower($r['email'])] = true;
+    }
+    $leadCount = count($emails);
+
+    $convRate = ($sessionCount > 0) ? round(($leadCount / $sessionCount) * 100, 1) : 0;
+
+    // Top unit
+    $unitInquiries = $sb->select('unit_inquiries', 'unit');
+    $unitCounts = [];
+    foreach ($unitInquiries as $r) {
+        $u = $r['unit'];
+        $unitCounts[$u] = ($unitCounts[$u] ?? 0) + 1;
+    }
+    arsort($unitCounts);
+    $topUnit = $unitCounts ? array_key_first($unitCounts) : 'None';
 
     echo json_encode([
-        'totalSessions' => $sessions,
-        'totalLeads' => $leads,
+        'totalSessions' => $sessionCount,
+        'totalLeads' => $leadCount,
         'conversionRate' => $convRate . '%',
-        'hottestSection' => $topUnit ?: 'None'
+        'hottestSection' => $topUnit
     ]);
 }
 
 function getLeads() {
-    global $pdo;
-    
+    global $sb;
+
     try {
-        // Fetch all recent submissions from all sources with activity counts
-        $sql = "SELECT all_leads.source, all_leads.first_name, all_leads.last_name, all_leads.email, all_leads.created_at, all_leads.tracking_id, 
-                       e.job_title, e.company, e.photo_url, e.company_logo, e.annual_revenue, e.headline, e.raw_response,
-                       (SELECT COUNT(*) FROM activity_logs WHERE session_id = all_leads.tracking_id) as event_count
-                FROM (
-                    SELECT 'Waitlist' as source, first_name, last_name, email, created_at, tracking_id FROM waitlist_submissions
-                    UNION ALL
-                    SELECT 'Unit Interest' as source, first_name, last_name, email, created_at, tracking_id FROM unit_inquiries
-                    UNION ALL
-                    SELECT 'Mailing List' as source, first_name, last_name, email, created_at, tracking_id FROM mailing_list
-                ) all_leads
-                LEFT JOIN lead_enrichment e ON all_leads.email = e.email 
-                ORDER BY all_leads.created_at DESC LIMIT 100";
-                
-        $stmt = $pdo->query($sql);
-        $rawLeads = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Deduplicate by email in PHP (keep the first/most recent one found)
-        $uniqueLeads = [];
-        $seenEmails = [];
-        foreach ($rawLeads as $lead) {
-            $email = strtolower($lead['email']);
-            if (!isset($seenEmails[$email])) {
-                $seenEmails[$email] = true;
-                $uniqueLeads[] = $lead;
-            }
-            if (count($uniqueLeads) >= 50) break;
+        // Fetch from all 3 tables
+        $allLeads = [];
+        foreach ([
+            ['table' => 'waitlist_submissions', 'source' => 'Waitlist'],
+            ['table' => 'unit_inquiries', 'source' => 'Unit Interest'],
+            ['table' => 'mailing_list', 'source' => 'Mailing List']
+        ] as $src) {
+            $rows = $sb->select($src['table'], 'first_name,last_name,email,created_at,tracking_id',
+                [], 'created_at.desc', 100);
+            foreach ($rows as &$r) $r['source'] = $src['source'];
+            $allLeads = array_merge($allLeads, $rows);
         }
-        
-        echo json_encode($uniqueLeads, JSON_INVALID_UTF8_SUBSTITUTE);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Database Query Error: ' . $e->getMessage()], JSON_INVALID_UTF8_SUBSTITUTE);
+
+        // Sort by created_at desc
+        usort($allLeads, function($a, $b) {
+            return strtotime($b['created_at']) - strtotime($a['created_at']);
+        });
+
+        // Deduplicate by email
+        $seen = [];
+        $unique = [];
+        foreach ($allLeads as $lead) {
+            $email = strtolower($lead['email']);
+            if (isset($seen[$email])) continue;
+            $seen[$email] = true;
+
+            // Fetch enrichment data
+            $enrichment = $sb->selectOne('lead_enrichment',
+                'job_title,company,photo_url,company_logo,annual_revenue,headline,raw_response',
+                ['email=eq.' . urlencode($email)]);
+
+            if ($enrichment) {
+                $lead = array_merge($lead, $enrichment);
+            }
+
+            // Count activity events
+            if (!empty($lead['tracking_id'])) {
+                $events = $sb->select('activity_logs', 'id',
+                    ['session_id=eq.' . urlencode($lead['tracking_id'])]);
+                $lead['event_count'] = count($events);
+            } else {
+                $lead['event_count'] = 0;
+            }
+
+            $unique[] = $lead;
+            if (count($unique) >= 50) break;
+        }
+
+        echo json_encode($unique, JSON_INVALID_UTF8_SUBSTITUTE);
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'General API Error: ' . $e->getMessage()], JSON_INVALID_UTF8_SUBSTITUTE);
+        echo json_encode(['error' => $e->getMessage()]);
     }
 }
 
 function getLeadDetail($email) {
-    global $pdo;
-    
-    // 1. Fetch Enrichment Data
-    $stmt = $pdo->prepare("SELECT * FROM lead_enrichment WHERE email = ?");
-    $stmt->execute([$email]);
-    $enrichment = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    global $sb;
 
-    // 2. Fetch Submission Data (Check all source tables)
+    $enrichment = $sb->selectOne('lead_enrichment', '*', ['email=eq.' . urlencode($email)]) ?: [];
+
     $submission = [];
     $sources = [
         ['table' => 'waitlist_submissions', 'label' => 'Waitlist'],
@@ -131,9 +131,7 @@ function getLeadDetail($email) {
     ];
 
     foreach ($sources as $src) {
-        $st = $pdo->prepare("SELECT * FROM {$src['table']} WHERE email = ? ORDER BY created_at DESC LIMIT 1");
-        $st->execute([$email]);
-        $row = $st->fetch(PDO::FETCH_ASSOC);
+        $row = $sb->selectOne($src['table'], '*', ['email=eq.' . urlencode($email)]);
         if ($row) {
             $submission = $row;
             $submission['submission_type'] = $src['label'];
@@ -141,117 +139,140 @@ function getLeadDetail($email) {
         }
     }
 
-    // Merge them: Enrichment takes priority for job details, Submission for intent details
     $merged = array_merge($submission, $enrichment);
-    
-    // Normalize phone number field for frontend
     if (!isset($merged['phone_number']) && isset($merged['phone'])) {
         $merged['phone_number'] = $merged['phone'];
     }
-    
+
     echo json_encode($merged);
 }
 
 function getSessionDetail($sessionId) {
-    global $pdo;
-    
+    global $sb;
+
     if (empty($sessionId)) {
         echo json_encode(['error' => 'No session ID provided']);
         return;
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM activity_logs WHERE session_id = ? ORDER BY created_at ASC");
-    $stmt->execute([$sessionId]);
-    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+    $logs = $sb->select('activity_logs', '*',
+        ['session_id=eq.' . urlencode($sessionId)],
+        'created_at.asc');
+
     echo json_encode($logs);
 }
 
 function getLeadActivity($email) {
-    global $pdo;
+    global $sb;
 
     if (empty($email)) {
         echo json_encode(['error' => 'Email required']);
         return;
     }
 
-    // Join sessions and logs to get all activity for this lead by email
-    $sql = "SELECT l.*, s.id as session_id 
-            FROM activity_logs l
-            JOIN tracking_sessions s ON l.session_id = s.id
-            WHERE s.email = ? OR s.id IN (
-                SELECT tracking_id FROM waitlist_submissions WHERE email = ?
-                UNION
-                SELECT tracking_id FROM unit_inquiries WHERE email = ?
-                UNION
-                SELECT tracking_id FROM mailing_list WHERE email = ?
-            )
-            ORDER BY l.created_at ASC";
-            
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$email, $email, $email, $email]);
-    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+    // Get tracking IDs for this email
+    $trackingIds = [];
+    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+        $rows = $sb->select($table, 'tracking_id', ['email=eq.' . urlencode($email)]);
+        foreach ($rows as $r) {
+            if (!empty($r['tracking_id'])) $trackingIds[] = $r['tracking_id'];
+        }
+    }
+    $trackingIds = array_unique($trackingIds);
+
+    if (empty($trackingIds)) {
+        echo json_encode([]);
+        return;
+    }
+
+    $idList = '(' . implode(',', array_map(function($id) { return '"' . $id . '"'; }, $trackingIds)) . ')';
+    $logs = $sb->select('activity_logs', '*',
+        ['session_id=in.' . $idList],
+        'created_at.asc');
+
     echo json_encode($logs);
 }
 
 function getAnalytics() {
-    global $pdo;
-    
+    global $sb;
+
     try {
-        // 1. Section Engagement (Avg Time Spent)
-        // Group by the actual section ID inside the data payload
-        $sectionEngagementSql = "
-            SELECT
-                event_data->>'section' as section,
-                COUNT(*) as visit_count,
-                AVG(CAST(event_data->>'secondsSpent' AS INTEGER)) as avg_seconds
-            FROM activity_logs
-            WHERE event_type = 'visibility' AND event_name = 'section_leave'
-            GROUP BY event_data->>'section'
-            ORDER BY avg_seconds DESC";
-        $sectionEngagement = $pdo->query($sectionEngagementSql)->fetchAll(PDO::FETCH_ASSOC);
+        // 1. Section Engagement — fetch raw data and aggregate in PHP
+        $sectionLogs = $sb->select('activity_logs', 'event_data',
+            ['event_type=eq.visibility', 'event_name=eq.section_leave'],
+            null, 1000);
 
-        // 2. Top Interactions (Button Clicks)
-        $topInteractionsSql = "
-            SELECT
-                COALESCE(NULLIF(event_data->>'text', ''), 'Unnamed Action') as button_text,
-                COUNT(*) as click_count
-            FROM activity_logs
-            WHERE event_type = 'click' AND event_name = 'button_click'
-            GROUP BY button_text
-            ORDER BY click_count DESC
-            LIMIT 12";
-        $topInteractions = $pdo->query($topInteractionsSql)->fetchAll(PDO::FETCH_ASSOC);
+        $sections = [];
+        foreach ($sectionLogs as $log) {
+            $data = is_string($log['event_data']) ? json_decode($log['event_data'], true) : $log['event_data'];
+            $sec = $data['section'] ?? null;
+            $time = $data['secondsSpent'] ?? 0;
+            if ($sec) {
+                if (!isset($sections[$sec])) $sections[$sec] = ['total' => 0, 'count' => 0];
+                $sections[$sec]['total'] += $time;
+                $sections[$sec]['count']++;
+            }
+        }
+        $sectionEngagement = [];
+        foreach ($sections as $sec => $d) {
+            $sectionEngagement[] = [
+                'section' => $sec,
+                'visit_count' => $d['count'],
+                'avg_seconds' => $d['count'] > 0 ? round($d['total'] / $d['count']) : 0
+            ];
+        }
+        usort($sectionEngagement, function($a, $b) { return $b['avg_seconds'] - $a['avg_seconds']; });
 
-        // 3. Traffic Trends (Last 10 Days)
-        $trafficTrendsSql = "
-            SELECT 
-                DATE(created_at) as date,
-                COUNT(DISTINCT session_id) as sessions,
-                (SELECT COUNT(*) FROM (
-                    SELECT email, DATE(created_at) as d FROM waitlist_submissions
-                    UNION ALL SELECT email, DATE(created_at) as d FROM unit_inquiries
-                    UNION ALL SELECT email, DATE(created_at) as d FROM mailing_list
-                ) all_leads WHERE all_leads.d = DATE(activity_logs.created_at)) as leads
-            FROM activity_logs
-            WHERE created_at >= NOW() - INTERVAL '14 days'
-            GROUP BY DATE(created_at)
-            ORDER BY date ASC";
-        $trafficTrends = $pdo->query($trafficTrendsSql)->fetchAll(PDO::FETCH_ASSOC);
+        // 2. Top Interactions
+        $clickLogs = $sb->select('activity_logs', 'event_data',
+            ['event_type=eq.click', 'event_name=eq.button_click'],
+            null, 1000);
 
-        // 4. Device Breakdown (Simplified from User Agent)
-        $deviceBreakdownSql = "
-            SELECT 
-                CASE 
-                    WHEN user_agent LIKE '%Mobile%' OR user_agent LIKE '%Android%' OR user_agent LIKE '%iPhone%' THEN 'Mobile'
-                    WHEN user_agent LIKE '%Tablet%' OR user_agent LIKE '%iPad%' THEN 'Tablet'
-                    ELSE 'Desktop'
-                END as device_type,
-                COUNT(*) as count
-            FROM tracking_sessions
-            GROUP BY 1";
-        $deviceBreakdown = $pdo->query($deviceBreakdownSql)->fetchAll(PDO::FETCH_ASSOC);
+        $clicks = [];
+        foreach ($clickLogs as $log) {
+            $data = is_string($log['event_data']) ? json_decode($log['event_data'], true) : $log['event_data'];
+            $text = $data['text'] ?? 'Unnamed Action';
+            $clicks[$text] = ($clicks[$text] ?? 0) + 1;
+        }
+        arsort($clicks);
+        $topInteractions = [];
+        foreach (array_slice($clicks, 0, 12, true) as $text => $count) {
+            $topInteractions[] = ['button_text' => $text, 'click_count' => $count];
+        }
+
+        // 3. Traffic Trends (last 14 days)
+        $recentLogs = $sb->select('activity_logs', 'session_id,created_at',
+            ['created_at=gte.' . date('Y-m-d', strtotime('-14 days'))],
+            'created_at.asc', 5000);
+
+        $dayData = [];
+        foreach ($recentLogs as $log) {
+            $date = substr($log['created_at'], 0, 10);
+            if (!isset($dayData[$date])) $dayData[$date] = [];
+            $dayData[$date][$log['session_id']] = true;
+        }
+        $trafficTrends = [];
+        foreach ($dayData as $date => $sessions) {
+            $trafficTrends[] = ['date' => $date, 'sessions' => count($sessions), 'leads' => 0];
+        }
+
+        // 4. Device Breakdown
+        $allSessions = $sb->select('tracking_sessions', 'user_agent', [], null, 5000);
+        $devices = ['Desktop' => 0, 'Mobile' => 0, 'Tablet' => 0];
+        foreach ($allSessions as $s) {
+            $ua = $s['user_agent'] ?? '';
+            if (stripos($ua, 'Mobile') !== false || stripos($ua, 'Android') !== false || stripos($ua, 'iPhone') !== false) {
+                $devices['Mobile']++;
+            } elseif (stripos($ua, 'Tablet') !== false || stripos($ua, 'iPad') !== false) {
+                $devices['Tablet']++;
+            } else {
+                $devices['Desktop']++;
+            }
+        }
+        $deviceBreakdown = [];
+        foreach ($devices as $type => $count) {
+            if ($count > 0) $deviceBreakdown[] = ['device_type' => $type, 'count' => $count];
+        }
 
         echo json_encode([
             'sectionEngagement' => $sectionEngagement,
@@ -260,39 +281,30 @@ function getAnalytics() {
             'deviceBreakdown' => $deviceBreakdown
         ]);
 
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => $e->getMessage()]);
     }
 }
 
 function deleteLead($email, $source) {
-    global $pdo;
-    
+    global $sb;
+
     if (empty($email) || empty($source)) {
         echo json_encode(['success' => false, 'error' => 'Email and Source required']);
         return;
     }
 
-    try {
-        $pdo->beginTransaction();
-
-        $table = '';
-        switch ($source) {
-            case 'Waitlist': $table = 'waitlist_submissions'; break;
-            case 'Unit Interest': $table = 'unit_inquiries'; break;
-            case 'Mailing List': $table = 'mailing_list'; break;
-        }
-
-        if ($table) {
-            $stmt = $pdo->prepare("DELETE FROM $table WHERE email = ?");
-            $stmt->execute([$email]);
-        }
-
-        $pdo->commit();
-        echo json_encode(['success' => true]);
-    } catch (Exception $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    $table = '';
+    switch ($source) {
+        case 'Waitlist': $table = 'waitlist_submissions'; break;
+        case 'Unit Interest': $table = 'unit_inquiries'; break;
+        case 'Mailing List': $table = 'mailing_list'; break;
     }
+
+    if ($table) {
+        $sb->delete($table, ['email=eq.' . urlencode($email)]);
+    }
+
+    echo json_encode(['success' => true]);
 }

@@ -1,7 +1,6 @@
 <?php
 /**
  * User Activity Tracking API
- * Handles session initialization and logging of user events.
  */
 error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
 ini_set('display_errors', 0);
@@ -28,7 +27,7 @@ if (!$input || !isset($input['type'])) {
 $sessionId = $input['sessionId'] ?? '';
 $eventType = $input['type'] ?? '';
 $eventName = $input['name'] ?? '';
-$eventData = isset($input['data']) ? json_encode($input['data']) : null;
+$eventData = $input['data'] ?? null;
 $ipAddress = $_SERVER['REMOTE_ADDR'];
 $userAgent = $_SERVER['HTTP_USER_AGENT'];
 
@@ -40,16 +39,22 @@ if (empty($sessionId)) {
 
 try {
     // 1. Ensure tracking session exists
-    $stmt = $pdo->prepare("INSERT INTO tracking_sessions (id, user_agent, ip_address) VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING");
-    $stmt->execute([$sessionId, $userAgent, $ipAddress]);
+    $sb->upsert('tracking_sessions', [
+        'id' => $sessionId,
+        'user_agent' => $userAgent,
+        'ip_address' => $ipAddress
+    ], 'id');
 
     // 2. Log the activity
-    $stmt = $pdo->prepare("INSERT INTO activity_logs (session_id, event_type, event_name, event_data) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$sessionId, $eventType, $eventName, $eventData]);
+    $sb->insert('activity_logs', [
+        'session_id' => $sessionId,
+        'event_type' => $eventType,
+        'event_name' => $eventName,
+        'event_data' => $eventData
+    ]);
 
     echo json_encode(['success' => true]);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     error_log("Tracking error: " . $e->getMessage());
-    // We don't want to break the user experience if tracking fails
     echo json_encode(['success' => false, 'error' => 'Logging failed']);
 }

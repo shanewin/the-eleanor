@@ -52,16 +52,18 @@ require_once 'smtp-mail.php';
 $trackingId = clean($_POST['tracking_id'] ?? '');
 
 try {
-    $stmt = $pdo->prepare("INSERT INTO mailing_list 
-        (first_name, last_name, email, interests, consent, tracking_id) 
-        VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $firstName, $lastName, $email, $interests, $consent, $trackingId
+    $sb->insert('mailing_list', [
+        'first_name' => $firstName,
+        'last_name' => $lastName,
+        'email' => $email,
+        'interests' => $interests,
+        'consent' => $consent,
+        'tracking_id' => $trackingId
     ]);
 
     // Trigger Apollo Enrichment
     enrichLead($email, $firstName, $lastName);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     error_log("Database insert failed: " . $e->getMessage());
 }
 

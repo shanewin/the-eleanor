@@ -69,16 +69,23 @@ $ip_address = $_SERVER['REMOTE_ADDR'];
 
 // Database storage
 try {
-    $stmt = $pdo->prepare("INSERT INTO unit_inquiries 
-        (unit, first_name, last_name, email, phone, move_in_date, budget, hear_about_us, message, ip_address, tracking_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $unitValue, $firstName, $lastName, $email, $phone, $moveInDate, $budget, $hearAboutUs, $message, $ip_address, $trackingId
+    $sb->insert('unit_inquiries', [
+        'unit' => $unitValue,
+        'first_name' => $firstName,
+        'last_name' => $lastName,
+        'email' => $email,
+        'phone' => $phone,
+        'move_in_date' => $moveInDate,
+        'budget' => $budget,
+        'hear_about_us' => $hearAboutUs,
+        'message' => $message,
+        'ip_address' => $ip_address,
+        'tracking_id' => $trackingId
     ]);
 
     // Trigger Apollo Enrichment (Non-blocking as it might take time)
     enrichLead($email, $firstName, $lastName, $phone);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     error_log("Database insert failed (Unit Inquiry): " . $e->getMessage());
 }
 

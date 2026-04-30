@@ -4,9 +4,7 @@
  * Receives asynchronous enrichment data (Waterfall/Reveal results)
  */
 require_once 'db_config.php';
-require_once 'config.php';
 
-// Log incoming request for debugging
 $rawInput = file_get_contents('php://input');
 error_log("Apollo Webhook received: " . $rawInput);
 
@@ -22,33 +20,20 @@ if (!$person || !isset($person['email'])) {
 $email = $person['email'];
 
 try {
-    // Update existing lead record with revealed info
-    // We use COALESCE to keep existing data if the webhook payload is partial
-    $stmt = $pdo->prepare("UPDATE lead_enrichment SET 
-        full_name = COALESCE(?, full_name),
-        job_title = COALESCE(?, job_title),
-        linkedin_url = COALESCE(?, linkedin_url),
-        city = COALESCE(?, city),
-        state = COALESCE(?, state),
-        country = COALESCE(?, country),
-        photo_url = COALESCE(?, photo_url),
-        raw_response = ? 
-        WHERE email = ?");
+    // Build update with only non-null fields
+    $update = ['raw_response' => json_decode($rawInput, true)];
+    if (!empty($person['name'])) $update['full_name'] = $person['name'];
+    if (!empty($person['title'])) $update['job_title'] = $person['title'];
+    if (!empty($person['linkedin_url'])) $update['linkedin_url'] = $person['linkedin_url'];
+    if (!empty($person['city'])) $update['city'] = $person['city'];
+    if (!empty($person['state'])) $update['state'] = $person['state'];
+    if (!empty($person['country'])) $update['country'] = $person['country'];
+    if (!empty($person['photo_url'])) $update['photo_url'] = $person['photo_url'];
 
-    $stmt->execute([
-        $person['name'] ?? null,
-        $person['title'] ?? null,
-        $person['linkedin_url'] ?? null,
-        $person['city'] ?? null,
-        $person['state'] ?? null,
-        $person['country'] ?? null,
-        $person['photo_url'] ?? null,
-        $rawInput, // Store the latest raw response
-        $email
-    ]);
+    $sb->update('lead_enrichment', $update, ['email=eq.' . urlencode($email)]);
 
     echo json_encode(['status' => 'success']);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     error_log("Webhook database error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['status' => 'db_error']);

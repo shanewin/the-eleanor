@@ -28,18 +28,16 @@ if (empty($email)) {
 generateJustification($email, $insights, $grade, $score, $logs);
 
 function generateJustification($email, $insights, $grade, $score, $logs) {
-    global $pdo;
+    global $sb;
 
     // 1. Fetch Enrichment Data
-    $stmt = $pdo->prepare("SELECT raw_response, ai_summary FROM lead_enrichment WHERE email = ?");
-    $stmt->execute([$email]);
-    $lead = $stmt->fetch(PDO::FETCH_ASSOC);
+    $lead = $sb->selectOne('lead_enrichment', 'raw_response,ai_summary', ['email=eq.' . urlencode($email)]);
 
     if (!$lead) {
         die(json_encode(['error' => 'Lead not found or not enriched yet']));
     }
 
-    $raw = json_decode($lead['raw_response'], true);
+    $raw = is_string($lead['raw_response']) ? json_decode($lead['raw_response'], true) : $lead['raw_response'];
     $person = $raw['person'] ?? [];
     $org = $person['organization'] ?? [];
     $employment = $person['employment_history'] ?? [];
@@ -125,8 +123,7 @@ function generateJustification($email, $insights, $grade, $score, $logs) {
     $summary = trim($resData['content'][0]['text'] ?? '');
 
     // 4. Update Database
-    $updateStmt = $pdo->prepare("UPDATE lead_enrichment SET ai_summary = ? WHERE email = ?");
-    $updateStmt->execute([$summary, $email]);
+    $sb->update('lead_enrichment', ['ai_summary' => $summary], ['email=eq.' . urlencode($email)]);
 
     echo json_encode(['success' => true, 'summary' => $summary]);
 }
