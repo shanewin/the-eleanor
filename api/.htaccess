@@ -9,24 +9,8 @@
     Deny from all
 </Files>
 
-<Files "config.example.php">
-    Order Allow,Deny
-    Deny from all
-</Files>
-
-<Files "db_config.example.php">
-    Order Allow,Deny
-    Deny from all
-</Files>
-
 # 2. Protect log files from being seen by the public
 <Files "*.log">
-    Order Allow,Deny
-    Deny from all
-</Files>
-
-# 3. Protect SQL files
-<Files "*.sql">
     Order Allow,Deny
     Deny from all
 </Files>

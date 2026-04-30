@@ -202,25 +202,25 @@ function getAnalytics() {
         // 1. Section Engagement (Avg Time Spent)
         // Group by the actual section ID inside the data payload
         $sectionEngagementSql = "
-            SELECT 
-                JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.section')) as section,
+            SELECT
+                event_data->>'section' as section,
                 COUNT(*) as visit_count,
-                AVG(CAST(JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.secondsSpent')) AS UNSIGNED)) as avg_seconds
-            FROM activity_logs 
+                AVG(CAST(event_data->>'secondsSpent' AS INTEGER)) as avg_seconds
+            FROM activity_logs
             WHERE event_type = 'visibility' AND event_name = 'section_leave'
-            GROUP BY section 
+            GROUP BY event_data->>'section'
             ORDER BY avg_seconds DESC";
         $sectionEngagement = $pdo->query($sectionEngagementSql)->fetchAll(PDO::FETCH_ASSOC);
 
         // 2. Top Interactions (Button Clicks)
         $topInteractionsSql = "
-            SELECT 
-                COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.text')), ''), 'Unnamed Action') as button_text,
+            SELECT
+                COALESCE(NULLIF(event_data->>'text', ''), 'Unnamed Action') as button_text,
                 COUNT(*) as click_count
-            FROM activity_logs 
+            FROM activity_logs
             WHERE event_type = 'click' AND event_name = 'button_click'
-            GROUP BY button_text 
-            ORDER BY click_count DESC 
+            GROUP BY button_text
+            ORDER BY click_count DESC
             LIMIT 12";
         $topInteractions = $pdo->query($topInteractionsSql)->fetchAll(PDO::FETCH_ASSOC);
 
@@ -235,7 +235,7 @@ function getAnalytics() {
                     UNION ALL SELECT email, DATE(created_at) as d FROM mailing_list
                 ) all_leads WHERE all_leads.d = DATE(activity_logs.created_at)) as leads
             FROM activity_logs
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+            WHERE created_at >= NOW() - INTERVAL '14 days'
             GROUP BY DATE(created_at)
             ORDER BY date ASC";
         $trafficTrends = $pdo->query($trafficTrendsSql)->fetchAll(PDO::FETCH_ASSOC);
@@ -250,7 +250,7 @@ function getAnalytics() {
                 END as device_type,
                 COUNT(*) as count
             FROM tracking_sessions
-            GROUP BY device_type";
+            GROUP BY 1";
         $deviceBreakdown = $pdo->query($deviceBreakdownSql)->fetchAll(PDO::FETCH_ASSOC);
 
         echo json_encode([

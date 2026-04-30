@@ -40,7 +40,7 @@ if (empty($sessionId)) {
 
 try {
     // 1. Ensure tracking session exists
-    $stmt = $pdo->prepare("INSERT IGNORE INTO tracking_sessions (id, user_agent, ip_address) VALUES (?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO tracking_sessions (id, user_agent, ip_address) VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING");
     $stmt->execute([$sessionId, $userAgent, $ipAddress]);
 
     // 2. Log the activity
