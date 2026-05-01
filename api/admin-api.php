@@ -58,13 +58,14 @@ function getStats() {
 
     $convRate = ($sessionCount > 0) ? min(100, round(($leadCount / $sessionCount) * 100, 1)) : 0;
 
-    // New today — count leads submitted today
+    // New today — count UNIQUE emails submitted today
     $today = date('Y-m-d');
-    $newToday = 0;
+    $todayEmails = [];
     foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
-        $rows = $sb->select($table, 'id', ['created_at=gte.' . $today . 'T00:00:00'], null, null);
-        $newToday += count($rows);
+        $rows = $sb->select($table, 'email', ['created_at=gte.' . $today . 'T00:00:00'], null, null);
+        foreach ($rows as $r) $todayEmails[strtolower($r['email'])] = true;
     }
+    $newToday = count($todayEmails);
 
     echo json_encode([
         'totalSessions' => $sessionCount,
