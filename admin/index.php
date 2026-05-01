@@ -489,7 +489,6 @@ requireAdmin();
                                     <th class="sortable" onclick="sortLeads('grade_score')">Grade</th>
                                     <th>Assigned</th>
                                     <th>First Response</th>
-                                    <th>Signals</th>
                                     <th>Management</th>
                                 </tr>
                             </thead>
@@ -1176,9 +1175,7 @@ requireAdmin();
                                 + '<td>' + assignedHtml + '</td>'
                                 + '<td>' + firstResponseHtml + '</td>';
                         } else {
-                            const insightBadges = lead.grade.insights.map(function(i) {
-                                return '<span class="insight-badge badge-' + esc(i.type) + '">' + i.icon + ' ' + esc(i.label) + '</span>';
-                            }).join('');
+                            // Badges removed — grade speaks for itself
 
                             const escapedEmailForDelete = esc(lead.email || '').replace(/'/g, "\\'");
                             const escapedSourceForDelete = esc(lead.source || '').replace(/'/g, "\\'");
@@ -1191,7 +1188,6 @@ requireAdmin();
                                 + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
                                 + '<td>' + assignedHtml + '</td>'
                                 + '<td>' + firstResponseHtml + '</td>'
-                                + '<td style="vertical-align:top;padding-top:1.2rem"><div class="d-flex flex-column gap-1 align-items-start">' + insightBadges + '</div></td>'
                                 + '<td class="text-end"><button class="delete-btn" onclick="event.stopPropagation(); deleteLead(\'' + escapedEmailForDelete + '\', \'' + escapedSourceForDelete + '\')">Delete</button></td>';
                         }
                         row.innerHTML = rowContent;
@@ -1374,10 +1370,7 @@ requireAdmin();
             const escapedName = esc(name);
             const escapedTitle = esc(intel.job_title || person.title || 'Private Individual');
 
-            // Build insights badges
-            const insightBadgesHtml = insights.map(function(i) {
-                return '<span class="insight-badge badge-' + esc(i.type) + '">' + i.icon + ' ' + esc(i.label) + '</span>';
-            }).join('');
+            // Badges removed
 
             // Prepare AI summary data attribute
             const logsForAI = logs.map(function(l) { return { event: l.event_name, time: l.created_at }; });
@@ -1512,7 +1505,6 @@ requireAdmin();
                 + '<button class="icon-btn" id="copyEmailBtn">Copy</button></div>'
                 + phoneHtml
                 + '</div>'
-                + '<div class="d-flex flex-wrap justify-content-center my-3">' + insightBadgesHtml + '</div>'
                 + socialLinks
                 + '<div class="' + layoutClass + '">'
                 + '<div class="' + colClass + '">'
