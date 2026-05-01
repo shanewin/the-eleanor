@@ -24,6 +24,12 @@ switch ($action) {
     case 'analytics': getAnalytics(); break;
     case 'get_settings': getSettings(); break;
     case 'save_settings': saveSettings(); break;
+    case 'get_brokers': getBrokers(); break;
+    case 'add_broker': addBroker(); break;
+    case 'update_broker': updateBroker(); break;
+    case 'delete_broker': deleteBroker(); break;
+    case 'assign_lead': assignLead(); break;
+    case 'respond_lead': respondLead(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -64,10 +70,17 @@ function getLeads() {
 
     try {
         // Fetch from all 3 tables (include phone, budget, move_in_date, unit for display)
+        // Fetch all brokers for lookup
+        $brokerRows = $sb->select('brokers', 'id,name', []);
+        $brokerLookup = [];
+        foreach ($brokerRows as $b) {
+            $brokerLookup[$b['id']] = $b['name'];
+        }
+
         $allLeads = [];
         foreach ([
-            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,unit_type,created_at,tracking_id'],
-            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,created_at,tracking_id'],
+            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,unit_type,created_at,tracking_id,assigned_to,first_response_at,response_method'],
+            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,created_at,tracking_id,assigned_to,first_response_at,response_method'],
             ['table' => 'mailing_list', 'source' => 'Mailing List', 'fields' => 'first_name,last_name,email,created_at,tracking_id']
         ] as $src) {
             $rows = $sb->select($src['table'], $src['fields'],
@@ -110,6 +123,11 @@ function getLeads() {
             // Merge enrichment from pre-fetched data
             if (isset($enrichmentByEmail[$email])) {
                 $lead = array_merge($lead, $enrichmentByEmail[$email]);
+            }
+
+            // Attach broker name if assigned
+            if (!empty($lead['assigned_to']) && isset($brokerLookup[$lead['assigned_to']])) {
+                $lead['broker_name'] = $brokerLookup[$lead['assigned_to']];
             }
 
             $lead['event_count'] = 0;
@@ -384,6 +402,148 @@ function saveSettings() {
             'updated_at' => date('c')
         ], 'key');
     }
+
+    echo json_encode(['success' => true]);
+}
+
+/* ── Broker Management ── */
+
+function getBrokers() {
+    global $sb;
+    $brokers = $sb->select('brokers', '*', [], 'name.asc');
+    echo json_encode($brokers);
+}
+
+function addBroker() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (empty($input['name']) || empty($input['email'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Name and email are required']);
+        return;
+    }
+
+    $result = $sb->insert('brokers', [
+        'name'  => $input['name'],
+        'email' => $input['email'],
+        'phone' => $input['phone'] ?? null,
+        'role'  => $input['role'] ?? 'broker'
+    ]);
+
+    echo json_encode(['success' => true, 'broker' => $result]);
+}
+
+function updateBroker() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (empty($input['id'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Broker id is required']);
+        return;
+    }
+
+    $id = $input['id'];
+    $data = [];
+    foreach (['name', 'email', 'phone', 'role', 'is_active'] as $field) {
+        if (array_key_exists($field, $input)) {
+            $data[$field] = $input[$field];
+        }
+    }
+
+    $sb->update('brokers', $data, ['id=eq.' . $id]);
+    echo json_encode(['success' => true]);
+}
+
+function deleteBroker() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (empty($input['id'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Broker id is required']);
+        return;
+    }
+
+    $id = $input['id'];
+
+    // Unassign leads in both tables
+    $sb->update('waitlist_submissions', ['assigned_to' => null], ['assigned_to=eq.' . $id]);
+    $sb->update('unit_inquiries', ['assigned_to' => null], ['assigned_to=eq.' . $id]);
+
+    // Delete the broker
+    $sb->delete('brokers', ['id=eq.' . $id]);
+
+    echo json_encode(['success' => true]);
+}
+
+/* ── Lead Assignment & Response ── */
+
+function assignLead() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $email = $input['email'] ?? '';
+    $source = $input['source'] ?? '';
+    $brokerId = $input['broker_id'] ?? null;
+
+    if (empty($email) || empty($source)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Email and source are required']);
+        return;
+    }
+
+    $table = '';
+    switch ($source) {
+        case 'Waitlist':      $table = 'waitlist_submissions'; break;
+        case 'Unit Interest':  $table = 'unit_inquiries'; break;
+        default:
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid source for assignment']);
+            return;
+    }
+
+    $assignValue = (!empty($brokerId) && $brokerId != 0) ? $brokerId : null;
+
+    $sb->update($table, ['assigned_to' => $assignValue], ['email=eq.' . urlencode($email)]);
+    echo json_encode(['success' => true]);
+}
+
+function respondLead() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $email  = $input['email'] ?? '';
+    $source = $input['source'] ?? '';
+    $method = $input['method'] ?? '';
+
+    if (empty($email) || empty($source) || empty($method)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Email, source, and method are required']);
+        return;
+    }
+
+    if (!in_array($method, ['sms', 'email', 'phone'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Method must be sms, email, or phone']);
+        return;
+    }
+
+    $table = '';
+    switch ($source) {
+        case 'Waitlist':      $table = 'waitlist_submissions'; break;
+        case 'Unit Interest':  $table = 'unit_inquiries'; break;
+        default:
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid source for response tracking']);
+            return;
+    }
+
+    $sb->update($table, [
+        'first_response_at' => date('c'),
+        'response_method'   => $method
+    ], ['email=eq.' . urlencode($email)]);
 
     echo json_encode(['success' => true]);
 }

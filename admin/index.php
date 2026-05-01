@@ -376,6 +376,9 @@ requireAdmin();
             <a href="#" class="nav-link" data-view="analytics">
                 <i class="bi bi-bar-chart-line"></i> Analytics
             </a>
+            <a href="#" class="nav-link" data-view="brokers">
+                <i class="bi bi-person-badge"></i> Brokers
+            </a>
             <a href="#" class="nav-link" data-view="settings">
                 <i class="bi bi-gear"></i> Settings
             </a>
@@ -456,9 +459,11 @@ requireAdmin();
                                     <th>Intent</th>
                                     <th>Engagement</th>
                                     <th>Grade</th>
+                                    <th>Assigned</th>
+                                    <th>First Response</th>
                                 </tr>
                             </thead>
-                            <tbody><tr><td colspan="8" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
+                            <tbody><tr><td colspan="10" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -482,11 +487,13 @@ requireAdmin();
                                     <th>Intent</th>
                                     <th class="sortable" onclick="sortLeads('event_count')">Engagement</th>
                                     <th class="sortable" onclick="sortLeads('grade_score')">Grade</th>
+                                    <th>Assigned</th>
+                                    <th>First Response</th>
                                     <th>Signals</th>
                                     <th>Management</th>
                                 </tr>
                             </thead>
-                            <tbody><tr><td colspan="8" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
+                            <tbody><tr><td colspan="10" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -545,6 +552,35 @@ requireAdmin();
             </div>
         </div>
 
+        <!-- Brokers View -->
+        <div id="view-brokers" class="dashboard-view" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 fw-bold mb-0">Broker Management</h1>
+                <button class="btn btn-primary" onclick="showBrokerModal()"><i class="bi bi-plus-lg me-1"></i>Add Broker</button>
+            </div>
+            <div class="card bg-body-tertiary border-0">
+                <div class="card-body p-4">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0" style="background:transparent;" id="brokersTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" class="text-center py-5 text-body-tertiary">Loading brokers...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Lead Profile View (In-Page) -->
         <div id="view-lead-profile" class="dashboard-view" style="display:none">
             <div class="mb-3">
@@ -584,6 +620,44 @@ requireAdmin();
         <!-- Content dynamic -->
     </div>
 
+    <!-- Broker Modal -->
+    <div class="modal fade" id="brokerModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="brokerModalTitle">Add Broker</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="brokerEditId">
+            <div class="mb-3">
+              <label class="form-label small text-white-50">Name</label>
+              <input type="text" class="form-control bg-dark border-secondary text-white" id="brokerName">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-white-50">Email</label>
+              <input type="email" class="form-control bg-dark border-secondary text-white" id="brokerEmail">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-white-50">Phone</label>
+              <input type="text" class="form-control bg-dark border-secondary text-white" id="brokerPhone">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small text-white-50">Role</label>
+              <select class="form-select bg-dark border-secondary text-white" id="brokerRole">
+                <option value="broker">Broker</option>
+                <option value="owner">Owner</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveBroker()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <?php
     if (isset($_GET['logout'])) { logout(); }
     ?>
@@ -621,6 +695,9 @@ requireAdmin();
 
             if (view === 'analytics') {
                 fetchAnalytics();
+            }
+            if (view === 'brokers') {
+                fetchBrokers();
             }
             if (view === 'settings') {
                 loadSettings();
@@ -762,6 +839,166 @@ requireAdmin();
             return { score: totalScore, letter: getLetter(totalScore), insights: insights, roleTenure, companyTenure };
         }
 
+        // ── Brokers ──
+        let brokersCache = [];
+
+        async function fetchBrokers() {
+            try {
+                const res = await fetch('../api/admin-api.php?action=get_brokers');
+                const data = await res.json();
+                brokersCache = Array.isArray(data) ? data : [];
+                renderBrokersTable(brokersCache);
+            } catch (err) {
+                console.error('Error fetching brokers:', err);
+                brokersCache = [];
+            }
+        }
+
+        function renderBrokersTable(brokers) {
+            const tbody = document.querySelector('#brokersTable tbody');
+            if (!tbody) return;
+            if (brokers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-body-tertiary py-5">No brokers added yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = '';
+            brokers.forEach(function(broker) {
+                const statusBadge = broker.status === 'inactive'
+                    ? '<span class="badge bg-secondary">Inactive</span>'
+                    : '<span class="badge bg-success">Active</span>';
+                const row = document.createElement('tr');
+                row.innerHTML = '<td class="fw-semibold text-white">' + esc(broker.name) + '</td>'
+                    + '<td>' + esc(broker.email) + '</td>'
+                    + '<td>' + esc(broker.phone || '-') + '</td>'
+                    + '<td><span class="text-capitalize">' + esc(broker.role || 'broker') + '</span></td>'
+                    + '<td>' + statusBadge + '</td>'
+                    + '<td class="text-end">'
+                    + '<button class="btn btn-sm btn-outline-primary me-1" onclick="showBrokerModal(' + esc(String(broker.id)) + ')"><i class="bi bi-pencil"></i></button>'
+                    + '<button class="btn btn-sm btn-outline-danger" onclick="deleteBroker(' + esc(String(broker.id)) + ')"><i class="bi bi-trash"></i></button>'
+                    + '</td>';
+                tbody.appendChild(row);
+            });
+        }
+
+        function showBrokerModal(brokerId) {
+            const modal = new bootstrap.Modal(document.getElementById('brokerModal'));
+            document.getElementById('brokerEditId').value = '';
+            document.getElementById('brokerName').value = '';
+            document.getElementById('brokerEmail').value = '';
+            document.getElementById('brokerPhone').value = '';
+            document.getElementById('brokerRole').value = 'broker';
+            document.getElementById('brokerModalTitle').textContent = 'Add Broker';
+
+            if (brokerId) {
+                const broker = brokersCache.find(b => b.id == brokerId);
+                if (broker) {
+                    document.getElementById('brokerEditId').value = broker.id;
+                    document.getElementById('brokerName').value = broker.name || '';
+                    document.getElementById('brokerEmail').value = broker.email || '';
+                    document.getElementById('brokerPhone').value = broker.phone || '';
+                    document.getElementById('brokerRole').value = broker.role || 'broker';
+                    document.getElementById('brokerModalTitle').textContent = 'Edit Broker';
+                }
+            }
+            modal.show();
+        }
+
+        async function saveBroker() {
+            const id = document.getElementById('brokerEditId').value;
+            const payload = {
+                name: document.getElementById('brokerName').value.trim(),
+                email: document.getElementById('brokerEmail').value.trim(),
+                phone: document.getElementById('brokerPhone').value.trim(),
+                role: document.getElementById('brokerRole').value
+            };
+
+            if (!payload.name || !payload.email) {
+                alert('Name and email are required.');
+                return;
+            }
+
+            try {
+                const action = id ? 'update_broker' : 'add_broker';
+                if (id) payload.id = id;
+                const res = await fetch('../api/admin-api.php?action=' + action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('brokerModal')).hide();
+                    fetchBrokers();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Connection error while saving broker.');
+            }
+        }
+
+        async function deleteBroker(id) {
+            if (!confirm('Are you sure you want to delete this broker?')) return;
+            try {
+                const res = await fetch('../api/admin-api.php?action=delete_broker', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    fetchBrokers();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Connection error while deleting broker.');
+            }
+        }
+
+        async function assignLead(email, source, brokerId) {
+            try {
+                const res = await fetch('../api/admin-api.php?action=assign_lead', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, source: source, broker_id: brokerId || null })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    fetchData();
+                } else {
+                    alert('Error assigning lead: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Connection error while assigning lead.');
+            }
+        }
+
+        async function respondLead(email, source, method) {
+            try {
+                const res = await fetch('../api/admin-api.php?action=respond_lead', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, source: source, method: method })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    fetchData();
+                } else {
+                    alert('Error marking response: ' + (result.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Connection error while marking response.');
+            }
+        }
+
+        function formatElapsed(ms) {
+            if (ms < 60000) return '< 1m';
+            if (ms < 3600000) return Math.floor(ms / 60000) + 'm';
+            if (ms < 86400000) return Math.floor(ms / 3600000) + 'h ' + Math.floor((ms % 3600000) / 60000) + 'm';
+            return Math.floor(ms / 86400000) + 'd ' + Math.floor((ms % 86400000) / 3600000) + 'h';
+        }
+
         // ── Sorting ──
         let currentLeads = [];
         let sortConfig = { column: 'created_at', direction: 'desc' };
@@ -796,6 +1033,13 @@ requireAdmin();
                     const today = new Date();
                     document.getElementById('statTodayDate').innerText = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
                 }
+
+                // Fetch brokers for assignment dropdowns
+                try {
+                    const brokersRes = await fetch('../api/admin-api.php?action=get_brokers');
+                    const brokersData = await brokersRes.json();
+                    brokersCache = Array.isArray(brokersData) ? brokersData : [];
+                } catch (e) { /* brokers fetch is non-critical */ }
 
                 const leadsResponse = await fetch('../api/admin-api.php?action=leads');
                 if (!leadsResponse.ok) throw new Error("API Error");
@@ -851,7 +1095,7 @@ requireAdmin();
                     }
 
                     if (leads.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="' + (isOverview ? 6 : 7) + '" class="text-center text-body-tertiary py-5">No leads recorded yet.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="' + (isOverview ? 8 : 10) + '" class="text-center text-body-tertiary py-5">No leads recorded yet.</td></tr>';
                         return;
                     }
 
@@ -927,6 +1171,47 @@ requireAdmin();
                             + '<button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard(\'' + escapedEmail.replace(/'/g, "\\'") + '\', this)"><i class="bi bi-clipboard" style="font-size:0.65rem"></i></button></div>'
                             + phoneDisplay + '</div>';
 
+                        // Build Assigned column
+                        const escapedLeadEmail = esc(lead.email || '').replace(/'/g, "\\'");
+                        const escapedLeadSource = esc(lead.source || '').replace(/'/g, "\\'");
+                        let assignedHtml = '';
+                        if (lead.assigned_broker_id && brokersCache.length > 0) {
+                            const assignedBroker = brokersCache.find(b => b.id == lead.assigned_broker_id);
+                            if (assignedBroker) {
+                                assignedHtml = '<span class="badge bg-primary bg-opacity-25 text-primary-emphasis">' + esc(assignedBroker.name) + '</span>';
+                            }
+                        }
+                        if (!assignedHtml) {
+                            assignedHtml = '<select class="form-select form-select-sm bg-dark border-secondary text-white" style="width:auto;font-size:0.75rem;" onclick="event.stopPropagation()" onchange="assignLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', this.value)">'
+                                + '<option value="">Unassigned</option>';
+                            brokersCache.forEach(function(b) {
+                                const sel = (lead.assigned_broker_id && lead.assigned_broker_id == b.id) ? ' selected' : '';
+                                assignedHtml += '<option value="' + esc(String(b.id)) + '"' + sel + '>' + esc(b.name) + '</option>';
+                            });
+                            assignedHtml += '</select>';
+                        }
+
+                        // Build First Response column
+                        let firstResponseHtml = '';
+                        const createdAt = new Date(lead.created_at);
+                        if (lead.first_response_at) {
+                            const respondedAt = new Date(lead.first_response_at);
+                            const diffMs = respondedAt - createdAt;
+                            const method = lead.first_response_method ? ' via ' + esc(lead.first_response_method) : '';
+                            firstResponseHtml = '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>' + formatElapsed(diffMs) + method + '</span>';
+                        } else {
+                            const elapsedMs = Date.now() - createdAt.getTime();
+                            firstResponseHtml = '<div class="d-flex align-items-center gap-2">'
+                                + '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>' + formatElapsed(elapsedMs) + '</span>'
+                                + '<div class="dropdown" onclick="event.stopPropagation()">'
+                                + '<button class="btn btn-outline-secondary btn-sm dropdown-toggle" style="font-size:0.7rem;padding:0.15rem 0.4rem;" data-bs-toggle="dropdown">Mark</button>'
+                                + '<ul class="dropdown-menu dropdown-menu-dark">'
+                                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'SMS\')">SMS</a></li>'
+                                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Email\')">Email</a></li>'
+                                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Phone\')">Phone</a></li>'
+                                + '</ul></div></div>';
+                        }
+
                         let rowContent;
                         if (isOverview) {
                             rowContent = '<td>' + timestamp + '</td>'
@@ -934,7 +1219,9 @@ requireAdmin();
                                 + '<td>' + contactHtml + '</td>'
                                 + '<td>' + intentHtml + '</td>'
                                 + '<td>' + engagementLabel + '</td>'
-                                + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>';
+                                + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
+                                + '<td>' + assignedHtml + '</td>'
+                                + '<td>' + firstResponseHtml + '</td>';
                         } else {
                             const insightBadges = lead.grade.insights.map(function(i) {
                                 return '<span class="insight-badge badge-' + esc(i.type) + '">' + i.icon + ' ' + esc(i.label) + '</span>';
@@ -949,6 +1236,8 @@ requireAdmin();
                                 + '<td>' + intentHtml + '</td>'
                                 + '<td>' + engagementLabel + '</td>'
                                 + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
+                                + '<td>' + assignedHtml + '</td>'
+                                + '<td>' + firstResponseHtml + '</td>'
                                 + '<td style="vertical-align:top;padding-top:1.2rem"><div class="d-flex flex-column gap-1 align-items-start">' + insightBadges + '</div></td>'
                                 + '<td class="text-end"><button class="delete-btn" onclick="event.stopPropagation(); deleteLead(\'' + escapedEmailForDelete + '\', \'' + escapedSourceForDelete + '\')">Delete</button></td>';
                         }
