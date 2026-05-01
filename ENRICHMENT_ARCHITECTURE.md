@@ -16,76 +16,72 @@ flowchart TD
         A3[Mailing List Form] --> SUBMIT
     end
 
-    SUBMIT["Form Submission"]
-    SUBMIT --> VALIDATE["Validate & Sanitize"]
-    VALIDATE -->|Invalid| REJECT["Return Error 400/403/429"]
+    SUBMIT["Form Submission"] --> VALIDATE["Validate & Sanitize"]
+    VALIDATE -->|Invalid| REJECT["Return Error"]
     VALIDATE -->|Valid| DB_INSERT["Store in Supabase"]
     DB_INSERT --> ENRICH["enrichLead()"]
-    DB_INSERT --> SMTP_FORM["Send Form Notification Email"]
+    DB_INSERT --> SMTP_FORM["Send Notification Email"]
 
     ENRICH --> DEDUP{"Already enriched?"}
-    DEDUP -->|Yes| SKIP["Return 'already_enriched'"]
-    DEDUP -->|No| PDL_CALL
+    DEDUP -->|Yes| SKIP["Skip"]
+    DEDUP -->|No| STAGE1
 
     subgraph STAGE1["Stage 1: People Data Labs"]
-        PDL_CALL["PDL Person Enrich API"]
+        PDL["PDL Person Enrich"]
     end
 
-    PDL_CALL --> PDL_LOC{"US phone but<br/>non-US match?"}
-    PDL_LOC -->|Yes| PDL_REJECT["Reject PDL match"]
-    PDL_LOC -->|No match| PDL_REJECT
-    PDL_LOC -->|US match or no phone| PDL_ACCEPT["Accept PDL data"]
+    STAGE1 --> LOC1{"US phone +<br/>non-US match?"}
+    LOC1 -->|Mismatch| REJ1["Reject PDL"]
+    LOC1 -->|OK| ACC1["Accept PDL → extract work email"]
 
-    PDL_ACCEPT --> EXTRACT_EMAIL["Extract work email from PDL"]
-
-    EXTRACT_EMAIL --> APOLLO_TRY
-    PDL_REJECT --> APOLLO_TRY
+    ACC1 --> STAGE2
+    REJ1 --> STAGE2
 
     subgraph STAGE2["Stage 2: Apollo.io"]
-        APOLLO_TRY["Apollo People Match"]
+        APOLLO["Apollo People Match<br/>Try: work email, then submitted email"]
     end
 
-    APOLLO_TRY --> APOLLO_LOC{"US phone but<br/>non-US match?"}
-    APOLLO_LOC -->|Yes| APOLLO_REJECT["Reject Apollo match"]
-    APOLLO_LOC -->|No match| APOLLO_REJECT
-    APOLLO_LOC -->|Valid match| APOLLO_ACCEPT["Accept Apollo data"]
+    STAGE2 --> LOC2{"US phone +<br/>non-US match?"}
+    LOC2 -->|Mismatch| REJ2["Reject Apollo"]
+    LOC2 -->|OK| ACC2["Accept Apollo + supplement PDL social URLs"]
 
-    APOLLO_ACCEPT --> SUPPLEMENT["Supplement Apollo with PDL social URLs"]
-    SUPPLEMENT --> LI_CHECK
-
-    APOLLO_REJECT --> DEEP{"Name + phone<br/>available?"}
-    DEEP -->|No| NO_MATCH["Save as unenriched"]
-    DEEP -->|Yes| DEEP_ENRICH
+    ACC2 --> STAGE5
+    REJ2 --> STAGE3
 
     subgraph STAGE3["Stage 3: Deep Enrichment"]
-        DEEP_ENRICH["Tavily Web Search"] --> LI_SELECT["Select best LinkedIn URL"]
-        LI_SELECT --> LI_SCRAPE_DEEP["LinkedIn Scraper"]
-        LI_SCRAPE_DEEP --> CLAUDE["Claude AI Verification"]
+        direction TB
+        TAV["Tavily Web Search<br/>Query: name + location + LinkedIn"]
+        TAV --> LI_FIND["Select best LinkedIn URL"]
+        LI_FIND --> SCRAPE1["LinkedIn Scraper"]
+        SCRAPE1 --> CLAUDE["Claude AI Verification<br/>confidence >= 70%"]
     end
 
-    CLAUDE --> CONFIDENCE{"Confidence >= 70%<br/>and domain check?"}
-    CONFIDENCE -->|Fail| NO_MATCH
-    CONFIDENCE -->|Pass| DEEP_ACCEPT["Accept deep enrichment data"]
-    DEEP_ACCEPT --> LI_CHECK
+    CLAUDE -->|Fail| NO_MATCH["Save unenriched"]
+    CLAUDE -->|Pass + LinkedIn URL| STAGE4
 
-    LI_CHECK{"LinkedIn URL<br/>available?"}
-    LI_CHECK -->|No| STORE
-    LI_CHECK -->|Yes| LI_SCRAPE
-
-    subgraph STAGE4["Stage 4: LinkedIn Scraper — Source of Truth"]
-        LI_SCRAPE["RapidAPI LinkedIn Scraper"]
+    subgraph STAGE4["Stage 4: Re-Enrichment Loop"]
+        direction TB
+        PDL2["Re-run PDL with LinkedIn URL<br/>→ correct identity + work email"]
+        PDL2 --> APOLLO2["Re-run Apollo with<br/>LinkedIn URL + work email"]
+        APOLLO2 -->|No match| DEEP_DATA["Use deep enrichment data"]
     end
 
-    LI_SCRAPE --> OVERWRITE["Overwrite profile with fresh data"]
-    OVERWRITE --> STORE
+    APOLLO2 -->|Match| MERGE["Merge Apollo + PDL + Deep data"]
+    DEEP_DATA --> STAGE5
+    MERGE --> STAGE5
 
-    STORE["Store in Supabase lead_enrichment"]
-    STORE --> ENRICHMENT_EMAIL["Send HTML Enrichment Email"]
+    subgraph STAGE5["Stage 5: LinkedIn Scraper — Source of Truth"]
+        LI_FINAL["Scrape LinkedIn profile<br/>Overwrite: name, title, company,<br/>headline, photo, location"]
+    end
+
+    STAGE5 --> STORE["Store in Supabase"]
+    STORE --> EMAIL["Send HTML Enrichment Email"]
 
     style STAGE1 fill:#1a2332,stroke:#8b5cf6
     style STAGE2 fill:#1a2332,stroke:#f59e0b
     style STAGE3 fill:#1a2332,stroke:#ef4444
-    style STAGE4 fill:#1a2332,stroke:#10b981
+    style STAGE4 fill:#1a2332,stroke:#06b6d4
+    style STAGE5 fill:#1a2332,stroke:#10b981
     style VISITOR fill:#1a1a2e,stroke:#6366f1
 ```
 
@@ -101,124 +97,116 @@ IF lead_enrichment table has row WHERE email = submitted_email
 
 ### Step 2: People Data Labs (PDL)
 **Endpoint:** `GET https://api.peopledatalabs.com/v5/person/enrich`
-**Input:** email, phone (+1 prefix), first_name, last_name, min_likelihood=6
 
 ```
 CALL PDL with (email, phone, name)
 
 IF response.status == 200 AND likelihood >= 6:
-    IF phone area code is US AND pdl.location_country is NOT US:
-        REJECT — location mismatch (wrong person)
+    IF phone is US AND pdl.location_country is NOT US:
+        REJECT — location mismatch
     ELSE:
         ACCEPT PDL data
-        EXTRACT work_email from pdl.work_email or pdl.emails[]
-        (prefer type: 'current_professional')
+        EXTRACT work_email (prefer type: 'current_professional')
 ```
-
-**Data extracted from PDL:**
-- work_email (used to improve Apollo match)
-- linkedin_url, twitter_url, facebook_url, github_url
-- job_title, job_company_name, job_company_industry, job_company_size
-- location_locality, location_region, location_country
-- profiles[] array (all social networks)
 
 ### Step 3: Apollo.io
 **Endpoint:** `POST https://api.apollo.io/api/v1/people/match`
-**Input:** email, first_name, last_name, reveal_personal_emails=true
 
 ```
 emails_to_try = [work_email_from_PDL, submitted_email]
 
 FOR EACH email in emails_to_try:
     CALL Apollo People Match
-
     IF match found:
         IF phone is US AND apollo.country is NOT US:
-            REJECT — location mismatch
-            CONTINUE to next email
+            REJECT — skip to next email
         ELSE:
-            ACCEPT Apollo data as primary profile
-            BREAK
+            ACCEPT Apollo data
+            SUPPLEMENT with PDL social URLs (fill gaps only)
+            BREAK → go to Stage 5
 
-IF Apollo accepted AND PDL had data:
-    SUPPLEMENT missing social URLs from PDL into Apollo profile
-    (LinkedIn, Twitter, Facebook, GitHub — only fill gaps)
+IF no valid match → go to Stage 3
 ```
-
-**Data extracted from Apollo:**
-- name, title, seniority, headline
-- company, domain, industry, employee_count, revenue, logo
-- linkedin_url, twitter_url, github_url, facebook_url
-- employment_history[], education_history[]
-- city, state, country, photo_url
 
 ### Step 4: Deep Enrichment (Fallback)
 **Triggered when:** Both PDL and Apollo failed or were rejected
 
 ```
-IF no match yet AND firstName AND lastName available:
+1. TAVILY WEB SEARCH
+   Query: "{firstName} {lastName}" {companyHint} {stateFromPhone} LinkedIn
+   Domain filter: linkedin.com/in
+   Max results: 5
 
-    1. TAVILY WEB SEARCH
-       Query: "{firstName} {lastName}" {companyHint} {stateHint} LinkedIn
-       Domain filter: linkedin.com/in
-       Max results: 5
+   Selection strategy:
+     a. Prefer profiles mentioning company domain in snippet
+     b. Prefer profiles mentioning state/location in snippet
+     c. Fallback: first LinkedIn URL found
 
-       Selection strategy:
-         a. Prefer profiles mentioning company domain in snippet
-         b. Prefer profiles mentioning state/location in snippet
-         c. Fallback: first LinkedIn URL found
+2. LINKEDIN SCRAPER (RapidAPI)
+   Scrape the selected LinkedIn profile
 
-    2. LINKEDIN SCRAPER (RapidAPI)
-       Scrape the selected LinkedIn profile
+3. CLAUDE AI VERIFICATION (claude-haiku-4-5)
+   - Verify name match
+   - Verify domain match (corporate emails)
+   - Verify location plausibility
+   - Must return identity_confidence >= 70
 
-    3. CLAUDE AI VERIFICATION (claude-haiku-4-5)
-       Prompt includes:
-         - Target name, email, email domain
-         - Full scraped LinkedIn profile JSON
-         - Verification rules:
-           * Domain match check (corporate emails)
-           * Name match verification
-           * Location plausibility
-         - Must return identity_confidence (0-100) + reasoning
-
-       IF identity_confidence < 70: REJECT
-       IF corporate email AND company domain mismatch: REJECT
-       ELSE: ACCEPT verified profile data
+   IF confidence < 70: REJECT → save unenriched
+   IF domain mismatch (corporate email): REJECT
 ```
 
-### Step 5: LinkedIn Scraper — Source of Truth
+### Step 5: Re-Enrichment Loop (NEW)
+**Triggered when:** Deep enrichment found a verified LinkedIn URL
+
+This is the key innovation — using the discovered LinkedIn URL to circle back through PDL and Apollo for a correct match:
+
+```
+1. RE-RUN PDL with LinkedIn URL
+   → PDL now finds the CORRECT person (not the name collision)
+   → Extract work email if available
+
+2. RE-RUN APOLLO with:
+   a. Work email from PDL re-run + LinkedIn URL
+   b. Submitted email + LinkedIn URL
+   c. LinkedIn URL + name only (last attempt)
+
+   → Apollo now matches correctly because LinkedIn URL is unique
+
+3. IF Apollo re-run succeeds:
+   → Use Apollo data as primary (has firmographic data)
+   → Supplement with PDL social URLs
+   → Supplement with deep enrichment data
+
+4. IF Apollo re-run fails:
+   → Use deep enrichment data directly (Claude-verified)
+```
+
+**Why this works:** The LinkedIn URL is a unique identifier. When PDL returns the wrong "Shane Winter" by email, it returns the right one by LinkedIn URL. The work email PDL discovers then lets Apollo match precisely.
+
+### Step 6: LinkedIn Scraper — Source of Truth
 **Triggered when:** Any previous step found a LinkedIn URL
 
 ```
-IF profile has linkedin_url:
-    CALL RapidAPI LinkedIn Scraper
+CALL RapidAPI LinkedIn Scraper with linkedin_url
 
-    IF successful:
-        OVERWRITE (not fill gaps):
-            - name ← LinkedIn full_name
-            - headline ← LinkedIn headline
-            - photo_url ← LinkedIn profile_photo
-            - city, state, country ← LinkedIn location
+OVERWRITE (not fill gaps):
+    - name ← LinkedIn full_name
+    - headline ← LinkedIn headline
+    - photo_url ← LinkedIn profile_photo
+    - city, state, country ← LinkedIn location
 
-        FIND current job from experiences[] WHERE is_current == true:
-            OVERWRITE:
-                - title ← current job title
-                - company ← current job company
+FIND current job from experiences[] WHERE is_current == true:
+    OVERWRITE:
+        - title ← current job title
+        - company ← current job company
 ```
 
-**Why overwrite?** Apollo and PDL data can be months old. LinkedIn Scraper pulls the live profile, so it reflects current role, title, and company.
-
-### Step 6: Store & Notify
+### Step 7: Store & Notify
 ```
-INSERT into lead_enrichment:
-    All merged fields from the pipeline
-    raw_response = JSON of all API responses (for audit)
+INSERT into lead_enrichment (all merged fields + raw_response JSON)
 
-QUERY settings table for notification_emails
-QUERY activity_logs for behavioral data (sections viewed, buttons clicked)
-
-SEND HTML enrichment email to ALL notification recipients:
-    - Lead avatar, name, title, company
+SEND HTML enrichment email to all notification recipients:
+    - Profile card with avatar, name, title, company
     - Professional intel table
     - Behavioral journey summary
     - Link to admin dashboard
@@ -228,20 +216,19 @@ SEND HTML enrichment email to ALL notification recipients:
 
 ## Location Validation Logic
 
-The phone area code is used to detect and reject wrong-country matches:
-
 ```
 IF phone has US area code (10 digits, or starts with +1):
     likelyCountry = "United States"
-    likelyState = area code lookup (212→NY, 310→CA, 214→TX, etc.)
+    likelyState = area code lookup:
+        212, 646, 917, 332, 718, 347, 929, 631, 516 → New York
+        310, 213, 415, 650 → California
+        214, 972, 512, 713, 832 → Texas
 
 IF likelyCountry is US:
-    REJECT any PDL match where location_country is NOT US
-    REJECT any Apollo match where country is NOT US
+    REJECT any PDL match where location_country ≠ US
+    REJECT any Apollo match where country ≠ US
     USE likelyState as hint in Tavily search query
 ```
-
-This prevents the common failure case where a US-based lead has a name that matches a more prominent person in another country.
 
 ---
 
@@ -260,45 +247,37 @@ This prevents the common failure case where a US-based lead has a name that matc
 | **github_url** | yes | yes | — | — | PDL > Apollo |
 | **city/state/country** | yes | yes | yes | yes | LinkedIn > Deep > Apollo > PDL |
 | **seniority** | job_title_levels | yes | — | — | Apollo > PDL |
-| **company_domain** | job_company_website | yes | yes | — | Apollo > PDL |
 | **industry** | job_company_industry | yes | yes | — | Apollo > PDL |
 | **employee_count** | job_company_size | yes | yes | — | Apollo > PDL |
 | **annual_revenue** | — | yes | yes | — | Apollo > Deep |
-| **work_email** | yes (Pro tier) | — | — | — | PDL only |
+| **work_email** | yes (Pro) | — | — | — | PDL only (used internally) |
 | **employment_history** | — | yes | yes | experiences[] | Stored in raw_response |
-| **education_history** | — | yes | yes | education[] | Stored in raw_response |
+| **education_history** | — | yes | yes | educations[] | Stored in raw_response |
 
 ---
 
 ## API Details
 
-| API | Endpoint | Method | Auth | Timeout |
-|-----|----------|--------|------|---------|
-| **PDL** | `api.peopledatalabs.com/v5/person/enrich` | GET | `X-Api-Key` header | 15s |
-| **Apollo** | `api.apollo.io/api/v1/people/match` | POST | `X-Api-Key` header | 15s |
-| **Tavily** | `api.tavily.com/search` | POST | API key in body | 15s |
-| **LinkedIn Scraper** | `fresh-linkedin-profile-data.p.rapidapi.com/enrich-lead` | GET | `x-rapidapi-key` header | 15s |
-| **Anthropic Claude** | `api.anthropic.com/v1/messages` | POST | `x-api-key` header | 15s |
-| **Supabase** | `{project}.supabase.co/rest/v1` | Various | `apikey` header | N/A |
+| API | Endpoint | Method | Auth | Timeout | Cost |
+|-----|----------|--------|------|---------|------|
+| **PDL** | `api.peopledatalabs.com/v5/person/enrich` | GET | `X-Api-Key` header | 15s | ~$0.28/match |
+| **Apollo** | `api.apollo.io/api/v1/people/match` | POST | `X-Api-Key` header | 15s | Credits |
+| **Tavily** | `api.tavily.com/search` | POST | Key in body | 15s | Per search |
+| **LinkedIn Scraper** | `fresh-linkedin-profile-data.p.rapidapi.com` | GET | `x-rapidapi-key` | 15s | Per request |
+| **Anthropic Claude** | `api.anthropic.com/v1/messages` | POST | `x-api-key` header | 15s | Per token |
+| **Supabase** | `{project}.supabase.co/rest/v1` | Various | `apikey` header | N/A | Free tier |
 
 ---
 
-## Notification Flow
+## Worst-Case API Call Count
 
-### 1. Form Submission Email (plain text, immediate)
-- Sent to all emails in `settings.notification_emails`
-- Contains: name, email, phone, budget, unit, message
-- Subject: "New Wait List Submission - {name}"
-
-### 2. Enrichment Report Email (HTML, after pipeline completes)
-- Sent to all emails in `settings.notification_emails`
-- Contains: avatar, name, title, company, professional intel, behavioral journey
-- Behavioral data from `activity_logs`:
-  - Sections viewed with time spent
-  - Buttons/CTAs clicked with counts
-  - Total tracking events
-- Subject: "New Lead: {name} @ {company}"
-- Links to admin dashboard
+| Scenario | PDL | Apollo | Tavily | LinkedIn Scraper | Claude | Total |
+|----------|:---:|:------:|:------:|:----------------:|:------:|:-----:|
+| Corporate email, direct match | 1 | 1 | 0 | 1 | 0 | **3** |
+| Personal email, PDL work email found | 1 | 1-2 | 0 | 1 | 0 | **3-4** |
+| Personal email, location mismatch, deep enrichment | 1 | 1-2 | 1 | 2 | 1 | **6-7** |
+| Deep enrichment + re-enrichment loop | 2 | 3-4 | 1 | 2 | 1 | **9-10** |
+| All sources fail | 1 | 1-2 | 1 | 1 | 1 | **5-6** |
 
 ---
 
@@ -306,28 +285,40 @@ This prevents the common failure case where a US-based lead has a name that matc
 
 | Scenario | What Happens |
 |----------|-------------|
-| Corporate email, common name | PDL/Apollo match on email domain → usually correct |
+| Corporate email, common name | PDL/Apollo match on email → usually correct |
 | Personal email, unique name | PDL/Apollo email match → usually correct |
-| Personal email, common name, US phone | Location filter rejects wrong country → deep enrichment tries Tavily → may find correct LinkedIn |
-| Personal email, common name, no phone | No location signal → may match wrong person → stored but potentially inaccurate |
-| Personal email, no match anywhere | Lead saved with form data only, no enrichment |
+| Personal email, common name, US phone | Location filter rejects wrong country → deep enrichment → Tavily finds LinkedIn → re-enrichment loop with correct LinkedIn URL |
+| Personal email, common name, no phone | No location signal → may match wrong person |
+| Personal email, no match anywhere | Lead saved with form data only |
+| Tavily finds wrong LinkedIn | Claude verification rejects (confidence < 70%) |
 | All APIs timeout | Lead saved with form data only, errors logged |
-| Lead already enriched | Skip pipeline, return immediately |
+| Apollo out of credits | Deep enrichment + LinkedIn Scraper still work |
+
+---
+
+## Notification Flow
+
+### 1. Form Submission Email (plain text, immediate)
+- Sent to all emails in `settings.notification_emails` table
+- Contains: name, email, phone, budget, unit, message
+
+### 2. Enrichment Report Email (HTML, after pipeline)
+- Sent to all emails in `settings.notification_emails` table
+- Contains: avatar, name, title, company, professional intel, behavioral journey
+- Links to admin dashboard
 
 ---
 
 ## Key Design Decisions
 
-1. **LinkedIn Scraper is the source of truth** — it overwrites (not fills gaps) because it has the most current data.
+1. **LinkedIn Scraper is the source of truth** — overwrites all other data with live profile.
 
-2. **Location validation via phone area code** — rejects matches from the wrong country. A US phone number means the person should be in the US.
+2. **Location validation via phone area code** — rejects wrong-country matches before they enter the system.
 
-3. **PDL bridges personal→work email** — the primary value of PDL is finding a work email when someone submits with gmail. That work email enables a precise Apollo match.
+3. **Re-enrichment loop** — when Tavily discovers a LinkedIn URL, re-runs PDL and Apollo with it for a precise match. This solves the common-name problem.
 
-4. **Deep enrichment is the last resort** — Tavily web search + LinkedIn Scraper + Claude AI verification. Only triggered when PDL and Apollo both fail.
+4. **Never show wrong data** — if confidence < 70% or location doesn't match, save unenriched rather than showing an incorrect profile.
 
-5. **Never show wrong data** — if confidence is below 70% or location doesn't match, the lead is saved without enrichment rather than showing an incorrect profile.
+5. **All raw responses stored** — `raw_response` JSONB field preserves every API response for debugging.
 
-6. **All raw responses stored** — the `raw_response` JSONB field contains every API response for debugging and re-processing.
-
-7. **Notification emails configurable** — stored in Supabase `settings` table, editable from the admin Settings page. Supports multiple comma-separated recipients.
+6. **Configurable notifications** — stored in Supabase `settings` table, editable from admin Settings page.

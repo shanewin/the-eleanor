@@ -36,7 +36,7 @@ function getLikelyState($phone) {
     return $map[$areaCode] ?? null;
 }
 
-function pdlRequest($email, $phone = null, $firstName = null, $lastName = null) {
+function pdlRequest($email, $phone = null, $firstName = null, $lastName = null, $linkedinUrl = null) {
     $params = ['min_likelihood' => '6', 'pretty' => 'true'];
     if ($email) $params['email'] = $email;
     if ($phone) {
@@ -46,6 +46,10 @@ function pdlRequest($email, $phone = null, $firstName = null, $lastName = null) 
     }
     if ($firstName) $params['first_name'] = $firstName;
     if ($lastName) $params['last_name'] = $lastName;
+    if ($linkedinUrl) {
+        // PDL expects format: linkedin.com/in/username (no https://)
+        $params['profile'] = preg_replace('#^https?://(www\.)?#', '', $linkedinUrl);
+    }
 
     $url = 'https://api.peopledatalabs.com/v5/person/enrich?' . http_build_query($params);
     $ch = curl_init($url);
@@ -457,12 +461,131 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
         }
     }
 
-    // 5b. Deep enrichment fallback — use Tavily + LinkedIn Scraper + Claude verification
+    // 5b. Deep enrichment fallback — use Tavily to find LinkedIn URL, then re-enrich
     if (!$person && $firstName && $lastName) {
-        error_log("Deep Enrichment: All standard sources failed for $email. Trying Tavily + LinkedIn Scraper.");
+        error_log("Deep Enrichment: All standard sources failed for $email. Trying Tavily + LinkedIn discovery.");
         $deepData = deepEnrichment($email, $firstName, $lastName, $phone);
 
-        if ($deepData && !isset($deepData['error'])) {
+        if ($deepData && !isset($deepData['error']) && !empty($deepData['linkedin_url'])) {
+            $discoveredLinkedIn = $deepData['linkedin_url'];
+            error_log("Deep Enrichment: Discovered LinkedIn URL: $discoveredLinkedIn. Re-enriching via PDL + Apollo.");
+
+            // 5c. Re-run PDL with the discovered LinkedIn URL for correct identity
+            $pdlRerun = pdlRequest(null, null, null, null, $discoveredLinkedIn);
+            $pdlRerunData = ($pdlRerun['code'] === 200 && $pdlRerun['likelihood'] >= 6) ? $pdlRerun['data'] : null;
+
+            // Extract work email from PDL re-run
+            $discoveredWorkEmail = null;
+            if ($pdlRerunData) {
+                $dwe = $pdlRerunData['work_email'] ?? null;
+                if ($dwe && is_string($dwe) && $dwe !== 'true' && strtolower($dwe) !== strtolower($email)) {
+                    $discoveredWorkEmail = strtolower($dwe);
+                    error_log("PDL Re-run: Found work email via LinkedIn: $discoveredWorkEmail");
+                }
+                if (!$discoveredWorkEmail && !empty($pdlRerunData['emails'])) {
+                    foreach ($pdlRerunData['emails'] as $pdlEmail) {
+                        if (!is_array($pdlEmail)) continue;
+                        $val = $pdlEmail['address'] ?? '';
+                        $type = $pdlEmail['type'] ?? '';
+                        if ($val && strtolower($val) !== strtolower($email) && strpos($type, 'professional') !== false) {
+                            $discoveredWorkEmail = strtolower($val);
+                            error_log("PDL Re-run: Found professional email: $discoveredWorkEmail");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 5d. Re-run Apollo with discovered LinkedIn URL and/or work email
+            $rerunEmails = array_filter([$discoveredWorkEmail, $email]);
+            foreach ($rerunEmails as $tryEmail) {
+                error_log("Apollo Re-run: Trying $tryEmail + LinkedIn URL");
+                $apolloRerun = apolloRequest("https://api.apollo.io/api/v1/people/match", [
+                    'email' => $tryEmail,
+                    'linkedin_url' => $discoveredLinkedIn,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'reveal_personal_emails' => true
+                ]);
+                $apolloRerunPerson = $apolloRerun['data']['person'] ?? null;
+                if ($apolloRerunPerson) {
+                    $person = $apolloRerunPerson;
+                    $finalResponseRaw = json_encode([
+                        'source' => 'deep_enrichment_rerun',
+                        'person' => $person,
+                        'pdl_rerun' => $pdlRerunData,
+                        'deep_data' => $deepData
+                    ]);
+                    error_log("Apollo Re-run: Found match via LinkedIn URL — " . ($person['name'] ?? 'unknown'));
+                    break;
+                }
+            }
+
+            // Also try Apollo with just LinkedIn URL + name (no email)
+            if (!$person) {
+                error_log("Apollo Re-run: Trying LinkedIn URL only");
+                $apolloRerun = apolloRequest("https://api.apollo.io/api/v1/people/match", [
+                    'linkedin_url' => $discoveredLinkedIn,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'reveal_personal_emails' => true
+                ]);
+                $apolloRerunPerson = $apolloRerun['data']['person'] ?? null;
+                if ($apolloRerunPerson) {
+                    $person = $apolloRerunPerson;
+                    $finalResponseRaw = json_encode([
+                        'source' => 'deep_enrichment_rerun',
+                        'person' => $person,
+                        'pdl_rerun' => $pdlRerunData,
+                        'deep_data' => $deepData
+                    ]);
+                    error_log("Apollo Re-run: Found match via LinkedIn URL only — " . ($person['name'] ?? 'unknown'));
+                }
+            }
+
+            // 5e. If Apollo re-run failed, use deep enrichment data directly
+            if (!$person) {
+                error_log("Apollo Re-run: No match. Using deep enrichment data directly.");
+                $person = [
+                    'name' => $deepData['full_name'] ?? "$firstName $lastName",
+                    'title' => $deepData['job_title'] ?? null,
+                    'linkedin_url' => $deepData['linkedin_url'] ?? null,
+                    'twitter_url' => $deepData['twitter_url'] ?? null,
+                    'github_url' => $deepData['github_url'] ?? null,
+                    'facebook_url' => $deepData['facebook_url'] ?? null,
+                    'city' => $deepData['city'] ?? null,
+                    'state' => $deepData['state'] ?? null,
+                    'country' => $deepData['country'] ?? null,
+                    'seniority' => $deepData['seniority'] ?? null,
+                    'photo_url' => $deepData['photo_url'] ?? null,
+                    'headline' => $deepData['headline'] ?? null,
+                    'organization' => [
+                        'name' => $deepData['company'] ?? null,
+                        'primary_domain' => $deepData['company_domain'] ?? null,
+                        'industry' => $deepData['industry'] ?? null,
+                        'short_description' => $deepData['company_description'] ?? null,
+                        'estimated_num_employees' => $deepData['employee_count'] ?? null,
+                        'annual_revenue_printed' => $deepData['annual_revenue'] ?? null,
+                        'logo_url' => null
+                    ],
+                    '_deep_data' => $deepData
+                ];
+                $finalResponseRaw = json_encode(['source' => 'deep_enrichment', 'person' => $person, 'pdl_rerun' => $pdlRerunData]);
+            }
+
+            // Supplement with PDL social URLs if available
+            if ($person && $pdlRerunData) {
+                $pdlLi = !empty($pdlRerunData['linkedin_url']) ? 'https://' . ltrim($pdlRerunData['linkedin_url'], '/') : null;
+                $pdlTw = !empty($pdlRerunData['twitter_url']) ? 'https://' . ltrim($pdlRerunData['twitter_url'], '/') : null;
+                $pdlFb = !empty($pdlRerunData['facebook_url']) ? 'https://' . ltrim($pdlRerunData['facebook_url'], '/') : null;
+                $pdlGh = !empty($pdlRerunData['github_url']) ? 'https://' . ltrim($pdlRerunData['github_url'], '/') : null;
+                if (empty($person['linkedin_url']) && $pdlLi) $person['linkedin_url'] = $pdlLi;
+                if (empty($person['twitter_url']) && $pdlTw) $person['twitter_url'] = $pdlTw;
+                if (empty($person['facebook_url']) && $pdlFb) $person['facebook_url'] = $pdlFb;
+                if (empty($person['github_url']) && $pdlGh) $person['github_url'] = $pdlGh;
+            }
+        } elseif ($deepData && !isset($deepData['error'])) {
+            // Deep enrichment succeeded but no LinkedIn URL — use data directly
             $person = [
                 'name' => $deepData['full_name'] ?? "$firstName $lastName",
                 'title' => $deepData['job_title'] ?? null,
@@ -488,7 +611,7 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
                 '_deep_data' => $deepData
             ];
             $finalResponseRaw = json_encode(['source' => 'deep_enrichment', 'person' => $person]);
-            error_log("Deep Enrichment: Found verified match for $email — " . $person['name']);
+            error_log("Deep Enrichment: Found match (no LinkedIn URL) for $email — " . $person['name']);
         }
     }
 
