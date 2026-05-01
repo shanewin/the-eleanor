@@ -63,11 +63,11 @@ function getLeads() {
     global $sb;
 
     try {
-        // Fetch from all 3 tables (include phone for dedup)
+        // Fetch from all 3 tables (include phone, budget, move_in_date, unit for display)
         $allLeads = [];
         foreach ([
-            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,created_at,tracking_id'],
-            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,created_at,tracking_id'],
+            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,unit_type,created_at,tracking_id'],
+            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,created_at,tracking_id'],
             ['table' => 'mailing_list', 'source' => 'Mailing List', 'fields' => 'first_name,last_name,email,created_at,tracking_id']
         ] as $src) {
             $rows = $sb->select($src['table'], $src['fields'],

@@ -453,10 +453,9 @@ requireAdmin();
                                     <th>Timestamp</th>
                                     <th>Identity</th>
                                     <th>Contact</th>
-                                    <th>Grade</th>
+                                    <th>Intent</th>
                                     <th>Engagement</th>
-                                    <th>Role &amp; Company</th>
-                                    <th style="display:none">Actions</th>
+                                    <th>Grade</th>
                                 </tr>
                             </thead>
                             <tbody><!-- Dynamic --></tbody>
@@ -479,10 +478,11 @@ requireAdmin();
                                 <tr>
                                     <th class="sortable" onclick="sortLeads('created_at')">Timestamp</th>
                                     <th class="sortable" onclick="sortLeads('last_name')">Lead</th>
+                                    <th>Contact</th>
+                                    <th>Intent</th>
+                                    <th class="sortable" onclick="sortLeads('event_count')">Engagement</th>
                                     <th class="sortable" onclick="sortLeads('grade_score')">Grade</th>
                                     <th>Signals</th>
-                                    <th class="sortable" onclick="sortLeads('event_count')">Engagement</th>
-                                    <th class="sortable" onclick="sortLeads('job_title')">Role &amp; Company</th>
                                     <th>Management</th>
                                 </tr>
                             </thead>
@@ -902,20 +902,33 @@ requireAdmin();
                                              lead.event_count > 0 ? '<span class="text-body-tertiary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Quiet</span>' :
                                              '<span class="text-body-tertiary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> No Activity</span>';
 
-                        const engagement = '<div><small class="text-body-tertiary text-uppercase" style="font-size:0.65rem;letter-spacing:0.05em">' + esc(lead.source) + '</small><br><span style="font-size:0.8rem;" class="fw-semibold">' + activityLabel + '</span></div>';
+                        const engagementLabel = '<span style="font-size:0.8rem;" class="fw-semibold">' + activityLabel + '</span>';
 
                         const gradeClass = lead.grade.score >= 80 ? 'elite' : '';
+
+                        // Build intent column
+                        const intentParts = [];
+                        intentParts.push('<small class="text-uppercase fw-semibold" style="font-size:0.65rem;letter-spacing:0.05em;color:rgba(255,255,255,0.5)">' + esc(lead.source) + '</small>');
+                        if (lead.unit) intentParts.push('<span class="text-primary fw-semibold" style="font-size:0.85rem">Unit ' + esc(lead.unit) + '</span>');
+                        if (lead.budget) intentParts.push('<small class="text-body-tertiary">' + esc(lead.budget) + '</small>');
+                        if (lead.move_in_date) intentParts.push('<small class="text-body-tertiary"><i class="bi bi-calendar3" style="font-size:0.65rem"></i> ' + esc(lead.move_in_date) + '</small>');
+                        const intentHtml = '<div class="d-flex flex-column gap-0">' + intentParts.join('') + '</div>';
+
+                        // Contact column with email + phone
+                        const phoneDisplay = lead.phone ? '<div style="font-size:0.8rem;color:rgba(255,255,255,0.6)">' + esc(lead.phone) + '</div>' : '';
+                        const contactHtml = '<div>'
+                            + '<div class="d-flex align-items-center gap-1"><small>' + escapedEmail + '</small>'
+                            + '<button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard(\'' + escapedEmail.replace(/'/g, "\\'") + '\', this)"><i class="bi bi-clipboard" style="font-size:0.65rem"></i></button></div>'
+                            + phoneDisplay + '</div>';
 
                         let rowContent;
                         if (isOverview) {
                             rowContent = '<td>' + timestamp + '</td>'
                                 + '<td><div class="d-flex align-items-center gap-2">' + avatar + '<div><span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span></div></div></td>'
-                                + '<td><div class="d-flex align-items-center gap-2"><span style="font-size:0.9rem">' + escapedEmail + '</span>'
-                                + '<button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard(\'' + escapedEmail.replace(/'/g, "\\'") + '\', this)"><i class="bi bi-clipboard" style="font-size:0.7rem"></i></button></div></td>'
-                                + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
-                                + '<td>' + engagement + '</td>'
-                                + '<td>' + enrichment + '</td>'
-                                + '<td style="display:none"></td>';
+                                + '<td>' + contactHtml + '</td>'
+                                + '<td>' + intentHtml + '</td>'
+                                + '<td>' + engagementLabel + '</td>'
+                                + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>';
                         } else {
                             const insightBadges = lead.grade.insights.map(function(i) {
                                 return '<span class="insight-badge badge-' + esc(i.type) + '">' + i.icon + ' ' + esc(i.label) + '</span>';
@@ -925,17 +938,12 @@ requireAdmin();
                             const escapedSourceForDelete = esc(lead.source || '').replace(/'/g, "\\'");
 
                             rowContent = '<td>' + timestamp + '</td>'
-                                + '<td>' + identityCombined + '</td>'
+                                + '<td><div class="d-flex align-items-center gap-2">' + avatar + '<div><span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span></div></div></td>'
+                                + '<td>' + contactHtml + '</td>'
+                                + '<td>' + intentHtml + '</td>'
+                                + '<td>' + engagementLabel + '</td>'
                                 + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
                                 + '<td style="vertical-align:top;padding-top:1.2rem"><div class="d-flex flex-column gap-1 align-items-start">' + insightBadges + '</div></td>'
-                                + '<td>' + engagement + '</td>'
-                                + '<td><div>'
-                                    + '<div class="d-flex align-items-center gap-2">'
-                                    + (companyLogoUrl ? '<img src="' + esc(companyLogoUrl) + '" class="company-logo">' : '')
-                                    + '<span class="fw-semibold text-white" style="font-size:0.85rem">' + esc(lead.company) + '</span>'
-                                    + '</div>'
-                                    + '<small class="text-body-tertiary">' + esc(lead.job_title) + '</small>'
-                                    + '</div></td>'
                                 + '<td class="text-end"><button class="delete-btn" onclick="event.stopPropagation(); deleteLead(\'' + escapedEmailForDelete + '\', \'' + escapedSourceForDelete + '\')">Delete</button></td>';
                         }
                         row.innerHTML = rowContent;
