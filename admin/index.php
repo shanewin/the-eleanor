@@ -584,7 +584,7 @@ requireAdmin();
         <div id="view-lead-profile" class="dashboard-view" style="display:none">
             <div class="mb-3">
                 <a href="#" class="text-decoration-none text-body-tertiary" onclick="event.preventDefault(); showView('leads')">
-                    <i class="bi bi-arrow-left me-2"></i>Back to Leads
+                    <i class="bi bi-arrow-left me-2"></i>Full Profiles
                 </a>
             </div>
             <div id="inPageProfileContent">
@@ -1508,7 +1508,7 @@ requireAdmin();
                     + '</div></div></div></div>'
                     + '<div class="text-center mt-4">'
                     + '<a href="#" class="text-primary text-decoration-none fw-semibold" onclick="event.preventDefault(); showView(\'leads\')">'
-                    + '<i class="bi bi-arrow-left me-1"></i> Back to Leads'
+                    + '<i class="bi bi-arrow-left me-1"></i> Full Profiles'
                     + '</a>'
                     + '</div>'
                 + '</div>';
