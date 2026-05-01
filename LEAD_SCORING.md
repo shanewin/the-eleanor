@@ -57,8 +57,8 @@ required_salary = budget × 40
 
 IF inferred_salary >= required_salary:
     +30 points — "Can Afford" ✅
-ELSE IF inferred_salary >= required_salary × 0.75:
-    +10 points — "Borderline Afford" ⚠️
+ELSE IF inferred_salary >= required_salary × 0.60:
+    +15 points — "Borderline Afford" ⚠️
 ELSE:
     -10 points — "Budget Risk" ❌
 ```

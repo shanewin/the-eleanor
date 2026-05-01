@@ -733,8 +733,8 @@ requireAdmin();
 
                 if (annualSalary >= requiredSalary) {
                     insights.push({ label: "Can Afford", type: "success", icon: "\u2705", points: 30 });
-                } else if (annualSalary >= requiredSalary * 0.75) {
-                    insights.push({ label: "Borderline Afford", type: "warning", icon: "\u26A0\uFE0F", points: 10 });
+                } else if (annualSalary >= requiredSalary * 0.6) {
+                    insights.push({ label: "Borderline Afford", type: "warning", icon: "\u26A0\uFE0F", points: 15 });
                 } else {
                     insights.push({ label: "Budget Risk", type: "danger", icon: "\u274C", points: -10 });
                 }
