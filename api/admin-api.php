@@ -33,6 +33,11 @@ switch ($action) {
     case 'get_communications': getCommunications($_GET['email'] ?? ''); break;
     case 'add_communication': addCommunication(); break;
     case 'delete_communication': deleteCommunication(); break;
+    case 'sms_conversations': getSMSConversations(); break;
+    case 'sms_thread': getSMSThread($_GET['phone'] ?? ''); break;
+    case 'sms_send': sendSMSFromDashboard(); break;
+    case 'sms_toggle_ai': toggleAIForLead(); break;
+    case 'sms_ai_status': getAIStatus($_GET['phone'] ?? ''); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -563,7 +568,10 @@ function getCommunications($email) {
     global $sb;
 
     if (empty($email)) {
-        echo json_encode(['error' => 'Email required']);
+        // Return all recent communications across all leads
+        $comms = $sb->select('communications', '*', [],
+            'created_at.desc', 100);
+        echo json_encode($comms);
         return;
     }
 
@@ -615,4 +623,248 @@ function deleteCommunication() {
 
     $sb->delete('communications', ['id=eq.' . $input['id']]);
     echo json_encode(['success' => true]);
+}
+
+/* ── SMS Conversations ── */
+
+/**
+ * Get all SMS conversations (grouped by phone number) with lead info.
+ */
+function getSMSConversations() {
+    global $sb;
+
+    // Get all SMS messages ordered by most recent
+    $messages = $sb->select('sms_messages', '*', [], 'created_at.desc', 500);
+
+    // Group by phone and get latest message + count
+    $convos = [];
+    foreach ($messages as $msg) {
+        $phone = $msg['lead_phone'];
+        if (!isset($convos[$phone])) {
+            $convos[$phone] = [
+                'lead_phone'    => $phone,
+                'lead_email'    => $msg['lead_email'],
+                'last_message'  => $msg['body'],
+                'last_direction'=> $msg['direction'],
+                'last_sender'   => $msg['sender_type'],
+                'last_at'       => $msg['created_at'],
+                'message_count' => 0,
+                'unread'        => 0
+            ];
+        }
+        $convos[$phone]['message_count']++;
+        // Count inbound messages as "unread" (simplified — no read tracking yet)
+        if ($msg['direction'] === 'inbound') {
+            $convos[$phone]['unread']++;
+        }
+    }
+
+    // Enrich with lead names from submission tables
+    $result = [];
+    foreach ($convos as $phone => $convo) {
+        // Try to find lead name
+        $lead = findLeadByPhoneOrEmail($phone, $convo['lead_email']);
+        $convo['lead_name'] = $lead ? trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? '')) : '';
+        $convo['lead_source'] = $lead['source'] ?? '';
+
+        // Get AI automation status
+        $automation = $sb->selectOne('sms_automation', 'status',
+            ['lead_phone=eq.' . urlencode($phone)]);
+        $convo['ai_status'] = $automation['status'] ?? 'active';
+
+        $result[] = $convo;
+    }
+
+    // Sort by most recent message
+    usort($result, function($a, $b) {
+        return strtotime($b['last_at']) - strtotime($a['last_at']);
+    });
+
+    echo json_encode($result);
+}
+
+/**
+ * Get full SMS thread for a specific phone number.
+ */
+function getSMSThread($phone) {
+    global $sb;
+
+    if (empty($phone)) {
+        echo json_encode(['error' => 'Phone number required']);
+        return;
+    }
+
+    $messages = $sb->select('sms_messages', '*',
+        ['lead_phone=eq.' . urlencode($phone)],
+        'created_at.asc');
+
+    echo json_encode($messages);
+}
+
+/**
+ * Send an SMS from the admin dashboard (broker takeover).
+ */
+function sendSMSFromDashboard() {
+    global $sb;
+
+    require_once __DIR__ . '/telnyx-sms.php';
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $phone = $input['phone'] ?? '';
+    $body  = $input['body'] ?? '';
+    $senderName = $input['sender_name'] ?? 'Broker';
+
+    if (empty($phone) || empty($body)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Phone and body are required']);
+        return;
+    }
+
+    $normalizedPhone = normalizePhone($phone);
+
+    // Send via Telnyx
+    $result = sendSMS($normalizedPhone, $body);
+
+    if (!$result['success']) {
+        http_response_code(500);
+        echo json_encode(['error' => 'SMS send failed: ' . $result['error']]);
+        return;
+    }
+
+    // Find lead email
+    $leadEmail = null;
+    $lead = findLeadByPhoneOrEmail($normalizedPhone, null);
+    if ($lead) $leadEmail = $lead['email'] ?? null;
+
+    // Store the message
+    $sb->insert('sms_messages', [
+        'lead_phone'        => $normalizedPhone,
+        'lead_email'        => $leadEmail,
+        'direction'         => 'outbound',
+        'sender_type'       => 'broker',
+        'sender_name'       => $senderName,
+        'body'              => $body,
+        'telnyx_message_id' => $result['message_id'],
+        'status'            => 'sent'
+    ]);
+
+    // Pause AI automation for this lead (broker took over)
+    $existing = $sb->selectOne('sms_automation', 'id',
+        ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+
+    if ($existing) {
+        $sb->update('sms_automation', [
+            'status'     => 'paused_manual',
+            'paused_by'  => $senderName,
+            'updated_at' => date('c')
+        ], ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+    } else {
+        $sb->insert('sms_automation', [
+            'lead_phone' => $normalizedPhone,
+            'lead_email' => $leadEmail,
+            'status'     => 'paused_manual',
+            'paused_by'  => $senderName
+        ]);
+    }
+
+    echo json_encode(['success' => true, 'message_id' => $result['message_id']]);
+}
+
+/**
+ * Toggle AI automation on/off for a specific lead.
+ */
+function toggleAIForLead() {
+    global $sb;
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $phone  = $input['phone'] ?? '';
+    $status = $input['status'] ?? '';  // 'active' or 'paused_manual'
+
+    if (empty($phone) || !in_array($status, ['active', 'paused_manual'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Phone and valid status required']);
+        return;
+    }
+
+    require_once __DIR__ . '/telnyx-sms.php';
+    $normalizedPhone = normalizePhone($phone);
+
+    $existing = $sb->selectOne('sms_automation', 'id',
+        ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+
+    if ($existing) {
+        $sb->update('sms_automation', [
+            'status'     => $status,
+            'paused_by'  => $status === 'paused_manual' ? 'Admin' : null,
+            'updated_at' => date('c')
+        ], ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+    } else {
+        $leadEmail = null;
+        $lead = findLeadByPhoneOrEmail($normalizedPhone, null);
+        if ($lead) $leadEmail = $lead['email'] ?? null;
+
+        $sb->insert('sms_automation', [
+            'lead_phone' => $normalizedPhone,
+            'lead_email' => $leadEmail,
+            'status'     => $status,
+            'paused_by'  => $status === 'paused_manual' ? 'Admin' : null
+        ]);
+    }
+
+    echo json_encode(['success' => true, 'status' => $status]);
+}
+
+/**
+ * Get AI automation status for a lead.
+ */
+function getAIStatus($phone) {
+    global $sb;
+
+    if (empty($phone)) {
+        echo json_encode(['status' => 'active']);
+        return;
+    }
+
+    $record = $sb->selectOne('sms_automation', 'status,paused_by,updated_at',
+        ['lead_phone=eq.' . urlencode($phone)]);
+
+    echo json_encode($record ?: ['status' => 'active', 'paused_by' => null]);
+}
+
+/**
+ * Helper: find lead by phone or email across submission tables.
+ */
+function findLeadByPhoneOrEmail($phone, $email) {
+    global $sb;
+
+    $phoneDigits = preg_replace('/\D/', '', $phone ?? '');
+
+    foreach ([
+        ['table' => 'waitlist_submissions', 'source' => 'Waitlist'],
+        ['table' => 'unit_inquiries', 'source' => 'Unit Interest']
+    ] as $src) {
+        // Try email first (faster via index)
+        if ($email) {
+            $row = $sb->selectOne($src['table'], 'first_name,last_name,email,phone',
+                ['email=eq.' . urlencode($email)]);
+            if ($row) {
+                $row['source'] = $src['source'];
+                return $row;
+            }
+        }
+
+        // Try phone match
+        if ($phoneDigits) {
+            $rows = $sb->select($src['table'], 'first_name,last_name,email,phone');
+            foreach ($rows as $row) {
+                $rowPhone = preg_replace('/\D/', '', $row['phone'] ?? '');
+                if ($rowPhone && $rowPhone === $phoneDigits) {
+                    $row['source'] = $src['source'];
+                    return $row;
+                }
+            }
+        }
+    }
+
+    return null;
 }
