@@ -427,7 +427,7 @@ requireAdmin();
                 <div class="col-md-3 col-sm-6">
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
-                            <div class="stat-label">New Today</div>
+                            <div class="stat-label">New Today <span id="statTodayDate" style="font-weight:400;letter-spacing:0.05em;opacity:0.6"></span></div>
                             <div class="stat-value" id="statHot"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div></div>
                         </div>
                     </div>
@@ -793,6 +793,8 @@ requireAdmin();
                     document.getElementById('statLeads').innerText = stats.totalLeads !== undefined ? stats.totalLeads : '-';
                     document.getElementById('statConv').innerText = stats.conversionRate !== undefined ? stats.conversionRate : '-';
                     document.getElementById('statHot').innerText = stats.newToday !== undefined ? stats.newToday : '0';
+                    const today = new Date();
+                    document.getElementById('statTodayDate').innerText = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
                 }
 
                 const leadsResponse = await fetch('../api/admin-api.php?action=leads');
