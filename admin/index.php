@@ -686,6 +686,61 @@ requireAdmin();
                             <button class="btn btn-primary" onclick="saveSMSSettings()">Save SMS Settings</button>
                         </div>
                     </div>
+
+                    <!-- AI Messaging Behavior -->
+                    <div class="card bg-body-tertiary border-0 mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="fw-semibold mb-1"><i class="bi bi-robot me-2"></i>AI Messaging Behavior</h5>
+                            <p class="text-white-50 small mb-3">Customize how the AI leasing agent communicates with leads via SMS.</p>
+                            <hr class="border-secondary my-3">
+
+                            <div class="mb-3">
+                                <label class="form-label small text-white-50" for="aiTone">AI Personality</label>
+                                <select class="form-select form-select-sm bg-dark border-secondary text-white" id="aiTone">
+                                    <option value="friendly">Friendly and warm</option>
+                                    <option value="professional">Professional and polished</option>
+                                    <option value="casual">Casual and laid-back</option>
+                                    <option value="enthusiastic">Enthusiastic and energetic</option>
+                                </select>
+                                <div class="form-text text-white-50 small">Sets the overall tone for all AI responses.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-white-50" for="aiWelcomeInstructions">Welcome Message Instructions</label>
+                                <textarea class="form-control form-control-sm bg-dark border-secondary text-white" id="aiWelcomeInstructions" rows="3" maxlength="1000"
+                                    placeholder="Tell the AI what the first text to a new lead should include. E.g. 'Mention we're offering a free month on select units.'"></textarea>
+                                <div class="form-text text-white-50 small">Leave blank to use the default welcome message.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-white-50" for="aiTourHours">Tour Availability</label>
+                                <textarea class="form-control form-control-sm bg-dark border-secondary text-white" id="aiTourHours" rows="2" maxlength="1000"
+                                    placeholder="Weekdays 10am-6pm, Saturdays 11am-4pm"></textarea>
+                                <div class="form-text text-white-50 small">When the AI should suggest tours. Leave blank for default hours.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-white-50" for="aiTalkingPoints">Talking Points &amp; Priorities</label>
+                                <textarea class="form-control form-control-sm bg-dark border-secondary text-white" id="aiTalkingPoints" rows="4" maxlength="1000"
+                                    placeholder="Things the AI should emphasize. One per line.&#10;&#10;Example:&#10;We're offering 1 month free on select units&#10;Push for in-person tours&#10;Mention the rooftop terrace"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-white-50" for="aiExtraPropertyInfo">Additional Property Info</label>
+                                <textarea class="form-control form-control-sm bg-dark border-secondary text-white" id="aiExtraPropertyInfo" rows="4" maxlength="1000"
+                                    placeholder="Extra details the AI should know. E.g. 'Lobby renovation finishes June 15' or 'We now accept Rhino guarantors.'"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-white-50" for="aiOffLimits">Topics to Avoid</label>
+                                <textarea class="form-control form-control-sm bg-dark border-secondary text-white" id="aiOffLimits" rows="3" maxlength="1000"
+                                    placeholder="Things the AI should never say. One per line.&#10;&#10;Example:&#10;Don't mention the construction on 3rd Ave&#10;Never quote exact application fees"></textarea>
+                            </div>
+
+                            <div id="aiSettingsStatus" class="small mb-3" style="display:none"></div>
+                            <button class="btn btn-primary" onclick="saveAISettings()">Save AI Settings</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1542,43 +1597,65 @@ requireAdmin();
 
                 let html = '';
                 Object.entries(grouped).forEach(([day, items]) => {
-                    html += '<div class="mb-2 mt-3"><small class="text-white-50 fw-semibold" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em">' + esc(day) + '</small></div>';
+                    html += '<div class="mb-3 mt-4"><span class="badge bg-body-secondary text-white-50 px-3 py-2" style="font-size:0.7rem;letter-spacing:0.08em">' + esc(day) + '</span></div>';
                     items.forEach(c => {
-                        const time = new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                        let icon, iconColor;
+                        const dt = new Date(c.created_at);
+                        const dateTime = dt.toLocaleDateString() + ' at ' + dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                        const isInternal = c.direction === 'internal';
+                        const isInbound = c.direction === 'inbound';
+
+                        // Channel info
+                        let channelIcon, channelColor, channelLabel;
                         switch(c.channel) {
-                            case 'email': icon = 'bi-envelope-fill'; iconColor = '#3b82f6'; break;
-                            case 'sms': icon = 'bi-chat-dots-fill'; iconColor = '#10b981'; break;
-                            case 'phone': icon = 'bi-telephone-fill'; iconColor = '#f59e0b'; break;
-                            case 'note': icon = 'bi-sticky-fill'; iconColor = '#8b5cf6'; break;
-                            default: icon = 'bi-record-circle'; iconColor = '#6b7280';
+                            case 'email': channelIcon = 'bi-envelope-fill'; channelColor = '#3b82f6'; channelLabel = 'Email'; break;
+                            case 'sms': channelIcon = 'bi-chat-dots-fill'; channelColor = '#10b981'; channelLabel = 'SMS'; break;
+                            case 'phone': channelIcon = 'bi-telephone-fill'; channelColor = '#f59e0b'; channelLabel = 'Phone Call'; break;
+                            case 'note': channelIcon = 'bi-sticky-fill'; channelColor = '#8b5cf6'; channelLabel = 'Note'; break;
+                            default: channelIcon = 'bi-record-circle'; channelColor = '#6b7280'; channelLabel = c.channel;
                         }
-                        let dirBadge = '';
-                        if (c.direction === 'internal') dirBadge = '<span class="badge bg-secondary bg-opacity-25 text-secondary ms-2" style="font-size:0.55rem">Internal</span>';
-                        else if (c.direction === 'outbound') dirBadge = '<span class="badge bg-primary bg-opacity-25 text-primary ms-2" style="font-size:0.55rem">Outbound</span>';
-                        else if (c.direction === 'inbound') dirBadge = '<span class="badge bg-success bg-opacity-25 text-success ms-2" style="font-size:0.55rem">Inbound</span>';
 
-                        let statusBadge = '';
-                        if (c.status === 'failed') statusBadge = '<span class="badge bg-danger bg-opacity-25 text-danger ms-1" style="font-size:0.55rem">Failed</span>';
+                        // Card styling based on type
+                        let cardBorder, cardBg, headerBg;
+                        if (isInternal) {
+                            cardBorder = 'border-left:3px solid rgba(107,114,128,0.4)';
+                            cardBg = 'background:rgba(107,114,128,0.05)';
+                            headerBg = 'background:rgba(107,114,128,0.08)';
+                        } else if (isInbound) {
+                            cardBorder = 'border-left:3px solid rgba(16,185,129,0.6)';
+                            cardBg = 'background:rgba(16,185,129,0.03)';
+                            headerBg = 'background:rgba(16,185,129,0.06)';
+                        } else {
+                            cardBorder = 'border-left:3px solid rgba(59,130,246,0.6)';
+                            cardBg = 'background:rgba(59,130,246,0.03)';
+                            headerBg = 'background:rgba(59,130,246,0.06)';
+                        }
 
-                        html += '<div class="d-flex gap-3 py-3 px-3 rounded-2" style="border-bottom:1px solid rgba(255,255,255,0.04)">'
-                            + '<div class="d-flex flex-column align-items-center" style="width:24px;flex-shrink:0">'
-                            + '<i class="bi ' + icon + '" style="color:' + iconColor + ';font-size:0.9rem"></i>'
+                        // Direction label
+                        let dirLabel;
+                        if (isInternal) dirLabel = '<span style="color:#9ca3af;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em"><i class="bi bi-bell"></i> Team Notification</span>';
+                        else if (isInbound) dirLabel = '<span style="color:#10b981;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em"><i class="bi bi-arrow-down-left"></i> From Applicant</span>';
+                        else dirLabel = '<span style="color:#3b82f6;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em"><i class="bi bi-arrow-up-right"></i> To Applicant</span>';
+
+                        let failBadge = c.status === 'failed' ? ' <span class="badge bg-danger" style="font-size:0.6rem">Failed</span>' : '';
+
+                        html += '<div class="rounded-3 mb-3 overflow-hidden" style="' + cardBorder + ';' + cardBg + '">'
+                            // Header bar
+                            + '<div class="d-flex justify-content-between align-items-center px-3 py-2" style="' + headerBg + '">'
+                            + '<div class="d-flex align-items-center gap-2">'
+                            + '<i class="bi ' + channelIcon + '" style="color:' + channelColor + ';font-size:0.85rem"></i>'
+                            + '<span class="fw-semibold text-white" style="font-size:0.8rem">' + esc(channelLabel) + '</span>'
+                            + dirLabel + failBadge
                             + '</div>'
-                            + '<div class="flex-grow-1" style="min-width:0">'
-                            + '<div class="d-flex justify-content-between align-items-start">'
-                            + '<div style="min-width:0">'
-                            + '<span class="fw-semibold text-white" style="font-size:0.82rem">' + esc(c.subject || c.channel + ' ' + c.direction) + '</span>'
-                            + dirBadge + statusBadge
+                            + '<span class="text-white-50" style="font-size:0.75rem">' + esc(dateTime) + '</span>'
                             + '</div>'
-                            + '<small class="text-white-50 flex-shrink-0 ms-2">' + esc(time) + '</small>'
+                            // Body
+                            + '<div class="px-3 py-3">'
+                            + '<div class="fw-semibold text-white mb-1" style="font-size:0.85rem">' + esc(c.subject || 'No subject') + '</div>'
+                            + '<div class="d-flex gap-3 mb-2" style="font-size:0.75rem;color:rgba(255,255,255,0.35)">'
+                            + (c.sender ? '<span>From: ' + esc(c.sender) + '</span>' : '')
+                            + (c.recipient ? '<span>To: ' + esc(c.recipient) + '</span>' : '')
                             + '</div>'
-                            + '<div class="mt-1" style="font-size:0.75rem;color:rgba(255,255,255,0.4)">'
-                            + '<span class="text-primary">' + esc(c.lead_email || '') + '</span>'
-                            + (c.sender ? ' &middot; From: ' + esc(c.sender) : '')
-                            + (c.recipient ? ' &middot; To: ' + esc(c.recipient) : '')
-                            + '</div>'
-                            + (c.body ? '<div class="mt-1 text-white-50" style="font-size:0.78rem;max-height:40px;overflow:hidden;text-overflow:ellipsis">' + esc(c.body).substring(0, 150) + '</div>' : '')
+                            + (c.body ? '<div class="text-white-50" style="font-size:0.8rem;line-height:1.6">' + esc(c.body).substring(0, 300) + '</div>' : '')
                             + '</div>'
                             + '</div>';
                     });
@@ -2119,6 +2196,14 @@ requireAdmin();
                     cb.checked = activeDays.includes(cb.value);
                     updateDayBtnStyle(cb);
                 });
+
+                // AI messaging settings
+                document.getElementById('aiTone').value = settings.ai_tone || 'friendly';
+                document.getElementById('aiWelcomeInstructions').value = settings.ai_welcome_instructions || '';
+                document.getElementById('aiTourHours').value = settings.ai_tour_hours || '';
+                document.getElementById('aiTalkingPoints').value = settings.ai_talking_points || '';
+                document.getElementById('aiExtraPropertyInfo').value = settings.ai_extra_property_info || '';
+                document.getElementById('aiOffLimits').value = settings.ai_off_limits || '';
             } catch (e) {
                 console.error('Failed to load settings:', e);
             }
@@ -2207,6 +2292,39 @@ requireAdmin();
                 } else {
                     statusEl.className = 'small mb-3 text-danger';
                     statusEl.textContent = data.error || 'Failed to save SMS settings.';
+                }
+            } catch (e) {
+                statusEl.className = 'small mb-3 text-danger';
+                statusEl.textContent = 'Network error. Please try again.';
+            }
+            statusEl.style.display = 'block';
+            setTimeout(() => statusEl.style.display = 'none', 3000);
+        }
+
+        async function saveAISettings() {
+            const statusEl = document.getElementById('aiSettingsStatus');
+            const payload = {
+                ai_tone: document.getElementById('aiTone').value,
+                ai_welcome_instructions: document.getElementById('aiWelcomeInstructions').value.trim(),
+                ai_tour_hours: document.getElementById('aiTourHours').value.trim(),
+                ai_talking_points: document.getElementById('aiTalkingPoints').value.trim(),
+                ai_extra_property_info: document.getElementById('aiExtraPropertyInfo').value.trim(),
+                ai_off_limits: document.getElementById('aiOffLimits').value.trim()
+            };
+
+            try {
+                const res = await fetch('/api/admin-api.php?action=save_settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    statusEl.className = 'small mb-3 text-success';
+                    statusEl.textContent = 'AI settings saved successfully.';
+                } else {
+                    statusEl.className = 'small mb-3 text-danger';
+                    statusEl.textContent = data.error || 'Failed to save AI settings.';
                 }
             } catch (e) {
                 statusEl.className = 'small mb-3 text-danger';
