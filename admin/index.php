@@ -910,8 +910,8 @@ requireAdmin();
                         const intentParts = [];
                         intentParts.push('<small class="text-uppercase fw-semibold" style="font-size:0.65rem;letter-spacing:0.05em;color:rgba(255,255,255,0.5)">' + esc(lead.source) + '</small>');
                         if (lead.unit) intentParts.push('<span class="text-primary fw-semibold" style="font-size:0.85rem">Unit ' + esc(lead.unit) + '</span>');
-                        if (lead.budget) intentParts.push('<small class="text-body-tertiary">' + esc(lead.budget) + '</small>');
-                        if (lead.move_in_date) intentParts.push('<small class="text-body-tertiary"><i class="bi bi-calendar3" style="font-size:0.65rem"></i> ' + esc(lead.move_in_date) + '</small>');
+                        if (lead.budget) intentParts.push('<small class="text-body-tertiary">$' + esc(lead.budget).replace(/^\$/, '') + ' Budget</small>');
+                        if (lead.move_in_date) intentParts.push('<small class="text-body-tertiary">Move-In: ' + esc(lead.move_in_date) + '</small>');
                         const intentHtml = '<div class="d-flex flex-column gap-0">' + intentParts.join('') + '</div>';
 
                         // Contact column with email + phone
