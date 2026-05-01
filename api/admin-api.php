@@ -41,7 +41,7 @@ function getStats() {
     }
     $leadCount = count($emails);
 
-    $convRate = ($sessionCount > 0) ? round(($leadCount / $sessionCount) * 100, 1) : 0;
+    $convRate = ($sessionCount > 0) ? min(100, round(($leadCount / $sessionCount) * 100, 1)) : 0;
 
     // New today — count leads submitted today
     $today = date('Y-m-d');
@@ -63,14 +63,14 @@ function getLeads() {
     global $sb;
 
     try {
-        // Fetch from all 3 tables
+        // Fetch from all 3 tables (include phone for dedup)
         $allLeads = [];
         foreach ([
-            ['table' => 'waitlist_submissions', 'source' => 'Waitlist'],
-            ['table' => 'unit_inquiries', 'source' => 'Unit Interest'],
-            ['table' => 'mailing_list', 'source' => 'Mailing List']
+            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,created_at,tracking_id'],
+            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,created_at,tracking_id'],
+            ['table' => 'mailing_list', 'source' => 'Mailing List', 'fields' => 'first_name,last_name,email,created_at,tracking_id']
         ] as $src) {
-            $rows = $sb->select($src['table'], 'first_name,last_name,email,created_at,tracking_id',
+            $rows = $sb->select($src['table'], $src['fields'],
                 [], 'created_at.desc', 100);
             foreach ($rows as &$r) $r['source'] = $src['source'];
             $allLeads = array_merge($allLeads, $rows);
@@ -90,13 +90,22 @@ function getLeads() {
             $enrichmentByEmail[strtolower($e['email'])] = $e;
         }
 
-        // Deduplicate by email and collect tracking IDs
-        $seen = [];
+        // Deduplicate by email AND phone number
+        $seenEmails = [];
+        $seenPhones = [];
         $unique = [];
         foreach ($allLeads as $lead) {
             $email = strtolower($lead['email']);
-            if (isset($seen[$email])) continue;
-            $seen[$email] = true;
+            $phone = preg_replace('/\D/', '', $lead['phone'] ?? '');
+
+            // Skip if we've seen this email
+            if (isset($seenEmails[$email])) continue;
+
+            // Skip if we've seen this phone number (and it's not empty)
+            if ($phone && strlen($phone) >= 10 && isset($seenPhones[$phone])) continue;
+
+            $seenEmails[$email] = true;
+            if ($phone && strlen($phone) >= 10) $seenPhones[$phone] = true;
 
             // Merge enrichment from pre-fetched data
             if (isset($enrichmentByEmail[$email])) {

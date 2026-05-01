@@ -365,7 +365,7 @@ requireAdmin();
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="brand">THE ELEANOR</div>
-        <div class="brand-sub">Lead-to-Showing Command Center</div>
+        <div class="brand-sub">Command Center</div>
         <nav class="nav nav-pills flex-column gap-1" id="mainNav">
             <a href="#" class="nav-link active" data-view="overview">
                 <i class="bi bi-grid-1x2"></i> Overview
@@ -899,7 +899,8 @@ requireAdmin();
 
                         const activityLabel = lead.event_count > 10 ? '<span class="text-success"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Hot</span>' :
                                              lead.event_count > 5 ? '<span class="text-primary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Active</span>' :
-                                             '<span class="text-body-tertiary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Quiet</span>';
+                                             lead.event_count > 0 ? '<span class="text-body-tertiary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Quiet</span>' :
+                                             '<span class="text-body-tertiary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> No Activity</span>';
 
                         const engagement = '<div><small class="text-body-tertiary text-uppercase" style="font-size:0.65rem;letter-spacing:0.05em">' + esc(lead.source) + '</small><br><span style="font-size:0.8rem;" class="fw-semibold">' + activityLabel + '</span></div>';
 
