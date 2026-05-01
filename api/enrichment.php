@@ -920,5 +920,15 @@ EOD;
 
     foreach ($notifyEmails as $to) {
         smtpSend(trim($to), $subject, $body, $email, true);
+        $sb->insert('communications', [
+            'lead_email' => $email,
+            'direction' => 'internal',
+            'channel' => 'email',
+            'subject' => $subject,
+            'body' => 'Enrichment report sent',
+            'sender' => 'System (Enrichment)',
+            'recipient' => trim($to),
+            'status' => 'sent'
+        ]);
     }
 }

@@ -373,8 +373,8 @@ requireAdmin();
             <a href="#" class="nav-link" data-view="leads">
                 <i class="bi bi-people"></i> Leads
             </a>
-            <a href="#" class="nav-link" data-view="analytics">
-                <i class="bi bi-bar-chart-line"></i> Analytics
+            <a href="#" class="nav-link" data-view="communications">
+                <i class="bi bi-chat-left-text"></i> Communications
             </a>
             <a href="#" class="nav-link" data-view="brokers">
                 <i class="bi bi-person-badge"></i> Brokers
@@ -499,55 +499,17 @@ requireAdmin();
             </div>
         </div>
 
-        <!-- Analytics View -->
-        <div id="view-analytics" class="dashboard-view" style="display:none">
-            <div class="mb-4">
-                <h1 class="h3 fw-bold mb-0">User Behavioral Insights</h1>
-                <small class="text-body-tertiary">Deep behavioral analysis</small>
+        <!-- Communications View -->
+        <div id="view-communications" class="dashboard-view" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 fw-bold mb-0">Communications</h1>
+                <button class="btn btn-primary btn-sm" onclick="showAddCommModal()"><i class="bi bi-plus-lg me-1"></i>Add Note</button>
             </div>
-
-            <div class="row g-4">
-                <!-- Section Engagement -->
-                <div class="col-md-6">
-                    <div class="card bg-body-tertiary border-0 h-100">
-                        <div class="card-body p-4">
-                            <h5 class="fw-bold mb-1">Section Engagement</h5>
-                            <p class="text-body-tertiary mb-4" style="font-size:0.75rem;">Average time spent per section (seconds)</p>
-                            <div id="section-engagement-list"><!-- Dynamic --></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Interaction Hotspots -->
-                <div class="col-md-6">
-                    <div class="card bg-body-tertiary border-0 h-100">
-                        <div class="card-body p-4">
-                            <h5 class="fw-bold mb-1">Top Interactions</h5>
-                            <p class="text-body-tertiary mb-4" style="font-size:0.75rem;">Most clicked buttons and CTAs</p>
-                            <div id="top-interactions-list"><!-- Dynamic --></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Device Breakdown -->
-                <div class="col-md-6">
-                    <div class="card bg-body-tertiary border-0 h-100">
-                        <div class="card-body p-4">
-                            <h5 class="fw-bold mb-1">Device Distribution</h5>
-                            <div id="device-breakdown-list" class="mt-3"><!-- Dynamic --></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Traffic Trends -->
-                <div class="col-md-6">
-                    <div class="card bg-body-tertiary border-0 h-100">
-                        <div class="card-body p-4">
-                            <h5 class="fw-bold mb-1">Recent Traffic Trend</h5>
-                            <div id="traffic-trends-list" class="mt-3"><!-- Dynamic --></div>
-                        </div>
-                    </div>
-                </div>
+            <div class="mb-3">
+                <input type="text" class="form-control bg-dark border-secondary text-white" id="commSearchEmail" placeholder="Search by lead email..." oninput="searchComms()">
+            </div>
+            <div id="commsTimeline">
+                <div class="text-center text-body-tertiary py-5">Search for a lead email to view their communication history.</div>
             </div>
         </div>
 
@@ -657,6 +619,65 @@ requireAdmin();
       </div>
     </div>
 
+    <!-- Communication Modal -->
+    <div class="modal fade" id="commModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Log Communication</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small text-white-50">Lead Email</label>
+                        <input type="email" class="form-control bg-dark border-secondary text-white" id="commLeadEmail">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label class="form-label small text-white-50">Direction</label>
+                            <select class="form-select bg-dark border-secondary text-white" id="commDirection">
+                                <option value="outbound">Outbound</option>
+                                <option value="inbound">Inbound</option>
+                                <option value="internal">Internal</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label class="form-label small text-white-50">Channel</label>
+                            <select class="form-select bg-dark border-secondary text-white" id="commChannel">
+                                <option value="note">Note</option>
+                                <option value="email">Email</option>
+                                <option value="sms">SMS</option>
+                                <option value="phone">Phone Call</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-white-50">Subject</label>
+                        <input type="text" class="form-control bg-dark border-secondary text-white" id="commSubject">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-white-50">Body / Notes</label>
+                        <textarea class="form-control bg-dark border-secondary text-white" id="commBody" rows="3"></textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label class="form-label small text-white-50">From</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" id="commSender">
+                        </div>
+                        <div class="col">
+                            <label class="form-label small text-white-50">To</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-white" id="commRecipient">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveComm()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php
     if (isset($_GET['logout'])) { logout(); }
     ?>
@@ -692,8 +713,8 @@ requireAdmin();
             const target = document.getElementById('view-' + view);
             if (target) target.style.display = 'block';
 
-            if (view === 'analytics') {
-                fetchAnalytics();
+            if (view === 'communications') {
+                // Don't auto-load — user searches by email
             }
             if (view === 'brokers') {
                 fetchBrokers();
@@ -1225,69 +1246,122 @@ requireAdmin();
             }
         }
 
-        // ── Fetch Analytics ──
-        async function fetchAnalytics() {
+        // ── Communications ──
+        async function searchComms() {
+            const email = document.getElementById('commSearchEmail').value.trim();
+            if (email.length < 3) {
+                document.getElementById('commsTimeline').innerHTML = '<div class="text-center text-body-tertiary py-5">Type an email to search...</div>';
+                return;
+            }
+            await loadCommsForEmail(email);
+        }
+
+        async function loadCommsForEmail(email) {
+            const container = document.getElementById('commsTimeline');
+            container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+
             try {
-                const response = await fetch('../api/admin-api.php?action=analytics');
-                const data = await response.json();
+                const res = await fetch('../api/admin-api.php?action=get_communications&email=' + encodeURIComponent(email));
+                const comms = await res.json();
 
-                // 1. Section Engagement
-                const sectionList = document.getElementById('section-engagement-list');
-                sectionList.innerHTML = '';
-                const engagementData = data.sectionEngagement.filter(s => s.section && s.section !== 'unknown');
-                const maxSeconds = Math.max(...engagementData.map(s => s.avg_seconds), 1);
+                if (!Array.isArray(comms) || comms.length === 0) {
+                    container.innerHTML = '<div class="text-center text-body-tertiary py-5">No communications found for this email.</div>';
+                    return;
+                }
 
-                engagementData.forEach(s => {
-                    const pct = (s.avg_seconds / maxSeconds) * 100;
-                    const name = esc(s.section.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
-                    sectionList.innerHTML += '<div class="metric-row">'
-                        + '<div class="metric-info"><span class="metric-name">' + name + '</span><span class="metric-val">' + Math.round(s.avg_seconds) + 's <small class="text-body-tertiary">avg</small></span></div>'
-                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-primary" style="width:' + pct + '%"></div></div>'
+                let html = '<div class="d-flex flex-column gap-0">';
+                comms.forEach(function(c) {
+                    const date = new Date(c.created_at);
+                    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+                    // Icon based on channel
+                    let icon, iconColor;
+                    switch(c.channel) {
+                        case 'email': icon = 'bi-envelope'; iconColor = '#3b82f6'; break;
+                        case 'sms': icon = 'bi-chat-dots'; iconColor = '#10b981'; break;
+                        case 'phone': icon = 'bi-telephone'; iconColor = '#f59e0b'; break;
+                        case 'note': icon = 'bi-sticky'; iconColor = '#8b5cf6'; break;
+                        default: icon = 'bi-record-circle'; iconColor = '#6b7280';
+                    }
+
+                    // Direction label
+                    let dirLabel = '';
+                    if (c.direction === 'internal') dirLabel = '<span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.6rem">Internal</span>';
+                    else if (c.direction === 'outbound') dirLabel = '<span class="badge bg-primary bg-opacity-25 text-primary" style="font-size:0.6rem">Outbound</span>';
+                    else if (c.direction === 'inbound') dirLabel = '<span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.6rem">Inbound</span>';
+
+                    // Status indicator
+                    let statusDot = '';
+                    if (c.status === 'failed') statusDot = '<span class="badge bg-danger bg-opacity-25 text-danger" style="font-size:0.6rem">Failed</span>';
+
+                    html += '<div class="d-flex gap-3 py-3" style="border-bottom:1px solid rgba(255,255,255,0.05)">'
+                        + '<div class="d-flex flex-column align-items-center" style="width:30px">'
+                        + '<i class="bi ' + icon + '" style="color:' + iconColor + ';font-size:1.1rem"></i>'
+                        + '<div style="width:1px;flex:1;background:rgba(255,255,255,0.06);margin-top:4px"></div>'
+                        + '</div>'
+                        + '<div class="flex-grow-1">'
+                        + '<div class="d-flex justify-content-between align-items-start">'
+                        + '<div>'
+                        + '<span class="fw-semibold text-white" style="font-size:0.85rem">' + esc(c.subject || c.channel + ' ' + c.direction) + '</span> '
+                        + dirLabel + ' ' + statusDot
+                        + '</div>'
+                        + '<small class="text-white-50">' + esc(dateStr) + '</small>'
+                        + '</div>'
+                        + '<div class="text-white-50 mt-1" style="font-size:0.8rem">'
+                        + (c.sender ? '<span>From: ' + esc(c.sender) + '</span>' : '')
+                        + (c.recipient ? '<span class="ms-3">To: ' + esc(c.recipient) + '</span>' : '')
+                        + '</div>'
+                        + (c.body ? '<div class="text-white-50 mt-1" style="font-size:0.8rem;max-height:60px;overflow:hidden">' + esc(c.body).substring(0, 200) + '</div>' : '')
+                        + '</div>'
                         + '</div>';
                 });
+                html += '</div>';
+                container.innerHTML = html;
+            } catch(err) {
+                container.innerHTML = '<div class="alert alert-danger">Error loading communications.</div>';
+            }
+        }
 
-                // 2. Top Interactions
-                const interactionList = document.getElementById('top-interactions-list');
-                interactionList.innerHTML = '';
-                const maxClicks = Math.max(...data.topInteractions.map(i => i.click_count), 1);
+        function showAddCommModal() {
+            const email = document.getElementById('commSearchEmail').value.trim();
+            document.getElementById('commLeadEmail').value = email;
+            document.getElementById('commDirection').value = 'outbound';
+            document.getElementById('commChannel').value = 'note';
+            document.getElementById('commSubject').value = '';
+            document.getElementById('commBody').value = '';
+            document.getElementById('commSender').value = '';
+            document.getElementById('commRecipient').value = email;
+            const modal = new bootstrap.Modal(document.getElementById('commModal'));
+            modal.show();
+        }
 
-                data.topInteractions.forEach(i => {
-                    const pct = (i.click_count / maxClicks) * 100;
-                    interactionList.innerHTML += '<div class="metric-row">'
-                        + '<div class="metric-info"><span class="metric-name">' + esc(i.button_text) + '</span><span class="metric-badge">' + esc(String(i.click_count)) + '</span></div>'
-                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-info" style="width:' + pct + '%"></div></div>'
-                        + '</div>';
+        async function saveComm() {
+            const payload = {
+                lead_email: document.getElementById('commLeadEmail').value.trim(),
+                direction: document.getElementById('commDirection').value,
+                channel: document.getElementById('commChannel').value,
+                subject: document.getElementById('commSubject').value.trim(),
+                body: document.getElementById('commBody').value.trim(),
+                sender: document.getElementById('commSender').value.trim(),
+                recipient: document.getElementById('commRecipient').value.trim()
+            };
+            if (!payload.lead_email) { alert('Lead email is required'); return; }
+
+            try {
+                const res = await fetch('../api/admin-api.php?action=add_communication', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
-
-                // 3. Device Breakdown
-                const deviceList = document.getElementById('device-breakdown-list');
-                deviceList.innerHTML = '';
-                const totalDevices = data.deviceBreakdown.reduce((sum, d) => sum + parseInt(d.count), 0);
-
-                data.deviceBreakdown.forEach(d => {
-                    const pct = (d.count / totalDevices) * 100;
-                    deviceList.innerHTML += '<div class="metric-row">'
-                        + '<div class="metric-info"><span class="metric-name">' + esc(d.device_type) + '</span><span class="metric-val">' + Math.round(pct) + '%</span></div>'
-                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-warning" style="width:' + pct + '%"></div></div>'
-                        + '</div>';
-                });
-
-                // 4. Traffic Trends
-                const trafficList = document.getElementById('traffic-trends-list');
-                trafficList.innerHTML = '';
-                const maxSessions = Math.max(...data.trafficTrends.map(t => t.sessions), 1);
-
-                data.trafficTrends.forEach(t => {
-                    const pct = (t.sessions / maxSessions) * 100;
-                    const date = new Date(t.date).toLocaleDateString([], { month: 'short', day: 'numeric' });
-                    trafficList.innerHTML += '<div class="metric-row">'
-                        + '<div class="metric-info"><span class="metric-name">' + esc(date) + '</span><span class="metric-val">' + esc(String(t.sessions)) + ' <small class="text-body-tertiary">visits</small> / ' + esc(String(t.leads)) + ' <small class="text-success">leads</small></span></div>'
-                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-success" style="width:' + pct + '%"></div></div>'
-                        + '</div>';
-                });
-
-            } catch (err) {
-                console.error("Analytics Error:", err);
+                const result = await res.json();
+                if (result.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('commModal')).hide();
+                    loadCommsForEmail(payload.lead_email);
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown'));
+                }
+            } catch(err) {
+                alert('Network error');
             }
         }
 
@@ -1494,6 +1568,11 @@ requireAdmin();
             } else {
                 html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4 text-center text-white-50">No engagement events recorded.</div></div>';
             }
+
+            html += '<div class="text-center mt-2">'
+                + '<a href="#" class="text-primary text-decoration-none" style="font-size:0.8rem" onclick="event.preventDefault(); document.getElementById(\'commSearchEmail\').value=\'' + esc(intel.email).replace(/'/g, "\\'") + '\'; showView(\'communications\'); loadCommsForEmail(\'' + esc(intel.email).replace(/'/g, "\\'") + '\')">'
+                + '<i class="bi bi-chat-left-text me-1"></i>View Communications'
+                + '</a></div>';
 
             html += '</div>'; // end right col
             html += '</div>'; // end row

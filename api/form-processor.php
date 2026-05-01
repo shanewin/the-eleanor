@@ -192,6 +192,16 @@ function processForm(array $config): void {
         if (!$sent) {
             error_log("Failed to send notification email to $notifyTo for $table");
         }
+        $sb->insert('communications', [
+            'lead_email' => $email,
+            'direction' => 'internal',
+            'channel' => 'email',
+            'subject' => $subject,
+            'body' => $body,
+            'sender' => 'System',
+            'recipient' => trim($notifyTo),
+            'status' => $sent ? 'sent' : 'failed'
+        ]);
     }
 
     // ── CSRF token regeneration ─────────────────────────────────────

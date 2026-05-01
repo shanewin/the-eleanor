@@ -30,6 +30,9 @@ switch ($action) {
     case 'delete_broker': deleteBroker(); break;
     case 'assign_lead': assignLead(); break;
     case 'respond_lead': respondLead(); break;
+    case 'get_communications': getCommunications($_GET['email'] ?? ''); break;
+    case 'add_communication': addCommunication(); break;
+    case 'delete_communication': deleteCommunication(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -551,5 +554,65 @@ function respondLead() {
         'response_method'   => $method
     ], ['email=eq.' . urlencode($email)]);
 
+    echo json_encode(['success' => true]);
+}
+
+/* ── Communications ── */
+
+function getCommunications($email) {
+    global $sb;
+
+    if (empty($email)) {
+        echo json_encode(['error' => 'Email required']);
+        return;
+    }
+
+    $comms = $sb->select('communications', '*',
+        ['lead_email=eq.' . urlencode($email)],
+        'created_at.desc');
+
+    echo json_encode($comms);
+}
+
+function addCommunication() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $leadEmail = $input['lead_email'] ?? '';
+    $direction = $input['direction'] ?? '';
+    $channel   = $input['channel'] ?? '';
+
+    if (empty($leadEmail) || empty($direction) || empty($channel)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'lead_email, direction, and channel are required']);
+        return;
+    }
+
+    $result = $sb->insert('communications', [
+        'lead_email' => $leadEmail,
+        'direction'  => $direction,
+        'channel'    => $channel,
+        'subject'    => $input['subject'] ?? null,
+        'body'       => $input['body'] ?? null,
+        'sender'     => $input['sender'] ?? null,
+        'recipient'  => $input['recipient'] ?? null,
+        'status'     => $input['status'] ?? null,
+        'metadata'   => $input['metadata'] ?? null,
+    ]);
+
+    echo json_encode(['success' => true, 'communication' => $result]);
+}
+
+function deleteCommunication() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (empty($input['id'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Communication id is required']);
+        return;
+    }
+
+    $sb->delete('communications', ['id=eq.' . $input['id']]);
     echo json_encode(['success' => true]);
 }
