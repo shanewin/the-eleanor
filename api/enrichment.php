@@ -925,7 +925,7 @@ EOD;
             'direction' => 'internal',
             'channel' => 'email',
             'subject' => $subject,
-            'body' => 'Enrichment report sent',
+            'body' => "Lead Intelligence Report\n\n$name\n$title\n$company\n\nEmail: $email\nPhone: " . ($phone ?? '—') . "\n\nIndustry: $industry\nEmployees: $employees\nLocation: $location\nHeadline: $headline\nLinkedIn: " . ($linkedin ?? '—') . "\n\n$behavioralRaw",
             'sender' => 'System (Enrichment)',
             'recipient' => trim($to),
             'status' => 'sent'
