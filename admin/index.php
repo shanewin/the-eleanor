@@ -1014,6 +1014,58 @@ requireAdmin();
         </div>
     </div>
 
+    <!-- Auto Text Modal -->
+    <div class="modal fade" id="autoTextModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-robot me-2"></i>Auto Text</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Lead info -->
+                    <div class="d-flex justify-content-between align-items-center mb-3" id="autoTextLeadInfo" style="display:none!important">
+                        <div>
+                            <span class="fw-semibold text-white" id="autoTextLeadName"></span>
+                            <span class="text-white-50 small ms-2" id="autoTextLeadPhone"></span>
+                        </div>
+                    </div>
+
+                    <!-- Loading state -->
+                    <div id="autoTextLoading" class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-secondary mb-2"></div>
+                        <div class="text-white-50 small">Generating message...</div>
+                    </div>
+
+                    <!-- Message editor -->
+                    <div id="autoTextEditor" style="display:none">
+                        <label class="form-label small text-white-50">Message Preview</label>
+                        <textarea class="form-control bg-dark border-secondary text-white" id="autoTextBody" rows="5" style="font-size:0.9rem;line-height:1.5"></textarea>
+                        <div class="d-flex justify-content-between mt-2">
+                            <small class="text-white-50">Edit the message or send as-is</small>
+                            <small class="text-white-50" id="autoTextCharCount">0 / 160</small>
+                        </div>
+                    </div>
+
+                    <!-- Success state -->
+                    <div id="autoTextSuccess" class="text-center py-4" style="display:none">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size:2rem"></i>
+                        <div class="text-white mt-2">Message sent</div>
+                    </div>
+
+                    <!-- Error state -->
+                    <div id="autoTextError" class="alert alert-danger small mt-3" style="display:none"></div>
+                </div>
+                <div class="modal-footer border-secondary" id="autoTextFooter">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="autoTextSendBtn" onclick="sendAutoText()" style="display:none">
+                        <i class="bi bi-send me-1"></i>Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Showing Detail Modal -->
     <div class="modal fade" id="showingDetailModal" tabindex="-1">
         <div class="modal-dialog modal-sm">
@@ -2413,25 +2465,104 @@ requireAdmin();
             setTimeout(() => statusEl.style.display = 'none', 3000);
         }
 
+        let autoTextEmail = '';
+        let autoTextPhone = '';
+
         async function engageAI(email) {
-            if (!confirm('Send an auto text to this lead?')) return;
+            autoTextEmail = email;
+            autoTextPhone = '';
+
+            // Reset modal states
+            document.getElementById('autoTextLoading').style.display = 'block';
+            document.getElementById('autoTextEditor').style.display = 'none';
+            document.getElementById('autoTextSuccess').style.display = 'none';
+            document.getElementById('autoTextError').style.display = 'none';
+            document.getElementById('autoTextSendBtn').style.display = 'none';
+            document.getElementById('autoTextLeadInfo').style.display = 'none';
+            document.getElementById('autoTextFooter').style.display = '';
+
+            // Open modal
+            const modal = new bootstrap.Modal(document.getElementById('autoTextModal'));
+            modal.show();
+
+            // Generate preview
             try {
-                const res = await fetch('../api/admin-api.php?action=engage_ai', {
+                const res = await fetch('../api/admin-api.php?action=engage_ai_preview', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: email })
                 });
                 const result = await res.json();
+
                 if (result.success) {
-                    alert('AI welcome text sent to ' + (result.phone || 'lead'));
-                    fetchData();
+                    autoTextPhone = result.phone;
+                    document.getElementById('autoTextLeadName').textContent = result.name || 'Lead';
+                    document.getElementById('autoTextLeadPhone').textContent = result.phone || '';
+                    document.getElementById('autoTextLeadInfo').style.display = 'flex';
+                    document.getElementById('autoTextBody').value = result.message;
+                    updateAutoTextCharCount();
+                    document.getElementById('autoTextLoading').style.display = 'none';
+                    document.getElementById('autoTextEditor').style.display = 'block';
+                    document.getElementById('autoTextSendBtn').style.display = '';
                 } else {
-                    alert('Error: ' + (result.error || 'Could not engage AI'));
+                    document.getElementById('autoTextLoading').style.display = 'none';
+                    document.getElementById('autoTextError').textContent = result.error || 'Could not generate message';
+                    document.getElementById('autoTextError').style.display = 'block';
                 }
             } catch(err) {
-                alert('Network error');
+                document.getElementById('autoTextLoading').style.display = 'none';
+                document.getElementById('autoTextError').textContent = 'Network error — please try again';
+                document.getElementById('autoTextError').style.display = 'block';
             }
         }
+
+        async function sendAutoText() {
+            const body = document.getElementById('autoTextBody').value.trim();
+            if (!body) return;
+
+            const sendBtn = document.getElementById('autoTextSendBtn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+
+            try {
+                const res = await fetch('../api/admin-api.php?action=engage_ai_send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: autoTextEmail, phone: autoTextPhone, body: body })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    document.getElementById('autoTextEditor').style.display = 'none';
+                    document.getElementById('autoTextFooter').style.display = 'none';
+                    document.getElementById('autoTextSuccess').style.display = 'block';
+                    setTimeout(() => {
+                        bootstrap.Modal.getInstance(document.getElementById('autoTextModal')).hide();
+                        fetchData();
+                    }, 1500);
+                } else {
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+                    document.getElementById('autoTextError').textContent = result.error || 'Send failed';
+                    document.getElementById('autoTextError').style.display = 'block';
+                }
+            } catch(err) {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+                document.getElementById('autoTextError').textContent = 'Network error';
+                document.getElementById('autoTextError').style.display = 'block';
+            }
+        }
+
+        function updateAutoTextCharCount() {
+            const len = document.getElementById('autoTextBody').value.length;
+            const segments = Math.ceil(len / 160) || 1;
+            document.getElementById('autoTextCharCount').textContent = len + ' / ' + (segments * 160);
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const ta = document.getElementById('autoTextBody');
+            if (ta) ta.addEventListener('input', updateAutoTextCharCount);
+        });
 
         async function toggleOverviewSMS() {
             const toggle = document.getElementById('overviewSmsToggle');
