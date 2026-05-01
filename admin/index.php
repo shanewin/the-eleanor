@@ -503,51 +503,24 @@ requireAdmin();
         <div id="view-communications" class="dashboard-view" style="display:none">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 fw-bold mb-0">Communications</h1>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="refreshSMSConversations()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
-                    <button class="btn btn-primary btn-sm" onclick="showAddCommModal()"><i class="bi bi-plus-lg me-1"></i>Log Note</button>
-                </div>
+                <button class="btn btn-primary btn-sm" onclick="showAddCommModal()"><i class="bi bi-plus-lg me-1"></i>Log Communication</button>
             </div>
-
-            <div class="row g-0" style="height: calc(100vh - 140px);">
-                <!-- Left: Conversation List -->
-                <div class="col-md-4 col-lg-3" style="border-right:1px solid rgba(255,255,255,0.06); overflow-y:auto; height:100%;">
-                    <div class="p-3">
-                        <input type="text" class="form-control form-control-sm bg-dark border-secondary text-white mb-3" id="smsSearchInput" placeholder="Search conversations..." oninput="filterSMSConversations()">
-                    </div>
-                    <div id="smsConvoList">
-                        <div class="text-center text-body-tertiary py-5 small">Loading conversations...</div>
-                    </div>
-                </div>
-
-                <!-- Right: Active Thread -->
-                <div class="col-md-8 col-lg-9 d-flex flex-column" style="height:100%;">
-                    <!-- Thread Header -->
-                    <div id="smsThreadHeader" class="px-4 py-3 d-flex justify-content-between align-items-center" style="border-bottom:1px solid rgba(255,255,255,0.06); min-height:64px;">
-                        <div class="text-white-50 small">Select a conversation to start messaging</div>
-                    </div>
-
-                    <!-- Messages Area -->
-                    <div id="smsThreadMessages" class="flex-grow-1 px-4 py-3" style="overflow-y:auto;">
-                        <!-- Messages render here -->
-                    </div>
-
-                    <!-- Compose Box -->
-                    <div id="smsComposeBox" class="px-4 py-3" style="border-top:1px solid rgba(255,255,255,0.06); display:none;">
-                        <div class="d-flex gap-2">
-                            <input type="text" class="form-control bg-dark border-secondary text-white" id="smsComposeInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendSMSFromCompose()">
-                            <button class="btn btn-primary px-3" onclick="sendSMSFromCompose()"><i class="bi bi-send"></i></button>
-                        </div>
-                        <div class="d-flex justify-content-between mt-2">
-                            <small class="text-white-50" id="smsComposeStatus"></small>
-                            <small class="text-white-50" id="smsCharCount">0 / 160</small>
-                        </div>
-                    </div>
-                </div>
+            <div class="d-flex gap-2 mb-4">
+                <select class="form-select form-select-sm bg-dark border-secondary text-white" id="commFilterLead" onchange="loadAllComms()" style="max-width:300px">
+                    <option value="">All Leads</option>
+                </select>
+                <select class="form-select form-select-sm bg-dark border-secondary text-white" id="commFilterChannel" onchange="loadAllComms()" style="max-width:150px">
+                    <option value="">All Channels</option>
+                    <option value="email">Email</option>
+                    <option value="sms">SMS</option>
+                    <option value="phone">Phone</option>
+                    <option value="note">Note</option>
+                </select>
             </div>
-
-            <!-- Legacy email search (hidden, kept for "View Communications" links from lead profile) -->
-            <input type="hidden" id="commSearchEmail">
+            <div id="commsTimeline">
+                <div class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary"></div><span class="text-body-tertiary ms-2">Loading...</span></div>
+            </div>
+            <input type="hidden" id="commSearchEmail" value="">
         </div>
 
         <!-- Brokers View -->
@@ -808,7 +781,8 @@ requireAdmin();
             if (target) target.style.display = 'block';
 
             if (view === 'communications') {
-                refreshSMSConversations();
+                populateCommLeadFilter();
+                loadAllComms();
             }
             if (view === 'brokers') {
                 fetchBrokers();
@@ -1340,291 +1314,126 @@ requireAdmin();
             }
         }
 
-        // ── Communications / SMS ──
-        let smsConversations = [];
-        let activeThreadPhone = null;
-        let smsRefreshInterval = null;
+        // ── Communications ──
 
-        async function refreshSMSConversations() {
-            try {
-                const res = await fetch('../api/admin-api.php?action=sms_conversations');
-                smsConversations = await res.json();
-                renderConvoList(smsConversations);
-            } catch(err) {
-                document.getElementById('smsConvoList').innerHTML = '<div class="text-center text-danger py-4 small">Error loading conversations</div>';
-            }
-        }
+        async function loadAllComms() {
+            const container = document.getElementById('commsTimeline');
+            const leadFilter = document.getElementById('commFilterLead').value;
+            const channelFilter = document.getElementById('commFilterChannel').value;
 
-        function filterSMSConversations() {
-            const q = document.getElementById('smsSearchInput').value.toLowerCase().trim();
-            if (!q) { renderConvoList(smsConversations); return; }
-            const filtered = smsConversations.filter(c =>
-                (c.lead_name || '').toLowerCase().includes(q) ||
-                (c.lead_phone || '').includes(q) ||
-                (c.lead_email || '').toLowerCase().includes(q)
-            );
-            renderConvoList(filtered);
-        }
-
-        function renderConvoList(convos) {
-            const container = document.getElementById('smsConvoList');
-            if (!convos || convos.length === 0) {
-                container.innerHTML = '<div class="text-center text-body-tertiary py-5 small">No SMS conversations yet</div>';
-                return;
-            }
-
-            let html = '';
-            convos.forEach(function(c) {
-                const isActive = c.lead_phone === activeThreadPhone;
-                const timeAgo = formatTimeAgo(c.last_at);
-                const name = c.lead_name || c.lead_phone;
-                const preview = (c.last_message || '').substring(0, 50);
-                const dirIcon = c.last_direction === 'inbound' ? '<i class="bi bi-reply-fill text-success" style="font-size:0.65rem"></i> ' : '';
-
-                // AI status indicator
-                let aiDot = '';
-                if (c.ai_status === 'active') aiDot = '<span title="AI Active" style="color:#10b981;font-size:0.5rem">&#9679;</span>';
-                else if (c.ai_status === 'paused_manual') aiDot = '<span title="Broker Mode" style="color:#f59e0b;font-size:0.5rem">&#9679;</span>';
-                else if (c.ai_status === 'paused_optout') aiDot = '<span title="Opted Out" style="color:#ef4444;font-size:0.5rem">&#9679;</span>';
-
-                html += '<div class="px-3 py-3 cursor-pointer'
-                    + (isActive ? ' bg-primary bg-opacity-10' : '')
-                    + '" style="border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer" onclick="openSMSThread(\'' + esc(c.lead_phone) + '\')">'
-                    + '<div class="d-flex justify-content-between align-items-start">'
-                    + '<div class="d-flex align-items-center gap-2">'
-                    + '<span class="fw-semibold text-white" style="font-size:0.85rem">' + esc(name) + '</span> '
-                    + aiDot
-                    + '</div>'
-                    + '<small class="text-white-50" style="font-size:0.7rem;white-space:nowrap">' + esc(timeAgo) + '</small>'
-                    + '</div>'
-                    + '<div class="text-white-50 mt-1" style="font-size:0.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-                    + dirIcon + esc(preview)
-                    + '</div>'
-                    + '<div class="d-flex gap-2 mt-1">'
-                    + (c.lead_source ? '<span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.55rem">' + esc(c.lead_source) + '</span>' : '')
-                    + '<span class="text-white-50" style="font-size:0.6rem">' + c.message_count + ' msgs</span>'
-                    + '</div>'
-                    + '</div>';
-            });
-            container.innerHTML = html;
-        }
-
-        async function openSMSThread(phone) {
-            activeThreadPhone = phone;
-
-            // Highlight active in list
-            renderConvoList(smsConversations);
-
-            // Find conversation info
-            const convo = smsConversations.find(c => c.lead_phone === phone);
-            const name = convo ? (convo.lead_name || phone) : phone;
-            const email = convo ? convo.lead_email : '';
-            const aiStatus = convo ? convo.ai_status : 'active';
-
-            // Render header
-            const aiToggleBtn = aiStatus === 'active'
-                ? '<button class="btn btn-outline-warning btn-sm" onclick="toggleThreadAI(\'' + esc(phone) + '\', \'paused_manual\')"><i class="bi bi-pause-circle me-1"></i>Pause AI</button>'
-                : '<button class="btn btn-outline-success btn-sm" onclick="toggleThreadAI(\'' + esc(phone) + '\', \'active\')"><i class="bi bi-play-circle me-1"></i>Resume AI</button>';
-
-            const aiLabel = aiStatus === 'active'
-                ? '<span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.65rem">AI Active</span>'
-                : aiStatus === 'paused_manual'
-                ? '<span class="badge bg-warning bg-opacity-25 text-warning" style="font-size:0.65rem">Broker Mode</span>'
-                : '<span class="badge bg-danger bg-opacity-25 text-danger" style="font-size:0.65rem">Opted Out</span>';
-
-            document.getElementById('smsThreadHeader').innerHTML =
-                '<div>'
-                + '<span class="fw-semibold text-white">' + esc(name) + '</span> '
-                + '<span class="text-white-50 small ms-2">' + esc(phone) + '</span> '
-                + aiLabel
-                + (email ? '<a href="#" class="text-primary text-decoration-none small ms-2" onclick="event.preventDefault(); showView(\'leads\')">' + esc(email) + '</a>' : '')
-                + '</div>'
-                + '<div class="d-flex gap-2">'
-                + (aiStatus !== 'paused_optout' ? aiToggleBtn : '')
-                + '</div>';
-
-            // Show compose box
-            document.getElementById('smsComposeBox').style.display = aiStatus === 'paused_optout' ? 'none' : 'block';
-
-            // Load messages
-            await loadSMSThread(phone);
-
-            // Start auto-refresh for this thread
-            clearInterval(smsRefreshInterval);
-            smsRefreshInterval = setInterval(() => loadSMSThread(phone, true), 10000);
-        }
-
-        async function loadSMSThread(phone, silent) {
-            const container = document.getElementById('smsThreadMessages');
-            if (!silent) {
-                container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
-            }
+            container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
 
             try {
-                const res = await fetch('../api/admin-api.php?action=sms_thread&phone=' + encodeURIComponent(phone));
-                const messages = await res.json();
+                const url = leadFilter
+                    ? '../api/admin-api.php?action=get_communications&email=' + encodeURIComponent(leadFilter)
+                    : '../api/admin-api.php?action=get_communications';
+                const res = await fetch(url);
+                let comms = await res.json();
 
-                if (!Array.isArray(messages) || messages.length === 0) {
-                    container.innerHTML = '<div class="text-center text-body-tertiary py-5 small">No messages yet</div>';
+                if (!Array.isArray(comms)) { comms = []; }
+
+                // Client-side channel filter
+                if (channelFilter) {
+                    comms = comms.filter(c => c.channel === channelFilter);
+                }
+
+                if (comms.length === 0) {
+                    container.innerHTML = '<div class="text-center text-body-tertiary py-5">No communications recorded yet.</div>';
                     return;
                 }
 
+                // Group by date
+                const grouped = {};
+                comms.forEach(c => {
+                    const day = new Date(c.created_at).toLocaleDateString();
+                    if (!grouped[day]) grouped[day] = [];
+                    grouped[day].push(c);
+                });
+
                 let html = '';
-                let lastDate = '';
+                Object.entries(grouped).forEach(([day, items]) => {
+                    html += '<div class="mb-2 mt-3"><small class="text-white-50 fw-semibold" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em">' + esc(day) + '</small></div>';
+                    items.forEach(c => {
+                        const time = new Date(c.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                        let icon, iconColor;
+                        switch(c.channel) {
+                            case 'email': icon = 'bi-envelope-fill'; iconColor = '#3b82f6'; break;
+                            case 'sms': icon = 'bi-chat-dots-fill'; iconColor = '#10b981'; break;
+                            case 'phone': icon = 'bi-telephone-fill'; iconColor = '#f59e0b'; break;
+                            case 'note': icon = 'bi-sticky-fill'; iconColor = '#8b5cf6'; break;
+                            default: icon = 'bi-record-circle'; iconColor = '#6b7280';
+                        }
+                        let dirBadge = '';
+                        if (c.direction === 'internal') dirBadge = '<span class="badge bg-secondary bg-opacity-25 text-secondary ms-2" style="font-size:0.55rem">Internal</span>';
+                        else if (c.direction === 'outbound') dirBadge = '<span class="badge bg-primary bg-opacity-25 text-primary ms-2" style="font-size:0.55rem">Outbound</span>';
+                        else if (c.direction === 'inbound') dirBadge = '<span class="badge bg-success bg-opacity-25 text-success ms-2" style="font-size:0.55rem">Inbound</span>';
 
-                messages.forEach(function(msg) {
-                    const date = new Date(msg.created_at);
-                    const dateStr = date.toLocaleDateString();
-                    const timeStr = date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                        let statusBadge = '';
+                        if (c.status === 'failed') statusBadge = '<span class="badge bg-danger bg-opacity-25 text-danger ms-1" style="font-size:0.55rem">Failed</span>';
 
-                    // Date separator
-                    if (dateStr !== lastDate) {
-                        html += '<div class="text-center my-3"><small class="text-white-50 bg-dark px-3 py-1 rounded-pill" style="font-size:0.7rem">' + esc(dateStr) + '</small></div>';
-                        lastDate = dateStr;
-                    }
-
-                    const isOutbound = msg.direction === 'outbound';
-                    const align = isOutbound ? 'ms-auto' : 'me-auto';
-                    const bgColor = isOutbound ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)';
-                    const maxWidth = 'max-width:75%';
-
-                    // Sender label for outbound
-                    let senderLabel = '';
-                    if (isOutbound && msg.sender_type === 'ai') {
-                        senderLabel = '<small class="text-white-50" style="font-size:0.6rem"><i class="bi bi-robot me-1"></i>Eleanor AI</small>';
-                    } else if (isOutbound && msg.sender_type === 'broker') {
-                        senderLabel = '<small class="text-white-50" style="font-size:0.6rem"><i class="bi bi-person me-1"></i>' + esc(msg.sender_name || 'Broker') + '</small>';
-                    }
-
-                    // Status indicator for outbound
-                    let statusIcon = '';
-                    if (isOutbound) {
-                        if (msg.status === 'delivered') statusIcon = '<i class="bi bi-check2-all text-success" style="font-size:0.65rem"></i>';
-                        else if (msg.status === 'sent') statusIcon = '<i class="bi bi-check2 text-white-50" style="font-size:0.65rem"></i>';
-                        else if (msg.status === 'failed') statusIcon = '<i class="bi bi-x-circle text-danger" style="font-size:0.65rem"></i>';
-                    }
-
-                    html += '<div class="d-flex mb-2">'
-                        + '<div class="' + align + ' px-3 py-2 rounded-3" style="' + maxWidth + ';background:' + bgColor + '">'
-                        + '<div class="text-white" style="font-size:0.85rem;white-space:pre-wrap">' + esc(msg.body) + '</div>'
-                        + '<div class="d-flex justify-content-between align-items-center mt-1 gap-2">'
-                        + senderLabel
-                        + '<span class="text-white-50 d-flex align-items-center gap-1" style="font-size:0.6rem">' + esc(timeStr) + ' ' + statusIcon + '</span>'
-                        + '</div>'
-                        + '</div>'
-                        + '</div>';
+                        html += '<div class="d-flex gap-3 py-3 px-3 rounded-2" style="border-bottom:1px solid rgba(255,255,255,0.04)">'
+                            + '<div class="d-flex flex-column align-items-center" style="width:24px;flex-shrink:0">'
+                            + '<i class="bi ' + icon + '" style="color:' + iconColor + ';font-size:0.9rem"></i>'
+                            + '</div>'
+                            + '<div class="flex-grow-1" style="min-width:0">'
+                            + '<div class="d-flex justify-content-between align-items-start">'
+                            + '<div style="min-width:0">'
+                            + '<span class="fw-semibold text-white" style="font-size:0.82rem">' + esc(c.subject || c.channel + ' ' + c.direction) + '</span>'
+                            + dirBadge + statusBadge
+                            + '</div>'
+                            + '<small class="text-white-50 flex-shrink-0 ms-2">' + esc(time) + '</small>'
+                            + '</div>'
+                            + '<div class="mt-1" style="font-size:0.75rem;color:rgba(255,255,255,0.4)">'
+                            + '<span class="text-primary">' + esc(c.lead_email || '') + '</span>'
+                            + (c.sender ? ' &middot; From: ' + esc(c.sender) : '')
+                            + (c.recipient ? ' &middot; To: ' + esc(c.recipient) : '')
+                            + '</div>'
+                            + (c.body ? '<div class="mt-1 text-white-50" style="font-size:0.78rem;max-height:40px;overflow:hidden;text-overflow:ellipsis">' + esc(c.body).substring(0, 150) + '</div>' : '')
+                            + '</div>'
+                            + '</div>';
+                    });
                 });
 
                 container.innerHTML = html;
-
-                // Scroll to bottom
-                container.scrollTop = container.scrollHeight;
             } catch(err) {
-                if (!silent) container.innerHTML = '<div class="text-center text-danger py-4 small">Error loading messages</div>';
+                container.innerHTML = '<div class="alert alert-danger">Error loading communications.</div>';
             }
         }
 
-        async function sendSMSFromCompose() {
-            const input = document.getElementById('smsComposeInput');
-            const body = input.value.trim();
-            if (!body || !activeThreadPhone) return;
-
-            const statusEl = document.getElementById('smsComposeStatus');
-            statusEl.textContent = 'Sending...';
-            input.disabled = true;
-
-            try {
-                const res = await fetch('../api/admin-api.php?action=sms_send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: activeThreadPhone,
-                        body: body,
-                        sender_name: 'Broker'
-                    })
+        function populateCommLeadFilter() {
+            const select = document.getElementById('commFilterLead');
+            if (!select || select.options.length > 1) return;
+            // Use leads from the last fetch
+            fetch('../api/admin-api.php?action=leads')
+                .then(r => r.json())
+                .then(leads => {
+                    if (!Array.isArray(leads)) return;
+                    const seen = {};
+                    leads.forEach(l => {
+                        const e = (l.email || '').toLowerCase();
+                        if (e && !seen[e]) {
+                            seen[e] = true;
+                            const opt = document.createElement('option');
+                            opt.value = e;
+                            opt.textContent = (l.first_name || '') + ' ' + (l.last_name || '') + ' (' + e + ')';
+                            select.appendChild(opt);
+                        }
+                    });
                 });
-                const result = await res.json();
-
-                if (result.success) {
-                    input.value = '';
-                    document.getElementById('smsCharCount').textContent = '0 / 160';
-                    statusEl.textContent = '';
-
-                    // Reload thread and conversation list
-                    await loadSMSThread(activeThreadPhone);
-
-                    // Update AI status in header (broker takeover auto-pauses AI)
-                    const convo = smsConversations.find(c => c.lead_phone === activeThreadPhone);
-                    if (convo) convo.ai_status = 'paused_manual';
-                    openSMSThread(activeThreadPhone);
-                } else {
-                    statusEl.innerHTML = '<span class="text-danger">Failed: ' + esc(result.error || 'Unknown error') + '</span>';
-                }
-            } catch(err) {
-                statusEl.innerHTML = '<span class="text-danger">Network error</span>';
-            }
-
-            input.disabled = false;
-            input.focus();
         }
-
-        async function toggleThreadAI(phone, newStatus) {
-            try {
-                const res = await fetch('../api/admin-api.php?action=sms_toggle_ai', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: phone, status: newStatus })
-                });
-                const result = await res.json();
-                if (result.success) {
-                    // Update local state and re-render
-                    const convo = smsConversations.find(c => c.lead_phone === phone);
-                    if (convo) convo.ai_status = newStatus;
-                    openSMSThread(phone);
-                }
-            } catch(err) {
-                alert('Error toggling AI');
-            }
-        }
-
-        // Character counter for SMS compose
-        document.addEventListener('DOMContentLoaded', function() {
-            const input = document.getElementById('smsComposeInput');
-            if (input) {
-                input.addEventListener('input', function() {
-                    const len = this.value.length;
-                    const segments = Math.ceil(len / 160) || 1;
-                    document.getElementById('smsCharCount').textContent = len + ' / ' + (segments * 160);
-                });
-            }
-        });
-
-        function formatTimeAgo(dateStr) {
-            const now = new Date();
-            const date = new Date(dateStr);
-            const diffMs = now - date;
-            const diffMin = Math.floor(diffMs / 60000);
-            const diffHr = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-
-            if (diffMin < 1) return 'now';
-            if (diffMin < 60) return diffMin + 'm';
-            if (diffHr < 24) return diffHr + 'h';
-            if (diffDays < 7) return diffDays + 'd';
-            return date.toLocaleDateString();
-        }
-
-        // Legacy comm functions (still used by "Log Note" modal and lead profile links)
-        function searchComms() {} // no-op, replaced by SMS view
 
         function loadCommsForEmail(email) {
-            // If called from lead profile link, open communications tab
-            // and try to find the lead's phone to open their thread
+            const select = document.getElementById('commFilterLead');
+            if (select) select.value = email;
             showView('communications');
+            loadAllComms();
         }
 
+        function searchComms() {} // unused
+
         function showAddCommModal() {
-            document.getElementById('commLeadEmail').value = '';
+            const leadFilter = document.getElementById('commFilterLead');
+            document.getElementById('commLeadEmail').value = leadFilter ? leadFilter.value : '';
             document.getElementById('commDirection').value = 'outbound';
             document.getElementById('commChannel').value = 'note';
             document.getElementById('commSubject').value = '';
@@ -1656,6 +1465,7 @@ requireAdmin();
                 const result = await res.json();
                 if (result.success) {
                     bootstrap.Modal.getInstance(document.getElementById('commModal')).hide();
+                    loadAllComms();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown'));
                 }
@@ -1663,7 +1473,6 @@ requireAdmin();
                 alert('Network error');
             }
         }
-
         // ── Clipboard ──
         function copyToClipboard(text, btn) {
             navigator.clipboard.writeText(text).then(() => {
