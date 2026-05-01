@@ -38,6 +38,7 @@ switch ($action) {
     case 'sms_send': sendSMSFromDashboard(); break;
     case 'sms_toggle_ai': toggleAIForLead(); break;
     case 'sms_ai_status': getAIStatus($_GET['phone'] ?? ''); break;
+    case 'update_lead_status': updateLeadStatus(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -87,8 +88,8 @@ function getLeads() {
 
         $allLeads = [];
         foreach ([
-            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,unit_type,created_at,tracking_id,assigned_to,first_response_at,response_method'],
-            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,created_at,tracking_id,assigned_to,first_response_at,response_method'],
+            ['table' => 'waitlist_submissions', 'source' => 'Waitlist', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,unit_type,created_at,tracking_id,assigned_to,first_response_at,response_method,lead_status'],
+            ['table' => 'unit_inquiries', 'source' => 'Unit Interest', 'fields' => 'first_name,last_name,email,phone,budget,move_in_date,unit,created_at,tracking_id,assigned_to,first_response_at,response_method,lead_status'],
             ['table' => 'mailing_list', 'source' => 'Mailing List', 'fields' => 'first_name,last_name,email,created_at,tracking_id']
         ] as $src) {
             $rows = $sb->select($src['table'], $src['fields'],
@@ -142,6 +143,26 @@ function getLeads() {
             $unique[] = $lead;
             if (count($unique) >= 50) break;
         }
+
+        // Fetch all communications and build per-lead lookup
+        $allComms = $sb->select('communications', 'lead_email,subject,created_at', [], 'created_at.desc', 500);
+        $lastComm = [];
+        $commCount = [];
+        foreach ($allComms as $comm) {
+            $ce = strtolower($comm['lead_email'] ?? '');
+            if (!$ce) continue;
+            $commCount[$ce] = ($commCount[$ce] ?? 0) + 1;
+            if (!isset($lastComm[$ce])) {
+                $lastComm[$ce] = $comm;
+            }
+        }
+        foreach ($unique as &$lead) {
+            $le = strtolower($lead['email']);
+            $lead['last_comm_subject'] = isset($lastComm[$le]) ? $lastComm[$le]['subject'] : null;
+            $lead['last_comm_at'] = isset($lastComm[$le]) ? $lastComm[$le]['created_at'] : null;
+            $lead['comm_count'] = $commCount[$le] ?? 0;
+        }
+        unset($lead);
 
         // Fetch activity counts for all tracking IDs in one call
         $trackingIds = array_filter(array_column($unique, 'tracking_id'));
@@ -558,6 +579,43 @@ function respondLead() {
         'first_response_at' => date('c'),
         'response_method'   => $method
     ], ['email=eq.' . urlencode($email)]);
+
+    echo json_encode(['success' => true]);
+}
+
+/* ── Lead Status ── */
+
+function updateLeadStatus() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+    $email = $input['email'] ?? '';
+    $source = $input['source'] ?? '';
+    $status = $input['status'] ?? '';
+
+    if (empty($email) || empty($status)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Email and status required']);
+        return;
+    }
+
+    $table = '';
+    switch ($source) {
+        case 'Waitlist': $table = 'waitlist_submissions'; break;
+        case 'Unit Interest': $table = 'unit_inquiries'; break;
+        default: $table = 'waitlist_submissions'; break;
+    }
+
+    $sb->update($table, ['lead_status' => $status], ['email=eq.' . urlencode($email)]);
+
+    // Log status change as communication
+    $sb->insert('communications', [
+        'lead_email' => $email,
+        'direction' => 'internal',
+        'channel' => 'note',
+        'subject' => 'Status changed to: ' . $status,
+        'sender' => 'System',
+        'status' => 'sent'
+    ]);
 
     echo json_encode(['success' => true]);
 }

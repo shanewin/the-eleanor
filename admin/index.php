@@ -11,6 +11,7 @@ requireAdmin();
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.css" rel="stylesheet">
     <style>
         :root {
             --bs-body-font-family: 'Inter', sans-serif;
@@ -379,6 +380,9 @@ requireAdmin();
             <a href="#" class="nav-link" data-view="brokers">
                 <i class="bi bi-person-badge"></i> Brokers
             </a>
+            <a href="#" class="nav-link" data-view="calendar">
+                <i class="bi bi-calendar3"></i> Calendar
+            </a>
             <a href="#" class="nav-link" data-view="settings">
                 <i class="bi bi-gear"></i> Settings
             </a>
@@ -501,24 +505,41 @@ requireAdmin();
 
         <!-- Communications View -->
         <div id="view-communications" class="dashboard-view" style="display:none">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 fw-bold mb-0">Communications</h1>
-                <button class="btn btn-primary btn-sm" onclick="showAddCommModal()"><i class="bi bi-plus-lg me-1"></i>Log Communication</button>
+            <div id="commPipelineView">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 fw-bold mb-0">Communications</h1>
+                    <button class="btn btn-primary btn-sm" onclick="showAddCommModal()"><i class="bi bi-plus-lg me-1"></i>Log Communication</button>
+                </div>
+                <div class="card bg-body-tertiary border-0">
+                    <div class="card-body p-4">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover mb-0" style="background:transparent" id="commPipelineTable">
+                                <thead>
+                                    <tr>
+                                        <th>Lead</th>
+                                        <th>Contact</th>
+                                        <th>Status</th>
+                                        <th>Last Communication</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="5" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="d-flex gap-2 mb-4">
-                <select class="form-select form-select-sm bg-dark border-secondary text-white" id="commFilterLead" onchange="loadAllComms()" style="max-width:300px">
-                    <option value="">All Leads</option>
-                </select>
-                <select class="form-select form-select-sm bg-dark border-secondary text-white" id="commFilterChannel" onchange="loadAllComms()" style="max-width:150px">
-                    <option value="">All Channels</option>
-                    <option value="email">Email</option>
-                    <option value="sms">SMS</option>
-                    <option value="phone">Phone</option>
-                    <option value="note">Note</option>
-                </select>
-            </div>
-            <div id="commsTimeline">
-                <div class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary"></div><span class="text-body-tertiary ms-2">Loading...</span></div>
+            <div id="commTimelineView" style="display:none">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <a href="#" class="text-body-tertiary text-decoration-none" onclick="event.preventDefault(); showCommPipeline()"><i class="bi bi-arrow-left"></i></a>
+                        <h1 class="h3 fw-bold mb-0" id="commTimelineName">Communications</h1>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="showAddCommModal()"><i class="bi bi-plus-lg me-1"></i>Log Communication</button>
+                </div>
+                <div id="commsTimeline"></div>
             </div>
             <input type="hidden" id="commSearchEmail" value="">
         </div>
@@ -641,6 +662,72 @@ requireAdmin();
             </div>
         </div>
 
+        <!-- Calendar View -->
+        <div id="view-calendar" class="dashboard-view" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Showings Calendar</h1>
+                    <small class="text-body-tertiary">Tour requests and confirmed showings</small>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openNewShowingModal()">
+                    <i class="bi bi-plus-lg me-1"></i> New Showing
+                </button>
+            </div>
+
+            <!-- Calendar Stats Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-body-tertiary border-0">
+                        <div class="card-body p-3 text-center">
+                            <div class="stat-value fs-3 fw-bold" id="calStatPending">0</div>
+                            <div class="stat-label small text-warning">Pending Requests</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-body-tertiary border-0">
+                        <div class="card-body p-3 text-center">
+                            <div class="stat-value fs-3 fw-bold" id="calStatConfirmed">0</div>
+                            <div class="stat-label small text-success">Confirmed</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-body-tertiary border-0">
+                        <div class="card-body p-3 text-center">
+                            <div class="stat-value fs-3 fw-bold" id="calStatToday">0</div>
+                            <div class="stat-label small text-info">Today</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-body-tertiary border-0">
+                        <div class="card-body p-3 text-center">
+                            <div class="stat-value fs-3 fw-bold" id="calStatThisWeek">0</div>
+                            <div class="stat-label small text-white-50">This Week</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Container -->
+            <div class="card bg-body-tertiary border-0">
+                <div class="card-body p-4">
+                    <div id="showingsCalendar"></div>
+                </div>
+            </div>
+
+            <!-- Upcoming Showings List -->
+            <div class="card bg-body-tertiary border-0 mt-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-semibold mb-3">Upcoming Showings</h5>
+                    <div id="upcomingShowingsList">
+                        <div class="text-white-50 small text-center py-4">No upcoming showings</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /.main-content -->
 
     <!-- Journey Slide-Out Panel -->
@@ -750,6 +837,7 @@ requireAdmin();
     ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
     <script>
         // ── XSS Escape Helper ──
         function esc(str) {
@@ -781,8 +869,7 @@ requireAdmin();
             if (target) target.style.display = 'block';
 
             if (view === 'communications') {
-                populateCommLeadFilter();
-                loadAllComms();
+                loadCommPipeline();
             }
             if (view === 'brokers') {
                 fetchBrokers();
@@ -1316,26 +1403,82 @@ requireAdmin();
 
         // ── Communications ──
 
-        async function loadAllComms() {
+        async function loadCommPipeline() {
+            const tbody = document.querySelector('#commPipelineTable tbody');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></td></tr>';
+
+            try {
+                const res = await fetch('../api/admin-api.php?action=leads');
+                const leads = await res.json();
+                if (!Array.isArray(leads) || leads.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-body-tertiary py-5">No leads yet.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                leads.forEach(lead => {
+                    const status = lead.lead_status || 'New';
+                    const statusColors = {
+                        'New': 'primary',
+                        'Contacted': 'info',
+                        'Showing Scheduled': 'warning',
+                        'Showed': 'secondary',
+                        'Applied': 'success',
+                        'Leased': 'success',
+                        'Lost': 'danger'
+                    };
+                    const badgeColor = statusColors[status] || 'secondary';
+
+                    const lastComm = lead.last_comm_subject
+                        ? '<div style="font-size:0.8rem" class="text-white">' + esc(lead.last_comm_subject) + '</div><small class="text-white-50">' + esc(lead.last_comm_at ? new Date(lead.last_comm_at).toLocaleString() : '') + '</small>'
+                        : '<span class="text-white-50" style="font-size:0.8rem">No communications</span>';
+
+                    const row = document.createElement('tr');
+                    row.style.cursor = 'pointer';
+                    row.onclick = () => showCommTimeline(lead.email, esc(lead.first_name + ' ' + lead.last_name));
+
+                    row.innerHTML = '<td><div class="fw-semibold text-white">' + esc(lead.first_name + ' ' + lead.last_name) + '</div><small class="text-white-50">' + esc(lead.source || '') + '</small></td>'
+                        + '<td><div style="font-size:0.8rem">' + esc(lead.email) + '</div><small class="text-white-50">' + esc(lead.phone || '') + '</small></td>'
+                        + '<td><select class="form-select form-select-sm bg-dark border-secondary text-white" style="width:auto;font-size:0.75rem" onchange="event.stopPropagation(); updateLeadStatus(\'' + esc(lead.email).replace(/'/g, "\\'") + '\', \'' + esc(lead.source || '').replace(/'/g, "\\'") + '\', this.value)">'
+                        + ['New','Contacted','Showing Scheduled','Showed','Applied','Leased','Lost'].map(s => '<option value="' + s + '"' + (s === status ? ' selected' : '') + '>' + s + '</option>').join('')
+                        + '</select></td>'
+                        + '<td>' + lastComm + '</td>'
+                        + '<td><span class="badge bg-body-secondary">' + (lead.comm_count || 0) + '</span></td>';
+
+                    tbody.appendChild(row);
+                });
+            } catch(err) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading pipeline.</td></tr>';
+            }
+        }
+
+        function showCommPipeline() {
+            document.getElementById('commPipelineView').style.display = 'block';
+            document.getElementById('commTimelineView').style.display = 'none';
+        }
+
+        function showCommTimeline(email, name) {
+            document.getElementById('commPipelineView').style.display = 'none';
+            document.getElementById('commTimelineView').style.display = 'block';
+            document.getElementById('commTimelineName').textContent = name || email;
+            document.getElementById('commSearchEmail').value = email;
+            loadAllComms(email);
+        }
+
+        async function loadAllComms(filterEmail) {
+            const email = filterEmail || '';
             const container = document.getElementById('commsTimeline');
-            const leadFilter = document.getElementById('commFilterLead').value;
-            const channelFilter = document.getElementById('commFilterChannel').value;
 
             container.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
 
             try {
-                const url = leadFilter
-                    ? '../api/admin-api.php?action=get_communications&email=' + encodeURIComponent(leadFilter)
+                const url = email
+                    ? '../api/admin-api.php?action=get_communications&email=' + encodeURIComponent(email)
                     : '../api/admin-api.php?action=get_communications';
                 const res = await fetch(url);
                 let comms = await res.json();
 
                 if (!Array.isArray(comms)) { comms = []; }
-
-                // Client-side channel filter
-                if (channelFilter) {
-                    comms = comms.filter(c => c.channel === channelFilter);
-                }
 
                 if (comms.length === 0) {
                     container.innerHTML = '<div class="text-center text-body-tertiary py-5">No communications recorded yet.</div>';
@@ -1400,40 +1543,28 @@ requireAdmin();
             }
         }
 
-        function populateCommLeadFilter() {
-            const select = document.getElementById('commFilterLead');
-            if (!select || select.options.length > 1) return;
-            // Use leads from the last fetch
-            fetch('../api/admin-api.php?action=leads')
-                .then(r => r.json())
-                .then(leads => {
-                    if (!Array.isArray(leads)) return;
-                    const seen = {};
-                    leads.forEach(l => {
-                        const e = (l.email || '').toLowerCase();
-                        if (e && !seen[e]) {
-                            seen[e] = true;
-                            const opt = document.createElement('option');
-                            opt.value = e;
-                            opt.textContent = (l.first_name || '') + ' ' + (l.last_name || '') + ' (' + e + ')';
-                            select.appendChild(opt);
-                        }
-                    });
+        async function updateLeadStatus(email, source, status) {
+            try {
+                await fetch('../api/admin-api.php?action=update_lead_status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, source, status })
                 });
+            } catch(err) {
+                console.error('Status update failed:', err);
+            }
         }
 
         function loadCommsForEmail(email) {
-            const select = document.getElementById('commFilterLead');
-            if (select) select.value = email;
             showView('communications');
-            loadAllComms();
+            showCommTimeline(email, '');
         }
 
         function searchComms() {} // unused
 
         function showAddCommModal() {
-            const leadFilter = document.getElementById('commFilterLead');
-            document.getElementById('commLeadEmail').value = leadFilter ? leadFilter.value : '';
+            const emailField = document.getElementById('commSearchEmail');
+            document.getElementById('commLeadEmail').value = emailField ? emailField.value : '';
             document.getElementById('commDirection').value = 'outbound';
             document.getElementById('commChannel').value = 'note';
             document.getElementById('commSubject').value = '';
@@ -1465,7 +1596,11 @@ requireAdmin();
                 const result = await res.json();
                 if (result.success) {
                     bootstrap.Modal.getInstance(document.getElementById('commModal')).hide();
-                    loadAllComms();
+                    if (document.getElementById('commTimelineView').style.display !== 'none') {
+                        loadAllComms(document.getElementById('commSearchEmail').value);
+                    } else {
+                        loadCommPipeline();
+                    }
                 } else {
                     alert('Error: ' + (result.error || 'Unknown'));
                 }
