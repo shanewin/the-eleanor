@@ -1549,6 +1549,8 @@ requireAdmin();
                                 + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'SMS\')">SMS</a></li>'
                                 + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Email\')">Email</a></li>'
                                 + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Phone\')">Phone</a></li>'
+                                + '<li><hr class="dropdown-divider"></li>'
+                                + '<li><a class="dropdown-item text-info" href="#" onclick="event.preventDefault(); engageAI(\'' + escapedLeadEmail + '\')"><i class="bi bi-robot me-1"></i>Auto Text</a></li>'
                                 + '</ul></div></div>';
                         }
 
@@ -2409,6 +2411,26 @@ requireAdmin();
             }
             statusEl.style.display = 'block';
             setTimeout(() => statusEl.style.display = 'none', 3000);
+        }
+
+        async function engageAI(email) {
+            if (!confirm('Send an auto text to this lead?')) return;
+            try {
+                const res = await fetch('../api/admin-api.php?action=engage_ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('AI welcome text sent to ' + (result.phone || 'lead'));
+                    fetchData();
+                } else {
+                    alert('Error: ' + (result.error || 'Could not engage AI'));
+                }
+            } catch(err) {
+                alert('Network error');
+            }
         }
 
         async function toggleOverviewSMS() {

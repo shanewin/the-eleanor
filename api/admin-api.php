@@ -38,6 +38,7 @@ switch ($action) {
     case 'sms_send': sendSMSFromDashboard(); break;
     case 'sms_toggle_ai': toggleAIForLead(); break;
     case 'sms_ai_status': getAIStatus($_GET['phone'] ?? ''); break;
+    case 'engage_ai': engageAIForLead(); break;
     case 'update_lead_status': updateLeadStatus(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
@@ -926,4 +927,94 @@ function findLeadByPhoneOrEmail($phone, $email) {
     }
 
     return null;
+}
+
+/**
+ * Manually trigger AI welcome SMS for a lead (even if global automation is off).
+ */
+function engageAIForLead() {
+    global $sb;
+
+    require_once __DIR__ . '/telnyx-sms.php';
+    require_once __DIR__ . '/sms-ai.php';
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $email = $input['email'] ?? '';
+
+    if (empty($email)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Email is required']);
+        return;
+    }
+
+    // Find the lead across submission tables
+    $lead = findLeadByPhoneOrEmail(null, $email);
+    if (!$lead || empty($lead['phone'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Lead not found or no phone number on file']);
+        return;
+    }
+
+    $phone = normalizePhone($lead['phone']);
+    if (!$phone) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid phone number']);
+        return;
+    }
+
+    // Check if TELNYX_FROM_NUMBER is configured
+    if (!defined('TELNYX_FROM_NUMBER') || !TELNYX_FROM_NUMBER) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Telnyx phone number not configured']);
+        return;
+    }
+
+    // Check if we already have an active conversation with this lead
+    $existingMessages = $sb->select('sms_messages', 'id',
+        ['lead_phone=eq.' . urlencode($phone)], null, 1);
+
+    if (!empty($existingMessages)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'AI conversation already exists for this lead. Check the Communications tab.']);
+        return;
+    }
+
+    // Generate and send the initial AI message (bypasses global automation check)
+    $welcomeMsg = generateInitialMessage($phone, $email);
+
+    if (!$welcomeMsg) {
+        http_response_code(500);
+        echo json_encode(['error' => 'AI failed to generate welcome message']);
+        return;
+    }
+
+    $smsResult = sendSMS($phone, $welcomeMsg);
+
+    if (!$smsResult['success']) {
+        http_response_code(500);
+        echo json_encode(['error' => 'SMS send failed: ' . $smsResult['error']]);
+        return;
+    }
+
+    // Log the message
+    $sb->insert('sms_messages', [
+        'lead_phone'        => $phone,
+        'lead_email'        => $email,
+        'direction'         => 'outbound',
+        'sender_type'       => 'ai',
+        'sender_name'       => 'Eleanor AI',
+        'body'              => $welcomeMsg,
+        'telnyx_message_id' => $smsResult['message_id'] ?? null,
+        'status'            => 'sent'
+    ]);
+
+    // Create/update automation record — set to active so AI continues the conversation
+    $sb->upsert('sms_automation', [
+        'lead_phone' => $phone,
+        'lead_email' => $email,
+        'status'     => 'active',
+        'updated_at' => date('c')
+    ], 'lead_phone');
+
+    echo json_encode(['success' => true, 'phone' => $phone, 'message' => $welcomeMsg]);
 }

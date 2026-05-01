@@ -204,6 +204,49 @@ function processForm(array $config): void {
         ]);
     }
 
+    // ── SMS Auto Follow-up (Telnyx + Claude) ─────────────────────────
+    $phone = $fields['phone'] ?? '';
+    if (!empty($phone) && $table !== 'mailing_list') {
+        try {
+            require_once __DIR__ . '/telnyx-sms.php';
+            require_once __DIR__ . '/sms-ai.php';
+
+            if (isSMSAutomationAllowed() && defined('TELNYX_FROM_NUMBER') && TELNYX_FROM_NUMBER) {
+                $normalizedPhone = normalizePhone($phone);
+                if ($normalizedPhone) {
+                    // Generate personalized welcome message via Claude
+                    $welcomeMsg = generateInitialMessage($normalizedPhone, $email);
+
+                    if ($welcomeMsg) {
+                        $smsResult = sendSMS($normalizedPhone, $welcomeMsg);
+
+                        // Log the message
+                        $sb->insert('sms_messages', [
+                            'lead_phone'        => $normalizedPhone,
+                            'lead_email'        => $email,
+                            'direction'         => 'outbound',
+                            'sender_type'       => 'ai',
+                            'sender_name'       => 'Eleanor AI',
+                            'body'              => $welcomeMsg,
+                            'telnyx_message_id' => $smsResult['message_id'] ?? null,
+                            'status'            => $smsResult['success'] ? 'sent' : 'failed'
+                        ]);
+
+                        // Create or update automation record (upsert — lead_phone is UNIQUE)
+                        $sb->upsert('sms_automation', [
+                            'lead_phone' => $normalizedPhone,
+                            'lead_email' => $email,
+                            'status'     => 'active',
+                            'updated_at' => date('c')
+                        ], 'lead_phone');
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            error_log("SMS auto follow-up failed: " . $e->getMessage());
+        }
+    }
+
     // ── CSRF token regeneration ─────────────────────────────────────
     if ($useCsrf) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
