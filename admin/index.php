@@ -1426,31 +1426,8 @@ requireAdmin();
             }
 
             // Elite social signals section
-            let eliteSectionHtml = '';
-            if (education.length > 0 || boardRoles.length > 0) {
-                eliteSectionHtml = '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-                    + '<div class="section-label">Elite Social Signals</div>'
-                    + '<div class="intel-grid">' + educationHtml + boardHtml + '</div>'
-                    + '</div></div>';
-            }
-
-            // Career Journey
-            let careerHtml = '';
-            if (employment.length > 0) {
-                careerHtml = '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-                    + '<div class="section-label">Career Journey</div>'
-                    + '<div class="d-flex flex-column gap-3 mt-3">';
-                employment.forEach(function(job, idx) {
-                    const dotColor = idx === 0 ? '#6366f1' : 'rgba(255,255,255,0.1)';
-                    careerHtml += '<div class="d-flex gap-3 align-items-start">'
-                        + '<div style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';margin-top:0.4rem;flex-shrink:0"></div>'
-                        + '<div><div class="fw-medium text-white" style="font-size:0.9rem">' + esc(job.title) + '</div>'
-                        + '<small class="text-primary">' + esc(job.organization_name) + '</small></div></div>';
-                });
-                careerHtml += '</div></div></div>';
-            }
-
-            // User Journey (activity logs)
+            // Removed: Elite Social Signals, Career Journey, User Journey
+            // All enrichment details visible from the Leads table row
             let journeyHtml = '';
             if (logs.length === 0) {
                 journeyHtml = '<p class="text-body-tertiary">No events recorded.</p>';
@@ -1506,10 +1483,15 @@ requireAdmin();
                 + phoneHtml
                 + '</div>'
                 + socialLinks
-                + '<div class="' + layoutClass + '">'
-                + '<div class="' + colClass + '">'
-                    + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-                    + '<div class="section-label">Submission Details</div>'
+                + '<div class="mx-auto mt-4" style="max-width:600px">'
+                    + '<div class="accordion" id="submissionAccordion">'
+                    + '<div class="accordion-item bg-body-tertiary border-0">'
+                    + '<h2 class="accordion-header">'
+                    + '<button class="accordion-button collapsed bg-body-tertiary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#submissionCollapse" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;font-weight:600">'
+                    + 'Submission Details'
+                    + '</button></h2>'
+                    + '<div id="submissionCollapse" class="accordion-collapse collapse" data-bs-parent="#submissionAccordion">'
+                    + '<div class="accordion-body p-3">'
                     + '<table class="table table-sm table-dark mb-0" style="font-size:0.85rem">'
                     + '<tbody>'
                     + '<tr><td class="text-white-50" style="width:40%">Form</td><td class="text-primary fw-semibold">' + esc(intel.submission_type || 'General Lead') + '</td></tr>'
@@ -1517,33 +1499,18 @@ requireAdmin();
                     + (intel.phone || intel.phone_number ? '<tr><td class="text-white-50">Phone</td><td>' + esc(intel.phone || intel.phone_number) + '</td></tr>' : '')
                     + (intel.unit ? '<tr><td class="text-white-50">Unit</td><td>' + esc(intel.unit) + '</td></tr>' : '')
                     + (intel.unit_type ? '<tr><td class="text-white-50">Unit Type</td><td>' + esc(intel.unit_type) + '</td></tr>' : '')
-                    + (intel.budget ? '<tr><td class="text-white-50">Budget</td><td>' + esc(intel.budget) + '</td></tr>' : '')
+                    + (intel.budget ? '<tr><td class="text-white-50">Budget</td><td>$' + esc(String(intel.budget)).replace(/^\$/, '') + '</td></tr>' : '')
                     + (intel.move_in_date ? '<tr><td class="text-white-50">Move-In Date</td><td>' + esc(intel.move_in_date) + '</td></tr>' : '')
                     + (intel.hear_about_us ? '<tr><td class="text-white-50">How They Found Us</td><td>' + esc(intel.hear_about_us) + '</td></tr>' : '')
                     + (intel.interests ? '<tr><td class="text-white-50">Interests</td><td>' + esc(intel.interests) + '</td></tr>' : '')
                     + (intel.message ? '<tr><td class="text-white-50">Message</td><td style="white-space:pre-wrap">' + esc(intel.message) + '</td></tr>' : '')
                     + '</tbody></table>'
-                    + '</div></div>'
-                    + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-                    + '<div class="section-label">Executive Intelligence</div>'
-                    + '<div class="intel-grid">'
-                    + '<div class="intel-item"><span class="intel-label">Seniority</span><span class="intel-val">' + esc(intel.seniority || 'Unknown') + '</span></div>'
-                    + '<div class="intel-item"><span class="intel-label">Role Tenure</span><span class="intel-val">' + esc(formatTenure(roleTenure)) + '</span></div>'
-                    + '<div class="intel-item"><span class="intel-label">Company</span><span class="intel-val">' + esc(intel.company || 'Not specified') + '</span></div>'
-                    + '<div class="intel-item"><span class="intel-label">Annual Revenue</span><span class="intel-val">' + esc(intel.annual_revenue || org.annual_revenue_printed || 'Under $1M') + '</span></div>'
-                    + '<div class="intel-item" style="grid-column:span 2;margin-top:1rem"><span class="intel-label">About ' + esc(intel.company || 'the Company') + '</span>'
-                    + '<div class="p-3 rounded-3 mt-1" style="background:rgba(255,255,255,0.03);font-size:0.85rem;line-height:1.6;color:rgba(255,255,255,0.7)">'
-                    + esc(intel.company_description || org.short_description || 'No description available.') + '</div></div>'
-                    + '</div></div></div>'
-                    + eliteSectionHtml
-                    + careerHtml
-                + '</div>'
-                + '<div class="' + colClass + '">'
-                    + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-                    + '<div class="section-label">User Journey</div>'
-                    + '<div class="mt-3">' + journeyHtml + '</div>'
-                    + '</div></div>'
-                + '</div>'
+                    + '</div></div></div></div>'
+                    + '<div class="text-center mt-4">'
+                    + '<a href="#" class="text-primary text-decoration-none fw-semibold" onclick="event.preventDefault(); showView(\'leads\')">'
+                    + '<i class="bi bi-arrow-left me-1"></i> Back to Leads'
+                    + '</a>'
+                    + '</div>'
                 + '</div>';
 
             container.innerHTML = html;
