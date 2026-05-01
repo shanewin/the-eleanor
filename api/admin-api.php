@@ -191,6 +191,12 @@ function getLeadDetail($email) {
         $merged['phone_number'] = $merged['phone'];
     }
 
+    // Resolve broker name
+    if (!empty($merged['assigned_to'])) {
+        $broker = $sb->selectOne('brokers', 'name', ['id=eq.' . $merged['assigned_to']]);
+        $merged['broker_name'] = $broker['name'] ?? null;
+    }
+
     echo json_encode($merged);
 }
 
