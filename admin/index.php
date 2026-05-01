@@ -404,7 +404,7 @@ requireAdmin();
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
                             <div class="stat-label">Unique Visitors</div>
-                            <div class="stat-value" id="statSessions">-</div>
+                            <div class="stat-value" id="statSessions"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div></div>
                         </div>
                     </div>
                 </div>
@@ -412,7 +412,7 @@ requireAdmin();
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
                             <div class="stat-label">Total Leads</div>
-                            <div class="stat-value" id="statLeads">-</div>
+                            <div class="stat-value" id="statLeads"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div></div>
                         </div>
                     </div>
                 </div>
@@ -420,7 +420,7 @@ requireAdmin();
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
                             <div class="stat-label">Visitor-to-Lead Rate</div>
-                            <div class="stat-value" id="statConv">-</div>
+                            <div class="stat-value" id="statConv"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div></div>
                         </div>
                     </div>
                 </div>
@@ -428,7 +428,7 @@ requireAdmin();
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
                             <div class="stat-label">New Today</div>
-                            <div class="stat-value" id="statHot">-</div>
+                            <div class="stat-value" id="statHot"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div></div>
                         </div>
                     </div>
                 </div>
@@ -458,7 +458,7 @@ requireAdmin();
                                     <th>Grade</th>
                                 </tr>
                             </thead>
-                            <tbody><!-- Dynamic --></tbody>
+                            <tbody><tr><td colspan="8" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -486,7 +486,7 @@ requireAdmin();
                                     <th>Management</th>
                                 </tr>
                             </thead>
-                            <tbody><!-- Dynamic --></tbody>
+                            <tbody><tr><td colspan="8" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
                         </table>
                     </div>
                 </div>
