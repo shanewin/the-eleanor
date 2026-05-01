@@ -1385,13 +1385,13 @@ requireAdmin();
             // LinkedIn / Twitter links
             const linkedinUrl = safeUrl(intel.linkedin_url);
             const twitterUrl = safeUrl(intel.twitter_url);
+            const facebookUrl = safeUrl(intel.facebook_url);
+            const githubUrl = safeUrl(intel.github_url);
             let socialLinks = '<div class="d-flex justify-content-center gap-3 mt-3">';
-            if (linkedinUrl) {
-                socialLinks += '<a href="' + esc(linkedinUrl) + '" target="_blank" class="text-primary"><i class="bi bi-linkedin fs-5"></i></a>';
-            }
-            if (twitterUrl) {
-                socialLinks += '<a href="' + esc(twitterUrl) + '" target="_blank" class="text-body-tertiary"><i class="bi bi-twitter-x fs-5"></i></a>';
-            }
+            if (linkedinUrl) socialLinks += '<a href="' + esc(linkedinUrl) + '" target="_blank" class="text-primary"><i class="bi bi-linkedin fs-5"></i></a>';
+            if (twitterUrl) socialLinks += '<a href="' + esc(twitterUrl) + '" target="_blank" class="text-body-tertiary"><i class="bi bi-twitter-x fs-5"></i></a>';
+            if (facebookUrl) socialLinks += '<a href="' + esc(facebookUrl) + '" target="_blank" class="text-body-tertiary"><i class="bi bi-facebook fs-5"></i></a>';
+            if (githubUrl) socialLinks += '<a href="' + esc(githubUrl) + '" target="_blank" class="text-body-tertiary"><i class="bi bi-github fs-5"></i></a>';
             socialLinks += '</div>';
 
             // AI Summary removed — not relevant for leasing workflow

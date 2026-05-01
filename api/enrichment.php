@@ -465,6 +465,27 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
         }
     }
 
+    // 5a. If we have a person with LinkedIn URL but PDL didn't provide social URLs or salary, try PDL by LinkedIn URL
+    $pdlHadUsefulData = $pdl && (!empty($pdl['twitter_url']) || !empty($pdl['github_url']) || !empty($pdl['inferred_salary']));
+    if ($person && !$pdlHadUsefulData && !empty($person['linkedin_url'])) {
+        error_log("PDL: Re-trying with LinkedIn URL to grab social URLs + salary");
+        $pdlByLi = pdlRequest(null, null, null, null, $person['linkedin_url']);
+        if ($pdlByLi['code'] === 200 && $pdlByLi['likelihood'] >= 6 && $pdlByLi['data']) {
+            $pdlData = $pdlByLi['data'];
+            // Supplement social URLs
+            if (empty($person['twitter_url']) && !empty($pdlData['twitter_url'])) $person['twitter_url'] = 'https://' . ltrim($pdlData['twitter_url'], '/');
+            if (empty($person['facebook_url']) && !empty($pdlData['facebook_url'])) $person['facebook_url'] = 'https://' . ltrim($pdlData['facebook_url'], '/');
+            if (empty($person['github_url']) && !empty($pdlData['github_url'])) $person['github_url'] = 'https://' . ltrim($pdlData['github_url'], '/');
+            // Grab salary
+            if (!empty($pdlData['inferred_salary'])) $person['inferred_salary'] = $pdlData['inferred_salary'];
+            // Append to raw response
+            $existingRaw = json_decode($finalResponseRaw, true) ?? [];
+            $existingRaw['pdl_by_linkedin'] = $pdlData;
+            $finalResponseRaw = json_encode($existingRaw);
+            error_log("PDL: Got social URLs + salary via LinkedIn URL");
+        }
+    }
+
     // 5b. Deep enrichment fallback — use Tavily to find LinkedIn URL, then re-enrich
     if (!$person && $firstName && $lastName) {
         error_log("Deep Enrichment: All standard sources failed for $email. Trying Tavily + LinkedIn discovery.");
