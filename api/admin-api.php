@@ -96,7 +96,7 @@ function getLeads() {
 
         // Fetch ALL enrichment records in one call and index by email
         $allEnrichments = $sb->select('lead_enrichment',
-            'email,job_title,company,photo_url,company_logo,annual_revenue,headline,raw_response',
+            'email,job_title,company,photo_url,company_logo,annual_revenue,headline,inferred_salary,linkedin_url,raw_response',
             []);
         $enrichmentByEmail = [];
         foreach ($allEnrichments as $e) {

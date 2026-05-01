@@ -426,11 +426,14 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
             if (empty($person['facebook_url']) && $pdlFacebook) $person['facebook_url'] = $pdlFacebook;
             if (empty($person['github_url']) && $pdlGithub) $person['github_url'] = $pdlGithub;
 
+            // Capture inferred salary from PDL
+            if (!empty($pdl['inferred_salary'])) $person['inferred_salary'] = $pdl['inferred_salary'];
+
             // Append PDL to raw response
             $existingRaw = json_decode($finalResponseRaw, true) ?? [];
             $existingRaw['pdl'] = $pdl;
             $finalResponseRaw = json_encode($existingRaw);
-            error_log("PDL: Supplemented Apollo data with social URLs");
+            error_log("PDL: Supplemented Apollo data with social URLs + salary");
         } else {
             // Apollo found nothing — use PDL as primary profile
             $person = [
@@ -444,6 +447,7 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
                 'state' => $pdl['location_region'] ?? null,
                 'country' => $pdl['location_country'] ?? null,
                 'seniority' => $pdl['job_title_levels'][0] ?? null,
+                'inferred_salary' => $pdl['inferred_salary'] ?? null,
                 'photo_url' => null,
                 'headline' => $pdl['job_title'] . ' at ' . ($pdl['job_company_name'] ?? ''),
                 'organization' => [
@@ -684,6 +688,7 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
             'company_description' => $person['organization']['short_description'] ?? null,
             'headline' => $person['headline'] ?? null,
             'photo_url' => $person['photo_url'] ?? null,
+            'inferred_salary' => $person['inferred_salary'] ?? null,
             'raw_response' => $rawJson
         ]);
 

@@ -328,7 +328,7 @@ requireAdmin();
         .journey-time { font-size: 0.65rem; color: rgba(255,255,255,0.3); margin-bottom: 0.15rem; }
         .journey-title { font-size: 0.82rem; color: rgba(255,255,255,0.7); }
 
-        .ai-summary-box {
+        .ai-summary-box-removed {
             background: rgba(99,102,241,0.04);
             border: 1px solid rgba(99,102,241,0.12);
             border-radius: 12px;
@@ -717,126 +717,79 @@ requireAdmin();
             return Math.floor(years) + (Math.floor(years) === 1 ? " year" : " years");
         }
 
-        // ── Lead Grading Algorithm ──
+        // ── Lead Grading Algorithm (Leasing-Focused) ──
         function calculateLeadGrade(lead) {
             let insights = [];
-            let raw = {};
-            try {
-                raw = typeof lead.raw_response === 'string' ? JSON.parse(lead.raw_response) : (lead.raw_response || {});
-            } catch (e) { raw = {}; }
-
-            const person = raw.person || {};
-            const org = person.organization || {};
-            const employment = person.employment_history || [];
-            const education = person.education_history || person.education || [];
-
-            let roleTenure = 0;
-            let companyTenure = 0;
-            const now = new Date();
-
-            function parseTenure(dateStr) {
-                if (!dateStr || dateStr.toLowerCase().includes('present')) return now;
-                const d = new Date(dateStr);
-                return isNaN(d) ? null : d;
-            }
-
-            if (employment.length > 0) {
-                const firstJobStart = parseTenure(employment[0].start_date);
-                if (firstJobStart) {
-                    roleTenure = (now - firstJobStart) / (365 * 24 * 60 * 60 * 1000);
-                }
-                const primaryCo = lead.company || (employment[0] && employment[0].organization_name);
-                employment.forEach(job => {
-                    const start = parseTenure(job.start_date);
-                    if (start) {
-                        const end = job.current ? now : (parseTenure(job.end_date) || now);
-                        const yrs = (end - start) / (365 * 24 * 60 * 60 * 1000);
-                        if (primaryCo && job.organization_name && job.organization_name.toLowerCase().includes(primaryCo.toLowerCase())) {
-                            companyTenure += yrs;
-                        }
-                    }
-                });
-            }
-
-            // 1. Career Seniority
-            const title = (lead.job_title || person.title || '').toLowerCase();
-            if (['chief', 'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cpo', 'founder', 'owner', 'president'].some(k => title.includes(k))) {
-                insights.push({ label: "Executive Leadership", type: "success", icon: "\u{1F451}", points: 40 });
-            } else if (['vice president', 'vp', 'director', 'head of'].some(k => title.includes(k))) {
-                insights.push({ label: "Senior Management", type: "success", icon: "\u{1F48E}", points: 30 });
-            } else if (['manager', 'senior', 'lead', 'principal', 'engineer', 'architect', 'developer', 'analyst', 'specialist', 'consultant'].some(k => title.includes(k))) {
-                insights.push({ label: "Professional Lead", type: "info", icon: "\u{1F680}", points: 20 });
-            }
-
-            // 2. Career Depth
-            let totalYrsExp = 0;
-            employment.forEach(job => {
-                const s = parseTenure(job.start_date);
-                const e = job.current ? now : (parseTenure(job.end_date) || now);
-                if (s && e) totalYrsExp += (e - s) / (365 * 24 * 60 * 60 * 1000);
-            });
-            if (totalYrsExp >= 10) {
-                insights.push({ label: "Industry Veteran", type: "success", icon: "\u{1F3C6}", points: 25 });
-            } else if (totalYrsExp >= 5) {
-                insights.push({ label: "Seasoned Pro", type: "success", icon: "\u{1F31F}", points: 15 });
-            }
-
-            // 3. Verified Professional Signal
-            const jobTitle = lead.job_title || lead.title || person.title;
-            const companyName = lead.company || (org ? org.name : null) || (employment[0] ? employment[0].organization_name : null);
-            if (jobTitle && companyName) {
-                insights.push({ label: "Verified Identity", type: "success", icon: "\u2705", points: 15 });
-            }
-
-            // 4. Intent & Source
             const source = (lead.source || lead.submission_type || '').toLowerCase();
+
+            // 1. Affordability Check (30 pts max)
+            // Industry standard: rent should be no more than 1/40th of annual salary
+            const salary = lead.inferred_salary || '';
+            const budget = parseFloat((lead.budget || '0').replace(/[^0-9.]/g, ''));
+            if (salary && budget > 0) {
+                // Parse salary range like "100,000-150,000" → use lower bound
+                const salaryMatch = salary.replace(/,/g, '').match(/(\d+)/);
+                const annualSalary = salaryMatch ? parseInt(salaryMatch[1]) : 0;
+                const requiredSalary = budget * 40; // 40x rule
+
+                if (annualSalary >= requiredSalary) {
+                    insights.push({ label: "Can Afford", type: "success", icon: "\u2705", points: 30 });
+                } else if (annualSalary >= requiredSalary * 0.75) {
+                    insights.push({ label: "Borderline Afford", type: "warning", icon: "\u26A0\uFE0F", points: 10 });
+                } else {
+                    insights.push({ label: "Budget Risk", type: "danger", icon: "\u274C", points: -10 });
+                }
+            }
+
+            // 2. Intent Signal (20 pts)
             if (source.includes('unit interest')) {
-                insights.push({ label: "High Intent", type: "success", icon: "\u{1F525}", points: 15 });
+                insights.push({ label: "High Intent", type: "success", icon: "\u{1F525}", points: 20 });
+            } else if (source.includes('waitlist')) {
+                insights.push({ label: "Waitlist", type: "info", icon: "\u{1F4CB}", points: 10 });
             }
 
-            // 5. Stability & Tenure
-            if (companyTenure >= 3) {
-                insights.push({ label: "Established Pro", type: "success", icon: "\u2693", points: 20 });
-            }
-            if (roleTenure > 0 && roleTenure < 0.5) {
-                insights.push({ label: "New Transition", type: "warning", icon: "\u{1F331}", points: -15 });
-            }
-            if (employment.length >= 5 && totalYrsExp < 10) {
-                insights.push({ label: "Volatile History", type: "warning", icon: "\u26A0\uFE0F", points: -10 });
+            // 3. Verified Professional (15 pts)
+            if (lead.job_title && lead.company) {
+                insights.push({ label: "Verified Professional", type: "success", icon: "\u{1F4BC}", points: 15 });
             }
 
-            // 6. Organization Tier
-            const revenue = (lead.annual_revenue || org.annual_revenue_printed || '').toUpperCase();
-            if (revenue.includes('B') || revenue.includes('T')) {
-                insights.push({ label: "Enterprise Scale", type: "info", icon: "\u{1F3E2}", points: 15 });
-            } else if (org.primary_domain || org.short_description) {
-                insights.push({ label: "Verified Entity", type: "info", icon: "\u{1F3E2}", points: 10 });
+            // 4. Engagement (15 pts)
+            const events = lead.event_count || 0;
+            if (events >= 10) {
+                insights.push({ label: "Highly Engaged", type: "success", icon: "\u{1F4CA}", points: 15 });
+            } else if (events >= 5) {
+                insights.push({ label: "Engaged", type: "info", icon: "\u{1F4CA}", points: 10 });
             }
 
-            // 7. Multi-Org Advisor
-            if (employment.some(job => job.current && ['board', 'advisor', 'trustee'].some(k => (job.title || '').toLowerCase().includes(k)))) {
-                insights.push({ label: "Board Advisor", type: "info", icon: "\u2696\uFE0F", points: 15 });
+            // 5. Budget Provided (5 pts)
+            if (budget > 0) {
+                insights.push({ label: "Budget Provided", type: "info", icon: "\u{1F4B0}", points: 5 });
             }
 
-            const profScore = insights.reduce((sum, i) => sum + (i.points || 0), 0);
-            const engagementScore = Math.min(20, (lead.event_count || 0) * 2);
-            const totalScore = Math.min(100, profScore + engagementScore);
+            // 6. Move-In Timeline (5 pts)
+            if (lead.move_in_date) {
+                insights.push({ label: "Timeline Set", type: "info", icon: "\u{1F4C5}", points: 5 });
+            }
+
+            // 7. Enrichment Quality (10 pts)
+            if (lead.linkedin_url) {
+                insights.push({ label: "LinkedIn Verified", type: "info", icon: "\u{1F517}", points: 10 });
+            }
+
+            const totalScore = Math.max(0, Math.min(100, insights.reduce((sum, i) => sum + (i.points || 0), 0)));
 
             const getLetter = (s) => {
-                if (s >= 95) return 'A+';
-                if (s >= 90) return 'A';
-                if (s >= 85) return 'A-';
-                if (s >= 80) return 'B+';
-                if (s >= 75) return 'B';
-                if (s >= 70) return 'B-';
-                if (s >= 65) return 'C+';
-                if (s >= 60) return 'C';
-                if (s >= 55) return 'C-';
-                if (s >= 40) return 'D';
+                if (s >= 90) return 'A+';
+                if (s >= 80) return 'A';
+                if (s >= 70) return 'B+';
+                if (s >= 60) return 'B';
+                if (s >= 50) return 'C+';
+                if (s >= 40) return 'C';
+                if (s >= 30) return 'D';
                 return 'F';
             };
 
-            return { score: totalScore, letter: getLetter(totalScore), insights: insights, roleTenure, companyTenure };
+            return { score: totalScore, letter: getLetter(totalScore), insights: insights };
         }
 
         // ── Brokers ──
@@ -1448,20 +1401,7 @@ requireAdmin();
             }
             socialLinks += '</div>';
 
-            // AI Summary section
-            let aiSummaryHtml = '';
-            if (intel.ai_summary) {
-                const summaryLines = intel.ai_summary.split('\n').map(function(line) { return '<div class="mb-1">' + esc(line) + '</div>'; }).join('');
-                aiSummaryHtml = '<div class="ai-summary-box position-relative">'
-                    + '<div class="d-flex justify-content-between align-items-center mb-2">'
-                    + '<small class="text-primary text-uppercase fw-semibold" style="letter-spacing:0.1em;font-size:0.7rem">Prospect Summary</small>'
-                    + '<button class="mini-copy-btn" id="regenSummaryBtn" title="Regenerate Summary"><i class="bi bi-arrow-repeat" style="font-size:0.8rem"></i></button>'
-                    + '</div>'
-                    + '<div style="font-size:0.85rem;line-height:1.6;color:rgba(255,255,255,0.7);text-align:left">' + summaryLines + '</div>'
-                    + '</div>';
-            } else {
-                aiSummaryHtml = '<button id="genSummaryBtn" class="premium-btn">Generate Prospect Summary</button>';
-            }
+            // AI Summary removed — not relevant for leasing workflow
 
             // Phone row
             let phoneHtml = '';
@@ -1573,7 +1513,6 @@ requireAdmin();
                 + phoneHtml
                 + '</div>'
                 + '<div class="d-flex flex-wrap justify-content-center my-3">' + insightBadgesHtml + '</div>'
-                + '<div id="aiSummarySection" class="my-3 mx-auto" style="max-width:600px">' + aiSummaryHtml + '</div>'
                 + socialLinks
                 + '<div class="' + layoutClass + '">'
                 + '<div class="' + colClass + '">'
@@ -1627,19 +1566,6 @@ requireAdmin();
                 copyPhoneBtn.addEventListener('click', function() { copyToClipboard(intel.phone_number || '', this); });
             }
 
-            // Bind AI summary buttons
-            const genBtn = document.getElementById('genSummaryBtn');
-            if (genBtn) {
-                genBtn.addEventListener('click', function() {
-                    generateAISummary(intel.email, insightsLabels, grade, totalScore, logsForAI);
-                });
-            }
-            const regenBtn = document.getElementById('regenSummaryBtn');
-            if (regenBtn) {
-                regenBtn.addEventListener('click', function() {
-                    generateAISummary(intel.email, insightsLabels, grade, totalScore, logsForAI);
-                });
-            }
         }
 
         // ── Journey Panel (Slide-out) ──
@@ -1660,64 +1586,7 @@ requireAdmin();
             document.getElementById('journeyPanel').classList.remove('active');
         }
 
-        // ── AI Summary Generation ──
-        async function generateAISummary(email, insightsRaw, grade, score, logs) {
-            if (insightsRaw === undefined) insightsRaw = '';
-            if (grade === undefined) grade = 'N/A';
-            if (score === undefined) score = 0;
-            if (logs === undefined) logs = [];
-
-            const btn = document.getElementById('genSummaryBtn');
-            const section = document.getElementById('aiSummarySection');
-            const originalHtml = btn ? btn.innerHTML : '';
-
-            const insights = typeof insightsRaw === 'string' ? insightsRaw.split('|').filter(function(i) { return i; }) : insightsRaw;
-
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<span><i class="bi bi-arrow-repeat spin me-2"></i>Generating...</span>';
-            }
-
-            try {
-                const response = await fetch('../api/ai-summary.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email, insights: insights, grade: grade, score: score, logs: logs })
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    const summaryLines = result.summary.split('\n').map(function(line) { return '<div class="mb-1">' + esc(line) + '</div>'; }).join('');
-                    section.innerHTML = '<div class="ai-summary-box" style="animation:fadeIn 0.8s ease-out">'
-                        + '<div class="d-flex justify-content-between align-items-center mb-2">'
-                        + '<small class="text-primary text-uppercase fw-semibold" style="letter-spacing:0.1em;font-size:0.7rem">Prospect Summary</small>'
-                        + '<button class="mini-copy-btn" id="regenSummaryBtn2" title="Regenerate Summary"><i class="bi bi-arrow-repeat" style="font-size:0.8rem"></i></button>'
-                        + '</div>'
-                        + '<div style="font-size:0.85rem;line-height:1.6;color:rgba(255,255,255,0.7);text-align:left">' + summaryLines + '</div>'
-                        + '</div>';
-                    // Re-bind the regenerate button
-                    var regenBtn2 = document.getElementById('regenSummaryBtn2');
-                    if (regenBtn2) {
-                        regenBtn2.addEventListener('click', function() {
-                            generateAISummary(email, insights.join('|'), grade, score, logs);
-                        });
-                    }
-                } else {
-                    console.error("Narrative Error:", result);
-                    alert('Error: ' + (result.error || 'Unknown error'));
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = originalHtml;
-                    }
-                }
-            } catch (err) {
-                alert('Connection error');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalHtml;
-                }
-            }
-        }
+        // AI Summary removed — not relevant for leasing workflow
 
         // ── Settings ──
         async function loadSettings() {
