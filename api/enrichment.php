@@ -36,36 +36,32 @@ function getLikelyState($phone) {
     return $map[$areaCode] ?? null;
 }
 
-function fullContactRequest($email, $phone = null, $firstName = null, $lastName = null) {
-    $payload = [];
-    if ($email) $payload['emails'] = [$email];
+function pdlRequest($email, $phone = null, $firstName = null, $lastName = null) {
+    $params = ['min_likelihood' => '6', 'pretty' => 'true'];
+    if ($email) $params['email'] = $email;
     if ($phone) {
-        // Ensure phone has + prefix and country code
         $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
         if (strlen($cleanPhone) === 10) $cleanPhone = '1' . $cleanPhone;
-        $payload['phones'] = ['+' . $cleanPhone];
+        $params['phone'] = '+' . $cleanPhone;
     }
-    if ($firstName && $lastName) {
-        $payload['name'] = ['given' => $firstName, 'family' => $lastName];
-    }
+    if ($firstName) $params['first_name'] = $firstName;
+    if ($lastName) $params['last_name'] = $lastName;
 
-    $ch = curl_init('https://api.fullcontact.com/v3/person.enrich');
+    $url = 'https://api.peopledatalabs.com/v5/person/enrich?' . http_build_query($params);
+    $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . FULLCONTACT_API_KEY
+        'X-Api-Key: ' . PDL_API_KEY
     ]);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     $data = json_decode($response, true);
-    error_log("FullContact response ($httpCode): " . substr($response, 0, 500));
-    return ['code' => $httpCode, 'data' => $data, 'raw' => $response];
+    error_log("PDL response ($httpCode): " . substr($response, 0, 500));
+    return ['code' => $httpCode, 'data' => $data['data'] ?? null, 'likelihood' => $data['likelihood'] ?? 0, 'raw' => $response];
 }
 
 function apolloRequest($url, $payload) {
@@ -172,8 +168,9 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
 
     $likelyState = getLikelyState($phone);
 
-    // 1. Find LinkedIn URL via Tavily (using company domain for accuracy)
-    $query = "\"$firstName $lastName\" " . ($companyHint ? "$companyHint " : "") . "LinkedIn";
+    // 1. Find LinkedIn URL via Tavily (using company domain + location for accuracy)
+    $locationHint = $likelyState ? "$likelyState " : "";
+    $query = "\"$firstName $lastName\" " . ($companyHint ? "$companyHint " : "") . $locationHint . "LinkedIn";
     $resLinkedIn = tavilyRequest($query, [
         'include_domains' => ['linkedin.com/in'],
         'search_depth' => 'advanced',
@@ -282,11 +279,15 @@ function deepEnrichment($email, $firstName, $lastName, $phone = null) {
         return ['error' => 'Anthropic extraction failed', 'code' => $anthropicRes['code']];
     }
 
-    $extractedData = json_decode($anthropicRes['data']['content'][0]['text'] ?? '{}', true);
+    $aiText = $anthropicRes['data']['content'][0]['text'] ?? '';
+    // Strip markdown code blocks if Claude wrapped the JSON
+    $aiText = preg_replace('/^```(?:json)?\s*/i', '', trim($aiText));
+    $aiText = preg_replace('/\s*```$/', '', $aiText);
+    $extractedData = json_decode($aiText, true);
 
     if (empty($extractedData) || empty($extractedData['full_name'])) {
-        error_log("DEEP_ENRICH_FAIL: Anthropic could not normalize data for $email");
-        return ['error' => 'Anthropic could not normalize data', 'raw_ai_response' => $anthropicRes['data']['content'][0]['text'] ?? 'EMPTY'];
+        error_log("DEEP_ENRICH_FAIL: Anthropic could not normalize data for $email. Raw: " . substr($aiText, 0, 300));
+        return ['error' => 'Anthropic could not normalize data', 'raw_ai_response' => $aiText];
     }
 
     if (($extractedData['identity_confidence'] ?? 0) < 70) {
@@ -325,26 +326,58 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
     $person = null;
     $finalResponseRaw = null;
 
-    // 2. FullContact — send email + phone + name to identify the person
-    error_log("FullContact: Enriching $email ($firstName $lastName, $phone)");
-    $fcRes = fullContactRequest($email, $phone, $firstName, $lastName);
-    $fc = ($fcRes['code'] === 200) ? $fcRes['data'] : null;
+    // 2. People Data Labs — send email + phone + name to identify the person
+    error_log("PDL: Enriching $email ($firstName $lastName, $phone)");
+    $pdlRes = pdlRequest($email, $phone, $firstName, $lastName);
+    $pdl = ($pdlRes['code'] === 200 && $pdlRes['likelihood'] >= 6) ? $pdlRes['data'] : null;
 
-    // 3. Extract work email from FullContact to use with Apollo
+    // 2b. Location sanity check — reject PDL match if phone is US but match is not
+    $likelyCountry = getLikelyCountry($phone);
+    if ($pdl && $likelyCountry === 'United States') {
+        $pdlCountry = strtolower($pdl['location_country'] ?? '');
+        if ($pdlCountry && !in_array($pdlCountry, ['united states', 'us', 'usa'])) {
+            error_log("PDL: Location mismatch — phone is US but PDL match is in '$pdlCountry'. Rejecting PDL match.");
+            $pdl = null;
+        }
+    }
+
+    // 3. Extract work email from PDL to use with Apollo
     $workEmail = null;
-    if ($fc && !empty($fc['details']['emails'])) {
-        foreach ($fc['details']['emails'] as $fcEmail) {
-            $fcEmailVal = strtolower($fcEmail['value'] ?? '');
-            // Skip if it's the same email they submitted
-            if ($fcEmailVal && $fcEmailVal !== strtolower($email)) {
-                $workEmail = $fcEmailVal;
-                error_log("FullContact: Found additional email: $workEmail");
-                break;
+    if ($pdl) {
+        // Check work_email field
+        $pdlWorkEmail = $pdl['work_email'] ?? null;
+        if ($pdlWorkEmail && is_string($pdlWorkEmail) && $pdlWorkEmail !== 'true' && strtolower($pdlWorkEmail) !== strtolower($email)) {
+            $workEmail = strtolower($pdlWorkEmail);
+            error_log("PDL: Found work email: $workEmail");
+        }
+        // Also check emails array for professional emails
+        if (!$workEmail && !empty($pdl['emails'])) {
+            foreach ($pdl['emails'] as $pdlEmail) {
+                if (!is_array($pdlEmail)) continue;
+                $val = $pdlEmail['address'] ?? '';
+                $type = $pdlEmail['type'] ?? '';
+                // Prefer professional emails, skip personal
+                if ($val && strtolower($val) !== strtolower($email) && strpos($type, 'professional') !== false) {
+                    $workEmail = strtolower($val);
+                    error_log("PDL: Found professional email: $workEmail");
+                    break;
+                }
+            }
+        }
+        // Fallback: any email that's not the submitted one
+        if (!$workEmail && !empty($pdl['emails'])) {
+            foreach ($pdl['emails'] as $pdlEmail) {
+                $val = is_array($pdlEmail) ? ($pdlEmail['address'] ?? '') : $pdlEmail;
+                if ($val && strtolower($val) !== strtolower($email)) {
+                    $workEmail = strtolower($val);
+                    error_log("PDL: Found additional email: $workEmail");
+                    break;
+                }
             }
         }
     }
 
-    // 4. Try Apollo — first with work email from FullContact, then with submitted email
+    // 4. Try Apollo — first with work email from PDL, then with submitted email
     $emailsToTry = array_filter([$workEmail, $email]);
     foreach ($emailsToTry as $tryEmail) {
         error_log("Apollo: Trying match with email=$tryEmail");
@@ -354,58 +387,117 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
             'last_name' => $lastName,
             'reveal_personal_emails' => true
         ]);
-        $person = $matchRes['data']['person'] ?? null;
-        if ($person) {
+        $apolloPerson = $matchRes['data']['person'] ?? null;
+        if ($apolloPerson) {
+            // Location sanity check on Apollo result too
+            if ($likelyCountry === 'United States') {
+                $apolloCountry = strtolower($apolloPerson['country'] ?? '');
+                if ($apolloCountry && !in_array($apolloCountry, ['united states', 'us', 'usa', ''])) {
+                    error_log("Apollo: Location mismatch — phone is US but Apollo match is in '$apolloCountry'. Skipping.");
+                    continue;
+                }
+            }
+            $person = $apolloPerson;
             $finalResponseRaw = $matchRes['raw'];
-            error_log("Apollo: Found match via $tryEmail");
+            error_log("Apollo: Found verified match via $tryEmail");
             break;
         }
     }
 
-    // 5. If Apollo found nothing but FullContact had data, use FullContact data
-    if (!$person && $fc && !empty($fc['fullName'])) {
-        $person = [
-            'name' => $fc['fullName'] ?? "$firstName $lastName",
-            'title' => $fc['title'] ?? null,
-            'linkedin_url' => $fc['linkedin'] ?? null,
-            'twitter_url' => $fc['twitter'] ?? null,
-            'city' => null,
-            'state' => null,
-            'country' => null,
-            'seniority' => null,
-            'photo_url' => $fc['avatar'] ?? null,
-            'headline' => $fc['bio'] ?? null,
-            'organization' => [
-                'name' => $fc['organization'] ?? null,
-                'primary_domain' => null,
-                'industry' => null,
-                'short_description' => null,
-                'estimated_num_employees' => null,
-                'annual_revenue_printed' => null,
-                'logo_url' => null
-            ]
-        ];
-        if (!empty($fc['location'])) {
-            $parts = array_map('trim', explode(',', $fc['location']));
-            if (count($parts) >= 3) {
-                $person['city'] = $parts[0];
-                $person['state'] = $parts[1];
-                $person['country'] = $parts[2];
-            } elseif (count($parts) === 2) {
-                $person['city'] = $parts[0];
-                $person['state'] = $parts[1];
-            }
+    // 4b. Apollo name search removed — unreliable for common names.
+    // Deep enrichment (Tavily + LinkedIn + Claude) handles this case instead.
+
+    // 5. Build profile from PDL data
+    if ($pdl) {
+        // Extract social URLs from PDL
+        $pdlLinkedin = !empty($pdl['linkedin_url']) ? 'https://' . ltrim($pdl['linkedin_url'], '/') : null;
+        $pdlTwitter = !empty($pdl['twitter_url']) ? 'https://' . ltrim($pdl['twitter_url'], '/') : null;
+        $pdlFacebook = !empty($pdl['facebook_url']) ? 'https://' . ltrim($pdl['facebook_url'], '/') : null;
+        $pdlGithub = !empty($pdl['github_url']) ? 'https://' . ltrim($pdl['github_url'], '/') : null;
+
+        if ($person) {
+            // Apollo found a match — supplement with PDL social URLs where Apollo is missing
+            if (empty($person['linkedin_url']) && $pdlLinkedin) $person['linkedin_url'] = $pdlLinkedin;
+            if (empty($person['twitter_url']) && $pdlTwitter) $person['twitter_url'] = $pdlTwitter;
+            if (empty($person['facebook_url']) && $pdlFacebook) $person['facebook_url'] = $pdlFacebook;
+            if (empty($person['github_url']) && $pdlGithub) $person['github_url'] = $pdlGithub;
+
+            // Append PDL to raw response
+            $existingRaw = json_decode($finalResponseRaw, true) ?? [];
+            $existingRaw['pdl'] = $pdl;
+            $finalResponseRaw = json_encode($existingRaw);
+            error_log("PDL: Supplemented Apollo data with social URLs");
+        } else {
+            // Apollo found nothing — use PDL as primary profile
+            $person = [
+                'name' => $pdl['full_name'] ?? "$firstName $lastName",
+                'title' => $pdl['job_title'] ?? null,
+                'linkedin_url' => $pdlLinkedin,
+                'twitter_url' => $pdlTwitter,
+                'facebook_url' => $pdlFacebook,
+                'github_url' => $pdlGithub,
+                'city' => $pdl['location_locality'] ?? null,
+                'state' => $pdl['location_region'] ?? null,
+                'country' => $pdl['location_country'] ?? null,
+                'seniority' => $pdl['job_title_levels'][0] ?? null,
+                'photo_url' => null,
+                'headline' => $pdl['job_title'] . ' at ' . ($pdl['job_company_name'] ?? ''),
+                'organization' => [
+                    'name' => $pdl['job_company_name'] ?? null,
+                    'primary_domain' => $pdl['job_company_website'] ?? null,
+                    'industry' => $pdl['job_company_industry'] ?? null,
+                    'short_description' => null,
+                    'estimated_num_employees' => $pdl['job_company_size'] ?? null,
+                    'annual_revenue_printed' => null,
+                    'logo_url' => null
+                ]
+            ];
+            $finalResponseRaw = json_encode(['source' => 'pdl', 'data' => $pdl]);
+            error_log("Using PDL as primary profile for " . $person['name']);
         }
-        $finalResponseRaw = json_encode(['source' => 'fullcontact', 'data' => $fc]);
-        error_log("Using FullContact data for " . $person['name']);
+    }
+
+    // 5b. Deep enrichment fallback — use Tavily + LinkedIn Scraper + Claude verification
+    if (!$person && $firstName && $lastName) {
+        error_log("Deep Enrichment: All standard sources failed for $email. Trying Tavily + LinkedIn Scraper.");
+        $deepData = deepEnrichment($email, $firstName, $lastName, $phone);
+
+        if ($deepData && !isset($deepData['error'])) {
+            $person = [
+                'name' => $deepData['full_name'] ?? "$firstName $lastName",
+                'title' => $deepData['job_title'] ?? null,
+                'linkedin_url' => $deepData['linkedin_url'] ?? null,
+                'twitter_url' => $deepData['twitter_url'] ?? null,
+                'github_url' => $deepData['github_url'] ?? null,
+                'facebook_url' => $deepData['facebook_url'] ?? null,
+                'city' => $deepData['city'] ?? null,
+                'state' => $deepData['state'] ?? null,
+                'country' => $deepData['country'] ?? null,
+                'seniority' => $deepData['seniority'] ?? null,
+                'photo_url' => $deepData['photo_url'] ?? null,
+                'headline' => $deepData['headline'] ?? null,
+                'organization' => [
+                    'name' => $deepData['company'] ?? null,
+                    'primary_domain' => $deepData['company_domain'] ?? null,
+                    'industry' => $deepData['industry'] ?? null,
+                    'short_description' => $deepData['company_description'] ?? null,
+                    'estimated_num_employees' => $deepData['employee_count'] ?? null,
+                    'annual_revenue_printed' => $deepData['annual_revenue'] ?? null,
+                    'logo_url' => null
+                ],
+                '_deep_data' => $deepData
+            ];
+            $finalResponseRaw = json_encode(['source' => 'deep_enrichment', 'person' => $person]);
+            error_log("Deep Enrichment: Found verified match for $email — " . $person['name']);
+        }
     }
 
     if (!$person) {
-        error_log("Enrichment: No match found for $email ($firstName $lastName)");
+        error_log("Enrichment: All sources exhausted for $email ($firstName $lastName). No match.");
         return ['status' => 'no_match'];
     }
 
-    // 6. If we have a LinkedIn URL, scrape fresh data to fill gaps
+    // 6. If we have a LinkedIn URL, scrape fresh data (source of truth)
     $linkedinUrl = $person['linkedin_url'] ?? null;
     if ($linkedinUrl) {
         error_log("LinkedIn Scraper: Fetching fresh data from $linkedinUrl");
@@ -594,7 +686,10 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
         }
     }
 
-    $to = defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : 'admin@theeleanor.nyc';
+    // Get notification emails from settings table
+    $notifyRow = $sb->selectOne('settings', 'value', ['key=eq.notification_emails']);
+    $notifyEmails = array_filter(array_map('trim', explode(',', $notifyRow['value'] ?? (defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : ''))));
+
     $subject = "New Lead: $name" . ($company !== '—' ? " @ $company" : '');
 
     $body = <<<EOD
@@ -674,5 +769,7 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
 </body></html>
 EOD;
 
-    smtpSend($to, $subject, $body, $email, true);
+    foreach ($notifyEmails as $to) {
+        smtpSend(trim($to), $subject, $body, $email, true);
+    }
 }

@@ -7,7 +7,7 @@ requireAdmin();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Eleanor | Command Center</title>
+    <title>The Eleanor | Lead-to-Showing</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -365,7 +365,7 @@ requireAdmin();
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="brand">THE ELEANOR</div>
-        <div class="brand-sub">Command Center</div>
+        <div class="brand-sub">Lead-to-Showing Command Center</div>
         <nav class="nav nav-pills flex-column gap-1" id="mainNav">
             <a href="#" class="nav-link active" data-view="overview">
                 <i class="bi bi-grid-1x2"></i> Overview
@@ -394,7 +394,7 @@ requireAdmin();
         <div id="view-overview" class="dashboard-view">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h1 class="h3 fw-bold mb-0">Command Center</h1>
+                    <h1 class="h3 fw-bold mb-0">Lead-to-Showing Command Center</h1>
                     <small class="text-body-tertiary">Updating in real-time</small>
                 </div>
             </div>
@@ -403,7 +403,7 @@ requireAdmin();
                 <div class="col-md-3 col-sm-6">
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
-                            <div class="stat-label">Total Visitors</div>
+                            <div class="stat-label">Unique Visitors</div>
                             <div class="stat-value" id="statSessions">-</div>
                         </div>
                     </div>
@@ -419,7 +419,7 @@ requireAdmin();
                 <div class="col-md-3 col-sm-6">
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
-                            <div class="stat-label">Conversion Rate</div>
+                            <div class="stat-label">Visitor-to-Lead Rate</div>
                             <div class="stat-value" id="statConv">-</div>
                         </div>
                     </div>
@@ -427,7 +427,7 @@ requireAdmin();
                 <div class="col-md-3 col-sm-6">
                     <div class="card bg-body-tertiary border-0 stat-card">
                         <div class="card-body">
-                            <div class="stat-label">Top Interest</div>
+                            <div class="stat-label">New Today</div>
                             <div class="stat-value" id="statHot">-</div>
                         </div>
                     </div>
@@ -557,6 +557,26 @@ requireAdmin();
             </div>
         </div>
 
+        <!-- Settings View -->
+        <div id="view-settings" class="dashboard-view" style="display:none">
+            <h1 class="h3 fw-bold mb-4">Settings</h1>
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card bg-body-tertiary border-0 mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="fw-semibold mb-1">Notification Emails</h5>
+                            <p class="text-white-50 small mb-3">Comma-separated list of email addresses that receive lead notifications and enrichment reports.</p>
+                            <div class="mb-3">
+                                <textarea class="form-control bg-dark border-secondary text-white" id="settingsNotificationEmails" rows="3" placeholder="email1@example.com, email2@example.com"></textarea>
+                            </div>
+                            <div id="settingsStatus" class="small mb-3" style="display:none"></div>
+                            <button class="btn btn-primary" onclick="saveSettingsForm()">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /.main-content -->
 
     <!-- Journey Slide-Out Panel -->
@@ -601,6 +621,9 @@ requireAdmin();
 
             if (view === 'analytics') {
                 fetchAnalytics();
+            }
+            if (view === 'settings') {
+                loadSettings();
             }
         }
 
@@ -764,12 +787,12 @@ requireAdmin();
                     document.getElementById('statSessions').innerText = 'API Error';
                     document.getElementById('statLeads').innerText = 'API Error';
                     document.getElementById('statConv').innerText = 'API Error';
-                    document.getElementById('statHot').innerText = 'API Error';
+                    document.getElementById('statHot').innerText = '-';
                 } else {
                     document.getElementById('statSessions').innerText = stats.totalSessions !== undefined ? stats.totalSessions : '-';
                     document.getElementById('statLeads').innerText = stats.totalLeads !== undefined ? stats.totalLeads : '-';
                     document.getElementById('statConv').innerText = stats.conversionRate !== undefined ? stats.conversionRate : '-';
-                    document.getElementById('statHot').innerText = stats.hottestSection !== undefined ? stats.hottestSection : '-';
+                    document.getElementById('statHot').innerText = stats.newToday !== undefined ? stats.newToday : '0';
                 }
 
                 const leadsResponse = await fetch('../api/admin-api.php?action=leads');
@@ -1243,13 +1266,21 @@ requireAdmin();
                 + '<div class="' + layoutClass + '">'
                 + '<div class="' + colClass + '">'
                     + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-                    + '<div class="section-label">Submission Intent</div>'
-                    + '<div class="intel-grid">'
-                    + '<div class="intel-item"><span class="intel-label">Source</span><span class="intel-val text-primary">' + esc(intel.submission_type || 'General Lead') + '</span></div>'
-                    + (intel.budget ? '<div class="intel-item"><span class="intel-label">Budget</span><span class="intel-val">' + esc(intel.budget) + '</span></div>' : '')
-                    + (intel.move_in_date ? '<div class="intel-item"><span class="intel-label">Timeline</span><span class="intel-val">' + esc(intel.move_in_date) + '</span></div>' : '')
-                    + '<div class="intel-item"><span class="intel-label">Captured At</span><span class="intel-val text-body-tertiary">' + esc(new Date(intel.created_at).toLocaleString()) + '</span></div>'
-                    + '</div></div></div>'
+                    + '<div class="section-label">Submission Details</div>'
+                    + '<table class="table table-sm table-dark mb-0" style="font-size:0.85rem">'
+                    + '<tbody>'
+                    + '<tr><td class="text-white-50" style="width:40%">Form</td><td class="text-primary fw-semibold">' + esc(intel.submission_type || 'General Lead') + '</td></tr>'
+                    + '<tr><td class="text-white-50">Submitted</td><td>' + esc(intel.created_at ? new Date(intel.created_at).toLocaleString() : 'N/A') + '</td></tr>'
+                    + (intel.phone || intel.phone_number ? '<tr><td class="text-white-50">Phone</td><td>' + esc(intel.phone || intel.phone_number) + '</td></tr>' : '')
+                    + (intel.unit ? '<tr><td class="text-white-50">Unit</td><td>' + esc(intel.unit) + '</td></tr>' : '')
+                    + (intel.unit_type ? '<tr><td class="text-white-50">Unit Type</td><td>' + esc(intel.unit_type) + '</td></tr>' : '')
+                    + (intel.budget ? '<tr><td class="text-white-50">Budget</td><td>' + esc(intel.budget) + '</td></tr>' : '')
+                    + (intel.move_in_date ? '<tr><td class="text-white-50">Move-In Date</td><td>' + esc(intel.move_in_date) + '</td></tr>' : '')
+                    + (intel.hear_about_us ? '<tr><td class="text-white-50">How They Found Us</td><td>' + esc(intel.hear_about_us) + '</td></tr>' : '')
+                    + (intel.interests ? '<tr><td class="text-white-50">Interests</td><td>' + esc(intel.interests) + '</td></tr>' : '')
+                    + (intel.message ? '<tr><td class="text-white-50">Message</td><td style="white-space:pre-wrap">' + esc(intel.message) + '</td></tr>' : '')
+                    + '</tbody></table>'
+                    + '</div></div>'
                     + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
                     + '<div class="section-label">Executive Intelligence</div>'
                     + '<div class="intel-grid">'
@@ -1374,6 +1405,49 @@ requireAdmin();
                     btn.innerHTML = originalHtml;
                 }
             }
+        }
+
+        // ── Settings ──
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/admin-api.php?action=get_settings');
+                const settings = await res.json();
+                document.getElementById('settingsNotificationEmails').value = settings.notification_emails || '';
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+            }
+        }
+
+        async function saveSettingsForm() {
+            const statusEl = document.getElementById('settingsStatus');
+            const emails = document.getElementById('settingsNotificationEmails').value.trim();
+
+            if (!emails) {
+                statusEl.className = 'small mb-3 text-danger';
+                statusEl.textContent = 'Please enter at least one email address.';
+                statusEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin-api.php?action=save_settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notification_emails: emails })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    statusEl.className = 'small mb-3 text-success';
+                    statusEl.textContent = 'Settings saved successfully.';
+                } else {
+                    statusEl.className = 'small mb-3 text-danger';
+                    statusEl.textContent = data.error || 'Failed to save settings.';
+                }
+            } catch (e) {
+                statusEl.className = 'small mb-3 text-danger';
+                statusEl.textContent = 'Network error. Please try again.';
+            }
+            statusEl.style.display = 'block';
         }
 
         // ── Auto Refresh every 30s ──

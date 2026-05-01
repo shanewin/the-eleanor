@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const submitButton = waitlistForm.querySelector('button[type="submit"]');
             const originalText = submitButton.textContent;
+
+            // Clear any previous error
+            const prevError = document.getElementById('waitlistError');
+            if (prevError) prevError.style.display = 'none';
             
             // Show loading state
             submitButton.disabled = true;
@@ -49,7 +53,15 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('There was an error submitting your information. Please try again.');
+                let errorEl = document.getElementById('waitlistError');
+                if (!errorEl) {
+                    errorEl = document.createElement('div');
+                    errorEl.id = 'waitlistError';
+                    errorEl.className = 'alert alert-danger mt-3 text-center';
+                    waitlistForm.prepend(errorEl);
+                }
+                errorEl.textContent = error.message || 'There was an error submitting your information. Please try again.';
+                errorEl.style.display = 'block';
             })
             .finally(() => {
                 // Reset button

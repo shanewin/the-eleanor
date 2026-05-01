@@ -22,6 +22,8 @@ switch ($action) {
     case 'delete_lead': deleteLead($_POST['email'] ?? '', $_POST['source'] ?? ''); break;
     case 'lead_activity': getLeadActivity($_GET['email'] ?? ''); break;
     case 'analytics': getAnalytics(); break;
+    case 'get_settings': getSettings(); break;
+    case 'save_settings': saveSettings(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -41,21 +43,19 @@ function getStats() {
 
     $convRate = ($sessionCount > 0) ? round(($leadCount / $sessionCount) * 100, 1) : 0;
 
-    // Top unit
-    $unitInquiries = $sb->select('unit_inquiries', 'unit');
-    $unitCounts = [];
-    foreach ($unitInquiries as $r) {
-        $u = $r['unit'];
-        $unitCounts[$u] = ($unitCounts[$u] ?? 0) + 1;
+    // New today — count leads submitted today
+    $today = date('Y-m-d');
+    $newToday = 0;
+    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+        $rows = $sb->select($table, 'id', ['created_at=gte.' . $today . 'T00:00:00'], null, null);
+        $newToday += count($rows);
     }
-    arsort($unitCounts);
-    $topUnit = $unitCounts ? array_key_first($unitCounts) : 'None';
 
     echo json_encode([
         'totalSessions' => $sessionCount,
         'totalLeads' => $leadCount,
         'conversionRate' => $convRate . '%',
-        'hottestSection' => $topUnit
+        'newToday' => $newToday
     ]);
 }
 
@@ -344,6 +344,37 @@ function deleteLead($email, $source) {
 
     // Also delete orphaned enrichment data
     $sb->delete('lead_enrichment', ['email=eq.' . urlencode($email)]);
+
+    echo json_encode(['success' => true]);
+}
+
+function getSettings() {
+    global $sb;
+    $rows = $sb->select('settings', '*');
+    $settings = [];
+    foreach ($rows as $r) {
+        $settings[$r['key']] = $r['value'];
+    }
+    echo json_encode($settings);
+}
+
+function saveSettings() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (empty($input) || !is_array($input)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'No settings provided']);
+        return;
+    }
+
+    foreach ($input as $key => $value) {
+        $sb->upsert('settings', [
+            'key' => $key,
+            'value' => $value,
+            'updated_at' => date('c')
+        ], 'key');
+    }
 
     echo json_encode(['success' => true]);
 }

@@ -30,6 +30,17 @@ function clean(string $field): string {
 }
 
 /**
+ * Get notification email addresses from settings table.
+ * Falls back to NOTIFICATION_EMAIL constant if settings unavailable.
+ */
+function getNotificationEmails(): array {
+    global $sb;
+    $row = $sb->selectOne('settings', 'value', ['key=eq.notification_emails']);
+    $raw = $row['value'] ?? (defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : '');
+    return array_filter(array_map('trim', explode(',', $raw)));
+}
+
+/**
  * Main processor — called by each thin wrapper.
  */
 function processForm(array $config): void {
@@ -172,11 +183,15 @@ function processForm(array $config): void {
         $subject = str_replace('{' . $k . '}', $v, $subject);
     }
 
-    $body      = ($config['email_body'])($fields);
-    $emailSent = smtpSend(NOTIFICATION_EMAIL, $subject, $body, $email);
+    $body = ($config['email_body'])($fields);
 
-    if (!$emailSent) {
-        error_log("Failed to send notification email for $table");
+    // Get notification emails from settings table (comma-separated)
+    $notifyEmails = getNotificationEmails();
+    foreach ($notifyEmails as $notifyTo) {
+        $sent = smtpSend(trim($notifyTo), $subject, $body, $email);
+        if (!$sent) {
+            error_log("Failed to send notification email to $notifyTo for $table");
+        }
     }
 
     // ── CSRF token regeneration ─────────────────────────────────────
