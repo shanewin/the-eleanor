@@ -28,7 +28,7 @@ switch ($action) {
 function getStats() {
     global $sb;
 
-    $sessions = $sb->select('tracking_sessions', 'id');
+    $sessions = $sb->select('tracking_sessions', 'id', [], null, null);
     $sessionCount = count($sessions);
 
     // Get unique emails across all 3 tables
@@ -81,7 +81,16 @@ function getLeads() {
             return strtotime($b['created_at']) - strtotime($a['created_at']);
         });
 
-        // Deduplicate by email
+        // Fetch ALL enrichment records in one call and index by email
+        $allEnrichments = $sb->select('lead_enrichment',
+            'email,job_title,company,photo_url,company_logo,annual_revenue,headline,raw_response',
+            []);
+        $enrichmentByEmail = [];
+        foreach ($allEnrichments as $e) {
+            $enrichmentByEmail[strtolower($e['email'])] = $e;
+        }
+
+        // Deduplicate by email and collect tracking IDs
         $seen = [];
         $unique = [];
         foreach ($allLeads as $lead) {
@@ -89,26 +98,37 @@ function getLeads() {
             if (isset($seen[$email])) continue;
             $seen[$email] = true;
 
-            // Fetch enrichment data
-            $enrichment = $sb->selectOne('lead_enrichment',
-                'job_title,company,photo_url,company_logo,annual_revenue,headline,raw_response',
-                ['email=eq.' . urlencode($email)]);
-
-            if ($enrichment) {
-                $lead = array_merge($lead, $enrichment);
+            // Merge enrichment from pre-fetched data
+            if (isset($enrichmentByEmail[$email])) {
+                $lead = array_merge($lead, $enrichmentByEmail[$email]);
             }
 
-            // Count activity events
-            if (!empty($lead['tracking_id'])) {
-                $events = $sb->select('activity_logs', 'id',
-                    ['session_id=eq.' . urlencode($lead['tracking_id'])]);
-                $lead['event_count'] = count($events);
-            } else {
-                $lead['event_count'] = 0;
-            }
-
+            $lead['event_count'] = 0;
             $unique[] = $lead;
             if (count($unique) >= 50) break;
+        }
+
+        // Fetch activity counts for all tracking IDs in one call
+        $trackingIds = array_filter(array_column($unique, 'tracking_id'));
+        if (!empty($trackingIds)) {
+            $idList = '(' . implode(',', array_unique($trackingIds)) . ')';
+            $allEvents = $sb->select('activity_logs', 'session_id',
+                ['session_id=in.' . $idList]);
+
+            // Count events per session_id
+            $eventCounts = [];
+            foreach ($allEvents as $evt) {
+                $sid = $evt['session_id'];
+                $eventCounts[$sid] = ($eventCounts[$sid] ?? 0) + 1;
+            }
+
+            // Merge counts back into leads
+            foreach ($unique as &$lead) {
+                if (!empty($lead['tracking_id']) && isset($eventCounts[$lead['tracking_id']])) {
+                    $lead['event_count'] = $eventCounts[$lead['tracking_id']];
+                }
+            }
+            unset($lead);
         }
 
         echo json_encode($unique, JSON_INVALID_UTF8_SUBSTITUTE);
@@ -185,7 +205,7 @@ function getLeadActivity($email) {
         return;
     }
 
-    $idList = '(' . implode(',', array_map(function($id) { return '"' . $id . '"'; }, $trackingIds)) . ')';
+    $idList = '(' . implode(',', $trackingIds) . ')';
     $logs = $sb->select('activity_logs', '*',
         ['session_id=in.' . $idList],
         'created_at.asc');
@@ -251,9 +271,25 @@ function getAnalytics() {
             if (!isset($dayData[$date])) $dayData[$date] = [];
             $dayData[$date][$log['session_id']] = true;
         }
+        // Count leads per day from all 3 submission tables
+        $leadsByDay = [];
+        $cutoff = date('Y-m-d', strtotime('-14 days'));
+        foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+            $rows = $sb->select($table, 'created_at',
+                ['created_at=gte.' . $cutoff]);
+            foreach ($rows as $r) {
+                $date = substr($r['created_at'], 0, 10);
+                $leadsByDay[$date] = ($leadsByDay[$date] ?? 0) + 1;
+            }
+        }
+
         $trafficTrends = [];
         foreach ($dayData as $date => $sessions) {
-            $trafficTrends[] = ['date' => $date, 'sessions' => count($sessions), 'leads' => 0];
+            $trafficTrends[] = [
+                'date' => $date,
+                'sessions' => count($sessions),
+                'leads' => $leadsByDay[$date] ?? 0
+            ];
         }
 
         // 4. Device Breakdown
@@ -305,6 +341,9 @@ function deleteLead($email, $source) {
     if ($table) {
         $sb->delete($table, ['email=eq.' . urlencode($email)]);
     }
+
+    // Also delete orphaned enrichment data
+    $sb->delete('lead_enrichment', ['email=eq.' . urlencode($email)]);
 
     echo json_encode(['success' => true]);
 }

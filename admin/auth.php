@@ -61,6 +61,38 @@ function supabaseVerifyToken($accessToken) {
     return false;
 }
 
+/**
+ * Refresh a Supabase access token using a refresh token.
+ * Updates session tokens on success.
+ */
+function supabaseRefreshToken($refreshToken) {
+    $url = SUPABASE_URL . '/auth/v1/token?grant_type=refresh_token';
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        'refresh_token' => $refreshToken
+    ]));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'apikey: ' . SUPABASE_PUBLISHABLE_KEY
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        $_SESSION['supabase_access_token'] = $data['access_token'];
+        $_SESSION['supabase_refresh_token'] = $data['refresh_token'];
+        return true;
+    }
+
+    error_log("Supabase token refresh failed ($httpCode): $response");
+    return false;
+}
+
 function isAdmin() {
     if (empty($_SESSION['supabase_access_token'])) {
         return false;
@@ -68,7 +100,11 @@ function isAdmin() {
     // Verify token is still valid
     $user = supabaseVerifyToken($_SESSION['supabase_access_token']);
     if (!$user) {
-        // Token expired — clear session
+        // Token expired — try to refresh before clearing session
+        if (!empty($_SESSION['supabase_refresh_token']) && supabaseRefreshToken($_SESSION['supabase_refresh_token'])) {
+            return true;
+        }
+        // Refresh failed — clear session
         $_SESSION = [];
         return false;
     }

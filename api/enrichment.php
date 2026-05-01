@@ -51,6 +51,8 @@ function fullContactRequest($email, $phone = null, $firstName = null, $lastName 
 
     $ch = curl_init('https://api.fullcontact.com/v3/person.enrich');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -69,6 +71,8 @@ function fullContactRequest($email, $phone = null, $firstName = null, $lastName 
 function apolloRequest($url, $payload) {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -92,6 +96,8 @@ function tavilyRequest($query, $options = []) {
 
     $ch = curl_init("https://api.tavily.com/search");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
@@ -104,9 +110,11 @@ function tavilyRequest($query, $options = []) {
 function anthropicRequest($prompt, $maxTokens = 1500) {
     $ch = curl_init("https://api.anthropic.com/v1/messages");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-        'model' => 'claude-3-haiku-20240307',
+        'model' => 'claude-haiku-4-5-20251001',
         'max_tokens' => $maxTokens,
         'messages' => [
             ['role' => 'user', 'content' => $prompt]
@@ -132,7 +140,8 @@ function linkedinScraperRequest($linkedinUrl) {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING => "",
         CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 30,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
         CURLOPT_CUSTOMREQUEST => "GET",
         CURLOPT_HTTPHEADER => [
@@ -490,7 +499,7 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
 
     $logs = [];
     if (!empty($trackingIds)) {
-        $idList = '(' . implode(',', array_map(function($id) { return '"' . $id . '"'; }, $trackingIds)) . ')';
+        $idList = '(' . implode(',', $trackingIds) . ')';
         $logs = $sb->select('activity_logs', 'event_type,event_name,event_data,created_at',
             ['session_id=in.' . $idList],
             'created_at.asc'

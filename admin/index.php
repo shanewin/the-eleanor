@@ -3,160 +3,543 @@ require_once 'auth.php';
 requireAdmin();
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Eleanor | Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="admin.css">
+    <title>The Eleanor | Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bs-body-font-family: 'Inter', sans-serif;
+            --bs-body-bg: #0a0a0f;
+            --bs-tertiary-bg: #141420;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            min-height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1030;
+            background: #0d0d14;
+            border-right: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem 1rem;
+        }
+        .sidebar .brand {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: #fff;
+            padding: 0 0.75rem;
+        }
+        .sidebar .brand-sub {
+            font-size: 0.7rem;
+            font-weight: 400;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.35);
+            padding: 0 0.75rem;
+            margin-bottom: 2rem;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.5);
+            border-radius: 0.5rem;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            transition: all 0.15s;
+        }
+        .sidebar .nav-link:hover {
+            color: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.04);
+        }
+        .sidebar .nav-link.active {
+            color: #fff;
+            background: rgba(99,102,241,0.15);
+        }
+        .sidebar .nav-link i {
+            font-size: 1.1rem;
+            width: 1.3rem;
+            text-align: center;
+        }
+
+        /* Main content offset */
+        .main-content {
+            margin-left: 240px;
+            padding: 2rem 2.5rem;
+            min-height: 100vh;
+        }
+
+        /* Stat cards */
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .stat-card .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(255,255,255,0.4);
+            margin-bottom: 0.4rem;
+        }
+
+        /* Tables */
+        .table > thead > tr > th {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.35);
+            border-bottom-color: rgba(255,255,255,0.06);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .table > tbody > tr {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .table > tbody > tr:hover {
+            background: rgba(255,255,255,0.03) !important;
+        }
+        .table > tbody > tr > td {
+            vertical-align: middle;
+            border-bottom-color: rgba(255,255,255,0.04);
+            padding: 0.9rem 0.75rem;
+        }
+        th.sortable { cursor: pointer; }
+        th.sortable:hover { color: rgba(255,255,255,0.7); }
+        th.sortable.active { color: #6366f1; }
+
+        /* User avatar */
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .user-avatar-placeholder {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: rgba(99,102,241,0.15);
+            color: #818cf8;
+            flex-shrink: 0;
+        }
+
+        /* Grade pill */
+        .grade-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.6);
+        }
+        .grade-pill.elite {
+            background: rgba(99,102,241,0.2);
+            color: #a5b4fc;
+            box-shadow: 0 0 12px rgba(99,102,241,0.15);
+        }
+
+        /* Mini copy button */
+        .mini-copy-btn {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.25);
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .mini-copy-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.05); }
+
+        /* Company logo */
+        .company-logo {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            background: #fff;
+            padding: 2px;
+            flex-shrink: 0;
+        }
+
+        /* Delete button */
+        .delete-btn {
+            background: none;
+            border: 1px solid rgba(239,68,68,0.2);
+            color: rgba(239,68,68,0.5);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .delete-btn:hover { background: rgba(239,68,68,0.1); color: #ef4444; border-color: rgba(239,68,68,0.4); }
+
+        /* Analytics metric rows */
+        .metric-row { margin-bottom: 1.2rem; }
+        .metric-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+        .metric-name { font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.75); }
+        .metric-val { font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.5); }
+        .metric-badge {
+            background: rgba(99,102,241,0.15);
+            color: #818cf8;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+        }
+
+        /* Journey panel (slide-out) */
+        #journeyPanel {
+            position: fixed;
+            top: 0;
+            right: -520px;
+            width: 520px;
+            height: 100vh;
+            background: #111118;
+            border-left: 1px solid rgba(255,255,255,0.06);
+            z-index: 1050;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            padding: 2rem;
+        }
+        #journeyPanel.active { right: 0; }
+
+        /* Profile styles */
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+            border: 2px solid rgba(255,255,255,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+        }
+        .score-circle.score-high {
+            border-color: rgba(99,102,241,0.4);
+            background: rgba(99,102,241,0.08);
+        }
+        .score-val { font-size: 1.4rem; font-weight: 700; color: #fff; }
+        .score-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 0 auto 1rem;
+            display: block;
+            border: 2px solid rgba(255,255,255,0.08);
+        }
+        .profile-name { font-size: 1.4rem; font-weight: 700; color: #fff; text-align: center; }
+        .profile-title { font-size: 0.85rem; color: rgba(255,255,255,0.5); text-align: center; margin-bottom: 1.5rem; }
+
+        .insight-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.25rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            margin: 0.2rem;
+        }
+        .badge-success { background: rgba(16,185,129,0.12); color: #6ee7b7; }
+        .badge-info { background: rgba(99,102,241,0.12); color: #a5b4fc; }
+        .badge-warning { background: rgba(245,158,11,0.12); color: #fcd34d; }
+
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+        }
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.15rem;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.35);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .action-val { font-size: 0.82rem; color: rgba(255,255,255,0.7); text-transform: none; letter-spacing: 0; }
+        .icon-btn {
+            background: rgba(255,255,255,0.05);
+            border: none;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+        .section-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(255,255,255,0.3);
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .intel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .intel-item { display: flex; flex-direction: column; gap: 0.2rem; }
+        .intel-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.3); }
+        .intel-val { font-size: 0.85rem; color: rgba(255,255,255,0.75); font-weight: 500; }
+
+        .journey-item {
+            padding: 0.6rem 0.8rem;
+            border-left: 2px solid rgba(255,255,255,0.06);
+            margin-left: 0.5rem;
+        }
+        .journey-time { font-size: 0.65rem; color: rgba(255,255,255,0.3); margin-bottom: 0.15rem; }
+        .journey-title { font-size: 0.82rem; color: rgba(255,255,255,0.7); }
+
+        .ai-summary-box {
+            background: rgba(99,102,241,0.04);
+            border: 1px solid rgba(99,102,241,0.12);
+            border-radius: 12px;
+            padding: 1.2rem;
+        }
+
+        .premium-btn {
+            background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15));
+            border: 1px solid rgba(99,102,241,0.2);
+            color: #a5b4fc;
+            padding: 0.7rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        .premium-btn:hover { background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.25)); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; padding: 1rem; }
+        }
+    </style>
 </head>
 <body>
 
-    <aside>
-        <span class="logo">THE ELEANOR</span>
-        <nav id="mainNav">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="brand">THE ELEANOR</div>
+        <div class="brand-sub">Command Center</div>
+        <nav class="nav nav-pills flex-column gap-1" id="mainNav">
             <a href="#" class="nav-link active" data-view="overview">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                Overview
+                <i class="bi bi-grid-1x2"></i> Overview
             </a>
             <a href="#" class="nav-link" data-view="leads">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                Leads
+                <i class="bi bi-people"></i> Leads
             </a>
             <a href="#" class="nav-link" data-view="analytics">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002 2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                Analytics
+                <i class="bi bi-bar-chart-line"></i> Analytics
             </a>
             <a href="#" class="nav-link" data-view="settings">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                Settings
+                <i class="bi bi-gear"></i> Settings
             </a>
-            <div style="margin-top: auto; padding-top: 2rem;">
-                <a href="?logout=1" style="color: rgba(239, 68, 68, 0.6); font-size: 0.8rem;">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                    Sign Out
-                </a>
-            </div>
         </nav>
-    </aside>
+        <div class="mt-auto pt-4">
+            <a href="?logout=1" class="nav-link text-danger opacity-50" style="font-size:0.8rem;">
+                <i class="bi bi-box-arrow-right"></i> Sign Out
+            </a>
+        </div>
+    </div>
 
-    <main>
+    <!-- Main Content -->
+    <div class="main-content">
+
         <!-- Overview View -->
         <div id="view-overview" class="dashboard-view">
-            <header>
-                <h1>Dashboard Overview</h1>
-                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.4);">Updating in real-time</div>
-            </header>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Total Visitors</div>
-                    <div class="stat-value" id="statSessions">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Total Leads</div>
-                    <div class="stat-value" id="statLeads">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Conversion Rate</div>
-                    <div class="stat-value" id="statConv">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Top Interest</div>
-                    <div class="stat-value" id="statHot">-</div>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Command Center</h1>
+                    <small class="text-body-tertiary">Updating in real-time</small>
                 </div>
             </div>
 
-            <div class="card" style="padding: 2.5rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem">
-                    <h2 style="margin:0">Recent Conversions & Enrichment</h2>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Sort by: 
-                        <select id="overview-sort" onchange="fetchData()" style="background:rgba(255,255,255,0.05); color:white; border:1px solid var(--border); padding:0.4rem; border-radius:8px; outline:none">
-                            <option value="date">Date (Newest)</option>
-                            <option value="grade">Grade (Elite First)</option>
-                        </select>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3 col-sm-6">
+                    <div class="card bg-body-tertiary border-0 stat-card">
+                        <div class="card-body">
+                            <div class="stat-label">Total Visitors</div>
+                            <div class="stat-value" id="statSessions">-</div>
+                        </div>
                     </div>
                 </div>
-                <table class="leadsTable">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Identity</th>
-                            <th>Contact</th>
-                            <th>Grade</th>
-                            <th>Engagement</th>
-                            <th>Role & Company</th>
-                            <th style="display:none">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody><!-- Dynamic --></tbody>
-                </table>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card bg-body-tertiary border-0 stat-card">
+                        <div class="card-body">
+                            <div class="stat-label">Total Leads</div>
+                            <div class="stat-value" id="statLeads">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card bg-body-tertiary border-0 stat-card">
+                        <div class="card-body">
+                            <div class="stat-label">Conversion Rate</div>
+                            <div class="stat-value" id="statConv">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="card bg-body-tertiary border-0 stat-card">
+                        <div class="card-body">
+                            <div class="stat-label">Top Interest</div>
+                            <div class="stat-value" id="statHot">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-body-tertiary border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="h5 fw-bold mb-0">Recent Conversions &amp; Enrichment</h2>
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-body-tertiary">Sort by:</small>
+                            <select id="overview-sort" onchange="fetchData()" class="form-select form-select-sm" style="width:auto;">
+                                <option value="date">Date (Newest)</option>
+                                <option value="grade">Grade (Elite First)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover leadsTable mb-0" style="background:transparent;">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Identity</th>
+                                    <th>Contact</th>
+                                    <th>Grade</th>
+                                    <th>Engagement</th>
+                                    <th>Role &amp; Company</th>
+                                    <th style="display:none">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody><!-- Dynamic --></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Leads View -->
         <div id="view-leads" class="dashboard-view" style="display:none">
-            <header>
-                <h1>All Qualified Leads</h1>
-            </header>
-            <div class="card">
-                <table class="leadsTable">
-                    <thead>
-                        <tr>
-                            <th class="sortable" onclick="sortLeads('created_at')">Timestamp</th>
-                            <th class="sortable" onclick="sortLeads('last_name')">Lead</th>
-                            <th class="sortable" onclick="sortLeads('grade_score')">Grade</th>
-                            <th>Signals</th>
-                            <th class="sortable" onclick="sortLeads('event_count')">Engagement</th>
-                            <th class="sortable" onclick="sortLeads('job_title')">Role & Company</th>
-                            <th>Management</th>
-                        </tr>
-                    </thead>
-                    <tbody><!-- Dynamic --></tbody>
-                </table>
+            <div class="mb-4">
+                <h1 class="h3 fw-bold mb-0">All Qualified Leads</h1>
+            </div>
+            <div class="card bg-body-tertiary border-0">
+                <div class="card-body p-4">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover leadsTable mb-0" style="background:transparent;">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" onclick="sortLeads('created_at')">Timestamp</th>
+                                    <th class="sortable" onclick="sortLeads('last_name')">Lead</th>
+                                    <th class="sortable" onclick="sortLeads('grade_score')">Grade</th>
+                                    <th>Signals</th>
+                                    <th class="sortable" onclick="sortLeads('event_count')">Engagement</th>
+                                    <th class="sortable" onclick="sortLeads('job_title')">Role &amp; Company</th>
+                                    <th>Management</th>
+                                </tr>
+                            </thead>
+                            <tbody><!-- Dynamic --></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Analytics View -->
         <div id="view-analytics" class="dashboard-view" style="display:none">
-            <header>
-                <h1>User Behavioral Insights</h1>
-                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.4);">Deep behavioral analysis</div>
-            </header>
-            
-            <div class="analytics-grid">
+            <div class="mb-4">
+                <h1 class="h3 fw-bold mb-0">User Behavioral Insights</h1>
+                <small class="text-body-tertiary">Deep behavioral analysis</small>
+            </div>
+
+            <div class="row g-4">
                 <!-- Section Engagement -->
-                <div class="card analytics-card">
-                    <h2>Section Engagement</h2>
-                    <p style="font-size:0.75rem; color:var(--text-dim); margin-top:-1.5rem; margin-bottom:2rem">Average time spent per section (seconds)</p>
-                    <div id="section-engagement-list" class="metrics-list">
-                        <!-- Dynamic -->
+                <div class="col-md-6">
+                    <div class="card bg-body-tertiary border-0 h-100">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">Section Engagement</h5>
+                            <p class="text-body-tertiary mb-4" style="font-size:0.75rem;">Average time spent per section (seconds)</p>
+                            <div id="section-engagement-list"><!-- Dynamic --></div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Interaction Hotspots -->
-                <div class="card analytics-card">
-                    <h2>Top Interactions</h2>
-                    <p style="font-size:0.75rem; color:var(--text-dim); margin-top:-1.5rem; margin-bottom:2rem">Most clicked buttons and CTAs</p>
-                    <div id="top-interactions-list" class="metrics-list">
-                        <!-- Dynamic -->
+                <div class="col-md-6">
+                    <div class="card bg-body-tertiary border-0 h-100">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">Top Interactions</h5>
+                            <p class="text-body-tertiary mb-4" style="font-size:0.75rem;">Most clicked buttons and CTAs</p>
+                            <div id="top-interactions-list"><!-- Dynamic --></div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Device Breakdown -->
-                <div class="card analytics-card">
-                    <h2>Device Distribution</h2>
-                    <div id="device-breakdown-list" class="metrics-list" style="margin-top:1rem">
-                        <!-- Dynamic -->
+                <div class="col-md-6">
+                    <div class="card bg-body-tertiary border-0 h-100">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">Device Distribution</h5>
+                            <div id="device-breakdown-list" class="mt-3"><!-- Dynamic --></div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Traffic Trends -->
-                <div class="card analytics-card">
-                    <h2>Recent Traffic Trend</h2>
-                    <div id="traffic-trends-list" class="metrics-list" style="margin-top:1rem">
-                        <!-- Dynamic -->
+                <div class="col-md-6">
+                    <div class="card bg-body-tertiary border-0 h-100">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">Recent Traffic Trend</h5>
+                            <div id="traffic-trends-list" class="mt-3"><!-- Dynamic --></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -164,18 +547,19 @@ requireAdmin();
 
         <!-- Lead Profile View (In-Page) -->
         <div id="view-lead-profile" class="dashboard-view" style="display:none">
-            <div style="margin-bottom: 2rem">
-                <a href="#" class="back-link" onclick="event.preventDefault(); showView('leads')">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 0.5rem"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    Back to Leads
+            <div class="mb-3">
+                <a href="#" class="text-decoration-none text-body-tertiary" onclick="event.preventDefault(); showView('leads')">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Leads
                 </a>
             </div>
-            <div id="inPageProfileContent" class="profile-container">
+            <div id="inPageProfileContent">
                 <!-- Dynamic Content -->
             </div>
         </div>
-    </main>
 
+    </div><!-- /.main-content -->
+
+    <!-- Journey Slide-Out Panel -->
     <div id="journeyPanel">
         <!-- Content dynamic -->
     </div>
@@ -184,18 +568,35 @@ requireAdmin();
     if (isset($_GET['logout'])) { logout(); }
     ?>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Navigation Logic
+        // ── XSS Escape Helper ──
+        function esc(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function safeUrl(url) {
+            if (!url) return '';
+            const s = String(url).trim();
+            if (/^https?:\/\//i.test(s)) return s;
+            return '';
+        }
+
+        // ── Navigation Logic ──
         function showView(view) {
-            // Toggle nav state
             document.querySelectorAll('.nav-link').forEach(l => {
                 l.classList.remove('active');
                 if (l.getAttribute('data-view') === view) l.classList.add('active');
             });
-            
-            // Toggle view content
+
             document.querySelectorAll('.dashboard-view').forEach(v => v.style.display = 'none');
-            const target = document.getElementById(`view-${view}`);
+            const target = document.getElementById('view-' + view);
             if (target) target.style.display = 'block';
 
             if (view === 'analytics') {
@@ -216,6 +617,7 @@ requireAdmin();
             return Math.floor(years) + (Math.floor(years) === 1 ? " year" : " years");
         }
 
+        // ── Lead Grading Algorithm ──
         function calculateLeadGrade(lead) {
             let insights = [];
             let raw = {};
@@ -228,12 +630,10 @@ requireAdmin();
             const employment = person.employment_history || [];
             const education = person.education_history || person.education || [];
 
-            // Tenure Calculations
             let roleTenure = 0;
             let companyTenure = 0;
             const now = new Date();
 
-            // Helper to parse messy dates from AI
             function parseTenure(dateStr) {
                 if (!dateStr || dateStr.toLowerCase().includes('present')) return now;
                 const d = new Date(dateStr);
@@ -258,17 +658,17 @@ requireAdmin();
                 });
             }
 
-            // 1. Career Seniority (Primary Signal)
+            // 1. Career Seniority
             const title = (lead.job_title || person.title || '').toLowerCase();
             if (['chief', 'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cpo', 'founder', 'owner', 'president'].some(k => title.includes(k))) {
-                insights.push({ label: "Executive Leadership", type: "success", icon: "👑", points: 40 });
+                insights.push({ label: "Executive Leadership", type: "success", icon: "\u{1F451}", points: 40 });
             } else if (['vice president', 'vp', 'director', 'head of'].some(k => title.includes(k))) {
-                insights.push({ label: "Senior Management", type: "success", icon: "💎", points: 30 });
+                insights.push({ label: "Senior Management", type: "success", icon: "\u{1F48E}", points: 30 });
             } else if (['manager', 'senior', 'lead', 'principal', 'engineer', 'architect', 'developer', 'analyst', 'specialist', 'consultant'].some(k => title.includes(k))) {
-                insights.push({ label: "Professional Lead", type: "info", icon: "🚀", points: 20 });
+                insights.push({ label: "Professional Lead", type: "info", icon: "\u{1F680}", points: 20 });
             }
 
-            // 2. Career Depth (Total Experience)
+            // 2. Career Depth
             let totalYrsExp = 0;
             employment.forEach(job => {
                 const s = parseTenure(job.start_date);
@@ -276,47 +676,46 @@ requireAdmin();
                 if (s && e) totalYrsExp += (e - s) / (365 * 24 * 60 * 60 * 1000);
             });
             if (totalYrsExp >= 10) {
-                insights.push({ label: "Industry Veteran", type: "success", icon: "🏆", points: 25 });
+                insights.push({ label: "Industry Veteran", type: "success", icon: "\u{1F3C6}", points: 25 });
             } else if (totalYrsExp >= 5) {
-                insights.push({ label: "Seasoned Pro", type: "success", icon: "🌟", points: 15 });
+                insights.push({ label: "Seasoned Pro", type: "success", icon: "\u{1F31F}", points: 15 });
             }
 
             // 3. Verified Professional Signal
             const jobTitle = lead.job_title || lead.title || person.title;
             const companyName = lead.company || (org ? org.name : null) || (employment[0] ? employment[0].organization_name : null);
             if (jobTitle && companyName) {
-                insights.push({ label: "Verified Identity", type: "success", icon: "✅", points: 15 });
+                insights.push({ label: "Verified Identity", type: "success", icon: "\u2705", points: 15 });
             }
 
             // 4. Intent & Source
             const source = (lead.source || lead.submission_type || '').toLowerCase();
             if (source.includes('unit interest')) {
-                insights.push({ label: "High Intent", type: "success", icon: "🔥", points: 15 });
+                insights.push({ label: "High Intent", type: "success", icon: "\u{1F525}", points: 15 });
             }
 
             // 5. Stability & Tenure
             if (companyTenure >= 3) {
-                insights.push({ label: "Established Pro", type: "success", icon: "⚓", points: 20 });
+                insights.push({ label: "Established Pro", type: "success", icon: "\u2693", points: 20 });
             }
-            if (roleTenure > 0 && roleTenure < 0.5) { // Under 6 months
-                insights.push({ label: "New Transition", type: "warning", icon: "🌱", points: -15 });
+            if (roleTenure > 0 && roleTenure < 0.5) {
+                insights.push({ label: "New Transition", type: "warning", icon: "\u{1F331}", points: -15 });
             }
-            // Job Hopper check: Too many roles in too short a time
             if (employment.length >= 5 && totalYrsExp < 10) {
-                insights.push({ label: "Volatile History", type: "warning", icon: "⚠️", points: -10 });
+                insights.push({ label: "Volatile History", type: "warning", icon: "\u26A0\uFE0F", points: -10 });
             }
-            
+
             // 6. Organization Tier
             const revenue = (lead.annual_revenue || org.annual_revenue_printed || '').toUpperCase();
             if (revenue.includes('B') || revenue.includes('T')) {
-                insights.push({ label: "Enterprise Scale", type: "info", icon: "🏢", points: 15 });
+                insights.push({ label: "Enterprise Scale", type: "info", icon: "\u{1F3E2}", points: 15 });
             } else if (org.primary_domain || org.short_description) {
-                insights.push({ label: "Verified Entity", type: "info", icon: "🏢", points: 10 });
+                insights.push({ label: "Verified Entity", type: "info", icon: "\u{1F3E2}", points: 10 });
             }
 
             // 7. Multi-Org Advisor
             if (employment.some(job => job.current && ['board', 'advisor', 'trustee'].some(k => (job.title || '').toLowerCase().includes(k)))) {
-                insights.push({ label: "Board Advisor", type: "info", icon: "⚖️", points: 15 });
+                insights.push({ label: "Board Advisor", type: "info", icon: "\u2696\uFE0F", points: 15 });
             }
 
             const profScore = insights.reduce((sum, i) => sum + (i.points || 0), 0);
@@ -340,6 +739,7 @@ requireAdmin();
             return { score: totalScore, letter: getLetter(totalScore), insights: insights, roleTenure, companyTenure };
         }
 
+        // ── Sorting ──
         let currentLeads = [];
         let sortConfig = { column: 'created_at', direction: 'desc' };
 
@@ -353,12 +753,12 @@ requireAdmin();
             fetchData();
         }
 
+        // ── Fetch Data ──
         async function fetchData() {
             try {
-                // Fetch Stats
                 const statsResponse = await fetch('../api/admin-api.php?action=stats');
                 const stats = await statsResponse.json();
-                
+
                 if (stats.error) {
                     console.error("Stats API Error:", stats.error);
                     document.getElementById('statSessions').innerText = 'API Error';
@@ -372,43 +772,38 @@ requireAdmin();
                     document.getElementById('statHot').innerText = stats.hottestSection !== undefined ? stats.hottestSection : '-';
                 }
 
-                // Fetch Leads
                 const leadsResponse = await fetch('../api/admin-api.php?action=leads');
                 if (!leadsResponse.ok) throw new Error("API Error");
-                
+
                 let leads = await leadsResponse.json();
-                
-                // Add Grade to each lead object
-                leads = leads.map(l => ({ 
-                    ...l, 
+
+                leads = leads.map(l => ({
+                    ...l,
                     grade: calculateLeadGrade(l),
-                    grade_score: calculateLeadGrade(l).score // For sorting
+                    grade_score: calculateLeadGrade(l).score
                 }));
 
                 currentLeads = leads;
 
-                // Sorting for Overview (stays simple)
                 const sortVal = document.getElementById('overview-sort')?.value || 'date';
-                
-                // Unified Sorting Logic
+
                 const sortColumn = sortConfig.column;
                 const sortDir = sortConfig.direction === 'asc' ? 1 : -1;
 
                 leads.sort((a, b) => {
                     let valA = a[sortColumn];
                     let valB = b[sortColumn];
-                    
+
                     if (sortColumn === 'created_at') {
                         valA = new Date(valA);
                         valB = new Date(valB);
                     }
-                    
+
                     if (valA < valB) return -1 * sortDir;
                     if (valA > valB) return 1 * sortDir;
                     return 0;
                 });
 
-                // Overwrite sorting for Overview if not explicitly sorted via headers
                 if (document.getElementById('view-overview').style.display !== 'none') {
                     if (sortVal === 'grade') {
                         leads.sort((a, b) => b.grade.score - a.grade.score);
@@ -417,30 +812,28 @@ requireAdmin();
                     }
                 }
 
-                // Render to all lead tables
                 document.querySelectorAll('.leadsTable').forEach(table => {
                     const tbody = table.querySelector('tbody');
                     const isOverview = table.closest('#view-overview') !== null;
-                    
-                    // Update header active states
+
                     if (!isOverview) {
                         table.querySelectorAll('th.sortable').forEach(th => {
                             th.classList.remove('active');
-                            if (th.getAttribute('onclick')?.includes(`'${sortConfig.column}'`)) {
+                            if (th.getAttribute('onclick')?.includes("'" + sortConfig.column + "'")) {
                                 th.classList.add('active');
                             }
                         });
                     }
-                    
+
                     if (leads.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="${isOverview ? 6 : 7}" style="text-align:center; padding:3rem; color:rgba(255,255,255,0.2)">No leads recorded yet.</td></tr>`;
+                        tbody.innerHTML = '<tr><td colspan="' + (isOverview ? 6 : 7) + '" class="text-center text-body-tertiary py-5">No leads recorded yet.</td></tr>';
                         return;
                     }
-                    
+
                     tbody.innerHTML = '';
                     leads.forEach(lead => {
                         const row = document.createElement('tr');
-                        row.className = 'clickable-row';
+                        row.style.cursor = 'pointer';
                         row.onclick = () => {
                             const activeView = document.querySelector('.nav-link.active').getAttribute('data-view');
                             if (activeView === 'leads') {
@@ -449,117 +842,78 @@ requireAdmin();
                                 viewJourney(lead.tracking_id, lead.email);
                             }
                         };
-                        
+
                         const dateObj = new Date(lead.created_at);
-                        const timestamp = `
-                            <div style="display:flex; flex-direction:column">
-                                <span style="font-weight:600">${dateObj.toLocaleDateString()}</span>
-                                <span style="font-size:0.75rem; color:var(--text-dim)">${dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                        `;
+                        const dateStr = esc(dateObj.toLocaleDateString());
+                        const timeStr = esc(dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                        const timestamp = '<div><span class="fw-semibold">' + dateStr + '</span><br><small class="text-body-tertiary">' + timeStr + '</small></div>';
 
-                        const avatar = lead.photo_url ? `<img src="${lead.photo_url}" class="user-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${lead.first_name}+${lead.last_name}&background=3b82f6&color=fff'">` : 
-                            `<div class="user-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:1rem;background:rgba(59,130,246,0.1);color:var(--accent)">${lead.first_name[0]}${lead.last_name[0]}</div>`;
-                        
-                        const contactInfo = `
-                            <div style="display:flex; flex-direction:column; gap:0.2rem">
-                                <span style="font-weight:600; color:white; font-size:1rem">${lead.first_name} ${lead.last_name}</span>
-                                <div style="display:flex; align-items:center; gap:0.5rem">
-                                    <span style="font-size:0.8rem; color:var(--text-dim)">${lead.email}</span>
-                                    <button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard('${lead.email}', this)">
-                                        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                    </button>
-                                </div>
-                            </div>
-                        `;
+                        const photoUrl = safeUrl(lead.photo_url);
+                        const fallbackUrl = 'https://ui-avatars.com/api/?name=' + encodeURIComponent((lead.first_name || '') + ' ' + (lead.last_name || '')) + '&background=6366f1&color=fff';
+                        const avatar = photoUrl
+                            ? '<img src="' + esc(photoUrl) + '" class="user-avatar" onerror="this.src=\'' + esc(fallbackUrl) + '\'">'
+                            : '<div class="user-avatar-placeholder">' + esc((lead.first_name || '?')[0]) + esc((lead.last_name || '?')[0]) + '</div>';
 
-                        const identityCombined = `
-                            <div class="user-cell">
-                                ${avatar}
-                                ${contactInfo}
-                            </div>
-                        `;
+                        const escapedEmail = esc(lead.email || '');
+                        const contactInfo = '<div>'
+                            + '<span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span>'
+                            + '<div class="d-flex align-items-center gap-2">'
+                            + '<small class="text-body-tertiary">' + escapedEmail + '</small>'
+                            + '<button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard(\'' + escapedEmail.replace(/'/g, "\\'") + '\', this)">'
+                            + '<i class="bi bi-clipboard" style="font-size:0.7rem"></i>'
+                            + '</button>'
+                            + '</div></div>';
 
-                        const enrichment = lead.job_title ? `
-                            <div style="display:flex; flex-direction:column; gap:0.4rem">
-                                <div style="display:flex; align-items:center; gap:0.5rem">
-                                    ${lead.company_logo ? `<img src="${lead.company_logo}" class="company-logo" style="width:24px; height:24px">` : ''}
-                                    <span style="font-weight:500; font-size:0.85rem; line-height:1.3">${lead.job_title} @ ${lead.company}</span>
-                                </div>
-                            </div>
-                        ` : '<span style="color:rgba(255,255,255,0.2)">Pending...</span>';
-                        
-                        const activityLevel = lead.event_count > 10 ? '<span style="color:#10b981">● Hot</span>' : 
-                                             lead.event_count > 5 ? '<span style="color:#3b82f6">● Active</span>' : 
-                                             '<span style="color:rgba(255,255,255,0.3)">● Quiet</span>';
-                        
-                        const engagement = `
-                            <div style="display:flex; flex-direction:column; gap:0.2rem">
-                                <span style="font-size:0.7rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em">${lead.source}</span>
-                                <span style="font-size:0.75rem; font-weight:600">${activityLevel}</span>
-                            </div>
-                        `;
+                        const identityCombined = '<div class="d-flex align-items-center gap-2">' + avatar + contactInfo + '</div>';
 
-                        const rowContent = isOverview ? `
-                            <td>${timestamp}</td>
-                            <td>
-                                <div class="user-cell">
-                                    ${avatar}
-                                    <div style="display:flex; flex-direction:column">
-                                        <span style="font-weight:600; color:white">${lead.first_name} ${lead.last_name}</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div style="display:flex; align-items:center; gap:0.5rem">
-                                    <span style="font-size:0.9rem">${lead.email}</span>
-                                    <button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard('${lead.email}', this)">
-                                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                    </button>
-                                </div>
-                            </td>
-                            <td style="text-align:center">
-                                <div class="grade-pill ${lead.grade.score >= 80 ? 'elite' : ''}">
-                                    ${lead.grade.letter}
-                                </div>
-                            </td>
-                            <td>${engagement}</td>
-                            <td>${enrichment}</td>
-                            <td style="display:none"></td>
-                        ` : `
-                            <td>${timestamp}</td>
-                            <td>${identityCombined}</td>
-                            <td style="text-align:center">
-                                <div class="grade-pill ${lead.grade.score >= 80 ? 'elite' : ''}">
-                                    ${lead.grade.letter}
-                                </div>
-                            </td>
-                            <td style="vertical-align: top; padding-top: 1.5rem">
-                                <div style="display:flex; flex-direction:column; gap:0.4rem; align-items: flex-start">
-                                    ${lead.grade.insights.map(i => {
-                                        let extraClass = '';
-                                        if (i.label.toLowerCase().includes('alum')) extraClass = 'elite-alum';
-                                        if (i.label.toLowerCase().includes('exec')) extraClass = 'executive';
-                                        if (i.label.toLowerCase().includes('leader')) extraClass = 'leadership';
-                                        if (i.label.toLowerCase().includes('giant')) extraClass = 'market-giant';
-                                        return `<span class="badge ${extraClass}"><i>${i.icon}</i> ${i.label}</span>`;
-                                    }).join('')}
-                                </div>
-                            </td>
-                            <td>${engagement}</td>
-                            <td>
-                                <div style="display:flex; flex-direction:column; gap:0.2rem">
-                                    <div style="display:flex; align-items:center; gap:0.5rem">
-                                        ${lead.company_logo ? `<img src="${lead.company_logo}" class="company-logo" style="width:16px; height:16px; border-radius:3px; background:white; padding:2px; flex-shrink:0">` : ''}
-                                        <span style="font-weight:600; color:white; font-size:0.85rem; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${lead.company}</span>
-                                    </div>
-                                    <span style="font-size:0.75rem; color:var(--text-dim); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${lead.job_title}</span>
-                                </div>
-                            </td>
-                            <td style="text-align:right">
-                                <button class="delete-btn" onclick="event.stopPropagation(); deleteLead('${lead.email}', '${lead.source}')">Delete</button>
-                            </td>
-                        `;
+                        const companyLogoUrl = safeUrl(lead.company_logo);
+                        const enrichment = lead.job_title
+                            ? '<div class="d-flex align-items-center gap-2">'
+                                + (companyLogoUrl ? '<img src="' + esc(companyLogoUrl) + '" class="company-logo">' : '')
+                                + '<span class="fw-medium" style="font-size:0.85rem;">' + esc(lead.job_title) + ' @ ' + esc(lead.company) + '</span>'
+                                + '</div>'
+                            : '<span class="text-body-tertiary">Pending...</span>';
+
+                        const activityLabel = lead.event_count > 10 ? '<span class="text-success"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Hot</span>' :
+                                             lead.event_count > 5 ? '<span class="text-primary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Active</span>' :
+                                             '<span class="text-body-tertiary"><i class="bi bi-circle-fill" style="font-size:0.5rem"></i> Quiet</span>';
+
+                        const engagement = '<div><small class="text-body-tertiary text-uppercase" style="font-size:0.65rem;letter-spacing:0.05em">' + esc(lead.source) + '</small><br><span style="font-size:0.8rem;" class="fw-semibold">' + activityLabel + '</span></div>';
+
+                        const gradeClass = lead.grade.score >= 80 ? 'elite' : '';
+
+                        let rowContent;
+                        if (isOverview) {
+                            rowContent = '<td>' + timestamp + '</td>'
+                                + '<td><div class="d-flex align-items-center gap-2">' + avatar + '<div><span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span></div></div></td>'
+                                + '<td><div class="d-flex align-items-center gap-2"><span style="font-size:0.9rem">' + escapedEmail + '</span>'
+                                + '<button class="mini-copy-btn" onclick="event.stopPropagation(); copyToClipboard(\'' + escapedEmail.replace(/'/g, "\\'") + '\', this)"><i class="bi bi-clipboard" style="font-size:0.7rem"></i></button></div></td>'
+                                + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
+                                + '<td>' + engagement + '</td>'
+                                + '<td>' + enrichment + '</td>'
+                                + '<td style="display:none"></td>';
+                        } else {
+                            const insightBadges = lead.grade.insights.map(function(i) {
+                                return '<span class="insight-badge badge-' + esc(i.type) + '">' + i.icon + ' ' + esc(i.label) + '</span>';
+                            }).join('');
+
+                            const escapedEmailForDelete = esc(lead.email || '').replace(/'/g, "\\'");
+                            const escapedSourceForDelete = esc(lead.source || '').replace(/'/g, "\\'");
+
+                            rowContent = '<td>' + timestamp + '</td>'
+                                + '<td>' + identityCombined + '</td>'
+                                + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
+                                + '<td style="vertical-align:top;padding-top:1.2rem"><div class="d-flex flex-column gap-1 align-items-start">' + insightBadges + '</div></td>'
+                                + '<td>' + engagement + '</td>'
+                                + '<td><div>'
+                                    + '<div class="d-flex align-items-center gap-2">'
+                                    + (companyLogoUrl ? '<img src="' + esc(companyLogoUrl) + '" class="company-logo">' : '')
+                                    + '<span class="fw-semibold text-white" style="font-size:0.85rem">' + esc(lead.company) + '</span>'
+                                    + '</div>'
+                                    + '<small class="text-body-tertiary">' + esc(lead.job_title) + '</small>'
+                                    + '</div></td>'
+                                + '<td class="text-end"><button class="delete-btn" onclick="event.stopPropagation(); deleteLead(\'' + escapedEmailForDelete + '\', \'' + escapedSourceForDelete + '\')">Delete</button></td>';
+                        }
                         row.innerHTML = rowContent;
                         tbody.appendChild(row);
                     });
@@ -570,8 +924,9 @@ requireAdmin();
             }
         }
 
+        // ── Delete Lead ──
         async function deleteLead(email, source) {
-            if (!confirm(`Are you sure you want to permanently delete this lead from the ${source} list?`)) return;
+            if (!confirm('Are you sure you want to permanently delete this lead from the ' + source + ' list?')) return;
 
             try {
                 const formData = new FormData();
@@ -582,10 +937,10 @@ requireAdmin();
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
                 if (result.success) {
-                    fetchData(); // Refresh list
+                    fetchData();
                 } else {
                     alert('Error deleting lead: ' + (result.error || 'Unknown error'));
                 }
@@ -594,51 +949,38 @@ requireAdmin();
             }
         }
 
+        // ── Fetch Analytics ──
         async function fetchAnalytics() {
             try {
                 const response = await fetch('../api/admin-api.php?action=analytics');
                 const data = await response.json();
 
-                // 1. Section Engagement (Heatmap Style)
+                // 1. Section Engagement
                 const sectionList = document.getElementById('section-engagement-list');
                 sectionList.innerHTML = '';
                 const engagementData = data.sectionEngagement.filter(s => s.section && s.section !== 'unknown');
                 const maxSeconds = Math.max(...engagementData.map(s => s.avg_seconds), 1);
-                
+
                 engagementData.forEach(s => {
                     const pct = (s.avg_seconds / maxSeconds) * 100;
-                    const name = s.section.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    sectionList.innerHTML += `
-                        <div class="metric-row">
-                            <div class="metric-info">
-                                <span class="metric-name">${name}</span>
-                                <span class="metric-val">${Math.round(s.avg_seconds)}s <span style="font-size:0.7rem; color:var(--text-dim)">avg</span></span>
-                            </div>
-                            <div class="metric-bar-bg">
-                                <div class="metric-bar-fill" style="width: ${pct}%"></div>
-                            </div>
-                        </div>
-                    `;
+                    const name = esc(s.section.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+                    sectionList.innerHTML += '<div class="metric-row">'
+                        + '<div class="metric-info"><span class="metric-name">' + name + '</span><span class="metric-val">' + Math.round(s.avg_seconds) + 's <small class="text-body-tertiary">avg</small></span></div>'
+                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-primary" style="width:' + pct + '%"></div></div>'
+                        + '</div>';
                 });
 
-                // 2. Top Interactions (High Impact Actions)
+                // 2. Top Interactions
                 const interactionList = document.getElementById('top-interactions-list');
                 interactionList.innerHTML = '';
                 const maxClicks = Math.max(...data.topInteractions.map(i => i.click_count), 1);
 
                 data.topInteractions.forEach(i => {
                     const pct = (i.click_count / maxClicks) * 100;
-                    interactionList.innerHTML += `
-                        <div class="metric-row">
-                            <div class="metric-info">
-                                <span class="metric-name">${i.button_text}</span>
-                                <span class="metric-badge">${i.click_count}</span>
-                            </div>
-                            <div class="metric-bar-bg">
-                                <div class="metric-bar-fill interaction-bar" style="width: ${pct}%"></div>
-                            </div>
-                        </div>
-                    `;
+                    interactionList.innerHTML += '<div class="metric-row">'
+                        + '<div class="metric-info"><span class="metric-name">' + esc(i.button_text) + '</span><span class="metric-badge">' + esc(String(i.click_count)) + '</span></div>'
+                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-info" style="width:' + pct + '%"></div></div>'
+                        + '</div>';
                 });
 
                 // 3. Device Breakdown
@@ -648,17 +990,10 @@ requireAdmin();
 
                 data.deviceBreakdown.forEach(d => {
                     const pct = (d.count / totalDevices) * 100;
-                    deviceList.innerHTML += `
-                        <div class="metric-row">
-                            <div class="metric-info">
-                                <span class="metric-name">${d.device_type}</span>
-                                <span class="metric-val">${Math.round(pct)}%</span>
-                            </div>
-                            <div class="metric-bar-bg">
-                                <div class="metric-bar-fill device-bar" style="width: ${pct}%"></div>
-                            </div>
-                        </div>
-                    `;
+                    deviceList.innerHTML += '<div class="metric-row">'
+                        + '<div class="metric-info"><span class="metric-name">' + esc(d.device_type) + '</span><span class="metric-val">' + Math.round(pct) + '%</span></div>'
+                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-warning" style="width:' + pct + '%"></div></div>'
+                        + '</div>';
                 });
 
                 // 4. Traffic Trends
@@ -669,17 +1004,10 @@ requireAdmin();
                 data.trafficTrends.forEach(t => {
                     const pct = (t.sessions / maxSessions) * 100;
                     const date = new Date(t.date).toLocaleDateString([], { month: 'short', day: 'numeric' });
-                    trafficList.innerHTML += `
-                        <div class="metric-row">
-                            <div class="metric-info">
-                                <span class="metric-name">${date}</span>
-                                <span class="metric-val">${t.sessions} <span style="font-size:0.7rem; color:var(--text-dim)">visits</span> / ${t.leads} <span style="font-size:0.7rem; color:#10b981">leads</span></span>
-                            </div>
-                            <div class="metric-bar-bg">
-                                <div class="metric-bar-fill trend-bar" style="width: ${pct}%"></div>
-                            </div>
-                        </div>
-                    `;
+                    trafficList.innerHTML += '<div class="metric-row">'
+                        + '<div class="metric-info"><span class="metric-name">' + esc(date) + '</span><span class="metric-val">' + esc(String(t.sessions)) + ' <small class="text-body-tertiary">visits</small> / ' + esc(String(t.leads)) + ' <small class="text-success">leads</small></span></div>'
+                        + '<div class="progress" style="height:6px;background:rgba(255,255,255,0.06)"><div class="progress-bar bg-success" style="width:' + pct + '%"></div></div>'
+                        + '</div>';
                 });
 
             } catch (err) {
@@ -687,62 +1015,66 @@ requireAdmin();
             }
         }
 
+        // ── Clipboard ──
         function copyToClipboard(text, btn) {
             navigator.clipboard.writeText(text).then(() => {
                 const originalHtml = btn.innerHTML;
-                btn.innerHTML = '<svg width="12" height="12" fill="none" stroke="#10b981" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
-                btn.style.color = '#10b981';
+                btn.innerHTML = '<i class="bi bi-check-lg text-success"></i>';
                 setTimeout(() => {
                     btn.innerHTML = originalHtml;
-                    btn.style.color = '';
                 }, 1500);
             }).catch(err => {
                 console.error('Copy failed: ', err);
             });
         }
 
+        // ── In-Page Lead Profile ──
         async function viewInPageProfile(sessionId, email) {
             showView('lead-profile');
             const container = document.getElementById('inPageProfileContent');
-            container.innerHTML = `<div style="padding: 4rem; text-align: center; color: rgba(255,255,255,0.2)">Generating intelligence profile...</div>`;
-            
+            container.innerHTML = '<div class="text-center text-body-tertiary py-5">Generating intelligence profile...</div>';
+
             try {
                 const { intel, logs } = await fetchLeadData(email);
                 renderLeadProfile(intel, logs, container, false);
             } catch (err) {
-                container.innerHTML = `<div style="color: #ef4444">Error loading profile.</div>`;
+                container.innerHTML = '<div class="alert alert-danger">Error loading profile.</div>';
             }
         }
 
         async function fetchLeadData(email) {
-            const intelRes = await fetch(`../api/admin-api.php?action=lead_detail&email=${email}`);
+            const intelRes = await fetch('../api/admin-api.php?action=lead_detail&email=' + encodeURIComponent(email));
             const intel = await intelRes.json();
             let logs = [];
             if (email) {
-                const logsRes = await fetch(`../api/admin-api.php?action=lead_activity&email=${email}`);
+                const logsRes = await fetch('../api/admin-api.php?action=lead_activity&email=' + encodeURIComponent(email));
                 logs = await logsRes.json();
             }
             return { intel, logs };
         }
 
-        function renderLeadProfile(intel, logs, container, isPanel = true) {
+        // ── Render Lead Profile ──
+        function renderLeadProfile(intel, logs, container, isPanel) {
+            if (isPanel === undefined) isPanel = true;
             const name = intel.full_name || "Lead Profile";
-            const primaryAvatar = intel.photo_url || `https://ui-avatars.com/api/?name=${name}&background=3b82f6&color=fff&size=128`;
-            
+            const photoUrl = safeUrl(intel.photo_url);
+            const fallbackAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff&size=128';
+            const primaryAvatar = photoUrl || fallbackAvatar;
+
             let raw = {};
             try {
                 raw = typeof intel.raw_response === 'string' ? JSON.parse(intel.raw_response) : (intel.raw_response || {});
             } catch (e) {
                 raw = {};
             }
-            
+
             const person = raw.person || {};
             const org = person.organization || {};
             const employment = person.employment_history || [];
             const education = person.education_history || person.education || [];
 
-            const boardRoles = employment.filter(job => 
-                job.current && 
+            const boardRoles = employment.filter(job =>
+                job.current &&
                 ['board', 'advisor', 'trustee', 'committee'].some(k => (job.title || '').toLowerCase().includes(k))
             );
 
@@ -758,233 +1090,226 @@ requireAdmin();
             const roleTenure = gradeInfo.roleTenure;
             const companyTenure = gradeInfo.companyTenure;
 
-            let html = `
-                ${isPanel ? `<button onclick="closeJourney()" style="position:absolute; right:2rem; top:2rem; background:none; border:none; color:white; cursor:pointer; font-size:2rem; z-index:10">&times;</button>` : ''}
-                
-                <div class="score-circle ${totalScore >= 80 ? 'score-high' : ''}">
-                    <div class="score-val">${grade}</div>
-                    <div class="score-label">Grade</div>
-                </div>
+            const escapedEmail = esc(intel.email || '');
+            const escapedName = esc(name);
+            const escapedTitle = esc(intel.job_title || person.title || 'Private Individual');
 
-                <div class="profile-header">
-                    <img src="${primaryAvatar}" class="profile-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${name}&background=3b82f6&color=fff&size=128'">
-                    <div class="profile-name">${name}</div>
-                    <div class="profile-title">${intel.job_title || person.title || 'Private Individual'}</div>
-                    
-                    <div class="action-bar">
-                        <div class="action-item">
-                            <span>EMAIL</span>
-                            <span class="action-val">${intel.email || 'N/A'}</span>
-                            <button class="icon-btn" onclick="copyToClipboard('${intel.email}', this)">Copy</button>
-                        </div>
-                        ${intel.phone_number ? `
-                        <div class="action-item">
-                            <span>PHONE</span>
-                            <span class="action-val">${intel.phone_number}</span>
-                            <button class="icon-btn" onclick="copyToClipboard('${intel.phone_number}', this)">Copy</button>
-                        </div>
-                        ` : ''}
-                    </div>
+            // Build insights badges
+            const insightBadgesHtml = insights.map(function(i) {
+                return '<span class="insight-badge badge-' + esc(i.type) + '">' + i.icon + ' ' + esc(i.label) + '</span>';
+            }).join('');
 
-                    <div class="insight-container">
-                        ${insights.map(i => `<div class="insight-badge badge-${i.type}"><i>${i.icon}</i> ${i.label}</div>`).join('')}
-                    </div>
+            // Prepare AI summary data attribute
+            const logsForAI = logs.map(function(l) { return { event: l.event_name, time: l.created_at }; });
+            const insightsLabels = insights.map(function(i) { return i.label; }).join('|');
 
-                    <!-- AI Narrative Summary -->
-                    <div id="aiSummarySection" style="margin: 1.5rem auto; max-width: 600px; position: relative">
-                        ${intel.ai_summary ? `
-                            <div class="ai-summary-box" style="position:relative">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
-                                    <div style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600">
-                                        ✨ Prospect Summary
-                                    </div>
-                                    <button class="mini-copy-btn" onclick="generateAISummary('${intel.email}', '${insights.map(i => i.label).join('|')}', '${grade}', ${totalScore}, ${JSON.stringify(logs.map(l => ({event: l.event_name, time: l.created_at}))).replace(/"/g, '&quot;')})" title="Regenerate Summary">
-                                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                    </button>
-                                </div>
-                                <div style="font-size: 0.85rem; line-height: 1.6; color: rgba(255,255,255,0.7); text-align: left">
-                                    ${intel.ai_summary.split('\n').map(line => `<div style="margin-bottom:0.4rem">${line}</div>`).join('')}
-                                </div>
-                            </div>
-                        ` : `
-                            <button id="genSummaryBtn" class="premium-btn" onclick="generateAISummary('${intel.email}', '${insights.map(i => i.label).join('|')}', '${grade}', ${totalScore}, ${JSON.stringify(logs.map(l => ({event: l.event_name, time: l.created_at}))).replace(/"/g, '&quot;')})">
-                                <span>✨ Generate Prospect Summary</span>
-                            </button>
-                        `}
-                    </div>
+            // Close button for panel
+            let closeBtn = '';
+            if (isPanel) {
+                closeBtn = '<button onclick="closeJourney()" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" style="z-index:10"></button>';
+            }
 
-                    <div style="display:flex; justify-content:center; gap:1.5rem; margin-top:1rem">
-                        ${intel.linkedin_url ? `<a href="${intel.linkedin_url}" target="_blank" style="color:var(--accent)"><svg style="width:20px;height:20px;fill:currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg></a>` : ''}
-                        ${intel.twitter_url ? `<a href="${intel.twitter_url}" target="_blank" style="color:rgba(255,255,255,0.6)"><svg style="width:20px;height:20px;fill:currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg></a>` : ''}
-                    </div>
-                </div>
+            // LinkedIn / Twitter links
+            const linkedinUrl = safeUrl(intel.linkedin_url);
+            const twitterUrl = safeUrl(intel.twitter_url);
+            let socialLinks = '<div class="d-flex justify-content-center gap-3 mt-3">';
+            if (linkedinUrl) {
+                socialLinks += '<a href="' + esc(linkedinUrl) + '" target="_blank" class="text-primary"><i class="bi bi-linkedin fs-5"></i></a>';
+            }
+            if (twitterUrl) {
+                socialLinks += '<a href="' + esc(twitterUrl) + '" target="_blank" class="text-body-tertiary"><i class="bi bi-twitter-x fs-5"></i></a>';
+            }
+            socialLinks += '</div>';
 
-                <div class="${isPanel ? '' : 'detail-cols'}" style="${isPanel ? '' : 'display:grid; grid-template-columns: 1fr 1fr; gap:2rem; margin-top:2rem'}">
-                    <div class="panel-content">
-                        <div class="profile-section">
-                            <div class="section-label">Submission Intent</div>
-                            <div class="intel-grid">
-                                <div class="intel-item">
-                                    <span class="intel-label">Source</span>
-                                    <span class="intel-val" style="color:var(--accent)">${intel.submission_type || 'General Lead'}</span>
-                                </div>
-                                ${intel.budget ? `
-                                <div class="intel-item">
-                                    <span class="intel-label">Budget</span>
-                                    <span class="intel-val">${intel.budget}</span>
-                                </div>
-                                ` : ''}
-                                ${intel.move_in_date ? `
-                                <div class="intel-item">
-                                    <span class="intel-label">Timeline</span>
-                                    <span class="intel-val">${intel.move_in_date}</span>
-                                </div>
-                                ` : ''}
-                                <div class="intel-item">
-                                    <span class="intel-label">Captured At</span>
-                                    <span class="intel-val" style="color:rgba(255,255,255,0.5)">${new Date(intel.created_at).toLocaleString()}</span>
-                                </div>
-                            </div>
-                        </div>
+            // AI Summary section
+            let aiSummaryHtml = '';
+            if (intel.ai_summary) {
+                const summaryLines = intel.ai_summary.split('\n').map(function(line) { return '<div class="mb-1">' + esc(line) + '</div>'; }).join('');
+                aiSummaryHtml = '<div class="ai-summary-box position-relative">'
+                    + '<div class="d-flex justify-content-between align-items-center mb-2">'
+                    + '<small class="text-primary text-uppercase fw-semibold" style="letter-spacing:0.1em;font-size:0.7rem">Prospect Summary</small>'
+                    + '<button class="mini-copy-btn" id="regenSummaryBtn" title="Regenerate Summary"><i class="bi bi-arrow-repeat" style="font-size:0.8rem"></i></button>'
+                    + '</div>'
+                    + '<div style="font-size:0.85rem;line-height:1.6;color:rgba(255,255,255,0.7);text-align:left">' + summaryLines + '</div>'
+                    + '</div>';
+            } else {
+                aiSummaryHtml = '<button id="genSummaryBtn" class="premium-btn">Generate Prospect Summary</button>';
+            }
 
-                        <div class="profile-section">
-                            <div class="section-label">Executive Intelligence</div>
-                            <div class="intel-grid">
-                                <div class="intel-item">
-                                    <span class="intel-label">Seniority</span>
-                                    <span class="intel-val">${intel.seniority || 'Unknown'}</span>
-                                </div>
-                                <div class="intel-item">
-                                    <span class="intel-label">Role Tenure</span>
-                                    <span class="intel-val">${formatTenure(roleTenure)}</span>
-                                </div>
-                                <div class="intel-item">
-                                    <span class="intel-label">Company</span>
-                                    <span class="intel-val">${intel.company || 'Not specified'}</span>
-                                </div>
-                                <div class="intel-item">
-                                    <span class="intel-label">Annual Revenue</span>
-                                    <span class="intel-val">${intel.annual_revenue || org.annual_revenue_printed || 'Under $1M'}</span>
-                                </div>
-                                <div class="intel-item" style="grid-column: span 2; margin-top: 1rem">
-                                    <span class="intel-label">About ${intel.company || 'the Company'}</span>
-                                    <div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:12px; font-size:0.85rem; line-height:1.6; color:rgba(255,255,255,0.7); margin-top:0.4rem">
-                                        ${intel.company_description || org.short_description || 'No description available.'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            // Phone row
+            let phoneHtml = '';
+            if (intel.phone_number) {
+                phoneHtml = '<div class="action-item"><span>PHONE</span><span class="action-val">' + esc(intel.phone_number) + '</span>'
+                    + '<button class="icon-btn" id="copyPhoneBtn">Copy</button></div>';
+            }
 
-                        ${(education.length > 0 || boardRoles.length > 0) ? `
-                        <div class="profile-section">
-                            <div class="section-label">Elite Social Signals</div>
-                            <div class="intel-grid">
-                                ${education.length > 0 ? `
-                                <div class="intel-item" style="grid-column: span 2">
-                                    <span class="intel-label">Education</span>
-                                    ${education.map(edu => `
-                                        <div style="margin-top:0.4rem">
-                                            <span style="display:block; font-weight:600; font-size:0.85rem">${edu.school_name}</span>
-                                            <span style="display:block; font-size:0.75rem; color:rgba(255,255,255,0.4)">${edu.degree || ''} ${edu.major ? `• ${edu.major}` : ''}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                ` : ''}
-                                ${boardRoles.length > 0 ? `
-                                <div class="intel-item" style="grid-column: span 2">
-                                    <span class="intel-label">Board & Advisory Roles</span>
-                                    ${boardRoles.map(role => `
-                                        <div style="margin-top:0.4rem">
-                                            <span style="display:block; font-weight:600; font-size:0.85rem">${role.title}</span>
-                                            <span style="display:block; font-size:0.75rem; color:rgba(255,255,255,0.4)">${role.organization_name}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                        ` : ''}
+            // Education section
+            let educationHtml = '';
+            if (education.length > 0) {
+                educationHtml = '<div class="intel-item" style="grid-column:span 2"><span class="intel-label">Education</span>';
+                education.forEach(function(edu) {
+                    educationHtml += '<div class="mt-1"><span class="d-block fw-semibold" style="font-size:0.85rem">' + esc(edu.school_name) + '</span>'
+                        + '<small class="text-body-tertiary">' + esc(edu.degree || '') + (edu.major ? ' &bull; ' + esc(edu.major) : '') + '</small></div>';
+                });
+                educationHtml += '</div>';
+            }
 
-                        ${employment.length > 0 ? `
-                        <div class="profile-section">
-                            <div class="section-label">Career Journey</div>
-                            <div style="display:flex; flex-direction:column; gap:1.2rem; margin-top:1rem">
-                                ${employment.map((job, idx) => `
-                                    <div style="display:flex; gap:1rem; align-items:flex-start">
-                                        <div style="width:10px; height:10px; border-radius:50%; background:${idx === 0 ? 'var(--accent)' : 'rgba(255,255,255,0.1)'}; margin-top:0.4rem"></div>
-                                        <div style="flex:1">
-                                            <div style="font-size:0.9rem; font-weight:500; color:white">${job.title}</div>
-                                            <div style="font-size:0.75rem; color:var(--accent)">${job.organization_name}</div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                        ` : ''}
-                    </div>
+            // Board roles
+            let boardHtml = '';
+            if (boardRoles.length > 0) {
+                boardHtml = '<div class="intel-item" style="grid-column:span 2"><span class="intel-label">Board & Advisory Roles</span>';
+                boardRoles.forEach(function(role) {
+                    boardHtml += '<div class="mt-1"><span class="d-block fw-semibold" style="font-size:0.85rem">' + esc(role.title) + '</span>'
+                        + '<small class="text-body-tertiary">' + esc(role.organization_name) + '</small></div>';
+                });
+                boardHtml += '</div>';
+            }
 
-                    <div class="panel-content">
-                        <div class="profile-section">
-                            <div class="section-label">User Journey</div>
-                            <div id="timelineContainer" style="margin-top: 1.5rem">
-                                ${(() => {
-                                    if (logs.length === 0) return '<p style="color:rgba(255,255,255,0.2)">No events recorded.</p>';
-                                    
-                                    // Sort ASC (oldest first) for "Journey" flow
-                                    const sortedLogs = [...logs].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-                                    
-                                    let lastTime = null;
-                                    return sortedLogs.map((log, idx) => {
-                                        const currentTime = new Date(log.created_at);
-                                        const isConversion = log.event_name.includes('submit') || log.event_name.includes('confirm');
-                                        
-                                        // Detect session breaks (> 30 mins)
-                                        let sessionBreak = '';
-                                        if (lastTime && (currentTime - lastTime) > 30 * 60 * 1000) {
-                                            sessionBreak = `<div style="font-size:0.6rem; color:var(--accent); text-transform:uppercase; letter-spacing:0.2em; margin: 1.5rem 0 1.5rem -0.8rem; font-weight:700; opacity:0.6">— New Session —</div>`;
-                                        }
-                                        lastTime = currentTime;
+            // Elite social signals section
+            let eliteSectionHtml = '';
+            if (education.length > 0 || boardRoles.length > 0) {
+                eliteSectionHtml = '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+                    + '<div class="section-label">Elite Social Signals</div>'
+                    + '<div class="intel-grid">' + educationHtml + boardHtml + '</div>'
+                    + '</div></div>';
+            }
 
-                                        // Icon assignment
-                                        let icon = '👁️';
-                                        if (log.event_name.includes('hero')) icon = '🏡';
-                                        if (log.event_name.includes('gallery')) icon = '🖼️';
-                                        if (log.event_name.includes('unit')) icon = '🏢';
-                                        if (log.event_name.includes('form') || log.event_name.includes('waitlist')) icon = '📝';
-                                        if (isConversion) icon = '✨';
+            // Career Journey
+            let careerHtml = '';
+            if (employment.length > 0) {
+                careerHtml = '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+                    + '<div class="section-label">Career Journey</div>'
+                    + '<div class="d-flex flex-column gap-3 mt-3">';
+                employment.forEach(function(job, idx) {
+                    const dotColor = idx === 0 ? '#6366f1' : 'rgba(255,255,255,0.1)';
+                    careerHtml += '<div class="d-flex gap-3 align-items-start">'
+                        + '<div style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';margin-top:0.4rem;flex-shrink:0"></div>'
+                        + '<div><div class="fw-medium text-white" style="font-size:0.9rem">' + esc(job.title) + '</div>'
+                        + '<small class="text-primary">' + esc(job.organization_name) + '</small></div></div>';
+                });
+                careerHtml += '</div></div></div>';
+            }
 
-                                        return `
-                                            ${sessionBreak}
-                                            <div class="journey-item" style="${isConversion ? 'border-left: 2px solid #10b981' : ''}">
-                                                <div class="journey-time">
-                                                    ${currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </div>
-                                                <div style="display:flex; align-items:center; gap:0.5rem">
-                                                    <span style="font-size:0.8rem; opacity:0.8">${icon}</span>
-                                                    <span class="journey-title">${log.event_name.replace(/_/g, ' ')}</span>
-                                                </div>
-                                            </div>
-                                        `;
-                                    }).join('');
-                                })()}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            // User Journey (activity logs)
+            let journeyHtml = '';
+            if (logs.length === 0) {
+                journeyHtml = '<p class="text-body-tertiary">No events recorded.</p>';
+            } else {
+                const sortedLogs = logs.slice().sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+                let lastTime = null;
+                sortedLogs.forEach(function(log, idx) {
+                    const currentTime = new Date(log.created_at);
+                    const isConversion = log.event_name.includes('submit') || log.event_name.includes('confirm');
+
+                    if (lastTime && (currentTime - lastTime) > 30 * 60 * 1000) {
+                        journeyHtml += '<div class="text-primary text-uppercase fw-bold opacity-50 my-3" style="font-size:0.6rem;letter-spacing:0.2em">&mdash; New Session &mdash;</div>';
+                    }
+                    lastTime = currentTime;
+
+                    let icon = '\u{1F441}\uFE0F';
+                    if (log.event_name.includes('hero')) icon = '\u{1F3E1}';
+                    if (log.event_name.includes('gallery')) icon = '\u{1F5BC}\uFE0F';
+                    if (log.event_name.includes('unit')) icon = '\u{1F3E2}';
+                    if (log.event_name.includes('form') || log.event_name.includes('waitlist')) icon = '\u{1F4DD}';
+                    if (isConversion) icon = '\u2728';
+
+                    const borderStyle = isConversion ? 'border-left:2px solid #10b981' : '';
+                    journeyHtml += '<div class="journey-item" style="' + borderStyle + '">'
+                        + '<div class="journey-time">' + esc(currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '</div>'
+                        + '<div class="d-flex align-items-center gap-2"><span style="font-size:0.8rem;opacity:0.8">' + icon + '</span>'
+                        + '<span class="journey-title">' + esc(log.event_name.replace(/_/g, ' ')) + '</span></div></div>';
+                });
+            }
+
+            // Build the layout
+            const layoutClass = isPanel ? '' : 'row g-4 mt-2';
+            const colClass = isPanel ? '' : 'col-lg-6';
+
+            let html = closeBtn
+                + '<div class="score-circle ' + (totalScore >= 80 ? 'score-high' : '') + '">'
+                + '<div class="score-val">' + esc(grade) + '</div>'
+                + '<div class="score-label">Grade</div></div>'
+                + '<img src="' + esc(primaryAvatar) + '" class="profile-avatar" onerror="this.src=\'' + esc(fallbackAvatar) + '\'">'
+                + '<div class="profile-name">' + escapedName + '</div>'
+                + '<div class="profile-title">' + escapedTitle + '</div>'
+                + '<div class="action-bar">'
+                + '<div class="action-item"><span>EMAIL</span><span class="action-val">' + escapedEmail + '</span>'
+                + '<button class="icon-btn" id="copyEmailBtn">Copy</button></div>'
+                + phoneHtml
+                + '</div>'
+                + '<div class="d-flex flex-wrap justify-content-center my-3">' + insightBadgesHtml + '</div>'
+                + '<div id="aiSummarySection" class="my-3 mx-auto" style="max-width:600px">' + aiSummaryHtml + '</div>'
+                + socialLinks
+                + '<div class="' + layoutClass + '">'
+                + '<div class="' + colClass + '">'
+                    + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+                    + '<div class="section-label">Submission Intent</div>'
+                    + '<div class="intel-grid">'
+                    + '<div class="intel-item"><span class="intel-label">Source</span><span class="intel-val text-primary">' + esc(intel.submission_type || 'General Lead') + '</span></div>'
+                    + (intel.budget ? '<div class="intel-item"><span class="intel-label">Budget</span><span class="intel-val">' + esc(intel.budget) + '</span></div>' : '')
+                    + (intel.move_in_date ? '<div class="intel-item"><span class="intel-label">Timeline</span><span class="intel-val">' + esc(intel.move_in_date) + '</span></div>' : '')
+                    + '<div class="intel-item"><span class="intel-label">Captured At</span><span class="intel-val text-body-tertiary">' + esc(new Date(intel.created_at).toLocaleString()) + '</span></div>'
+                    + '</div></div></div>'
+                    + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+                    + '<div class="section-label">Executive Intelligence</div>'
+                    + '<div class="intel-grid">'
+                    + '<div class="intel-item"><span class="intel-label">Seniority</span><span class="intel-val">' + esc(intel.seniority || 'Unknown') + '</span></div>'
+                    + '<div class="intel-item"><span class="intel-label">Role Tenure</span><span class="intel-val">' + esc(formatTenure(roleTenure)) + '</span></div>'
+                    + '<div class="intel-item"><span class="intel-label">Company</span><span class="intel-val">' + esc(intel.company || 'Not specified') + '</span></div>'
+                    + '<div class="intel-item"><span class="intel-label">Annual Revenue</span><span class="intel-val">' + esc(intel.annual_revenue || org.annual_revenue_printed || 'Under $1M') + '</span></div>'
+                    + '<div class="intel-item" style="grid-column:span 2;margin-top:1rem"><span class="intel-label">About ' + esc(intel.company || 'the Company') + '</span>'
+                    + '<div class="p-3 rounded-3 mt-1" style="background:rgba(255,255,255,0.03);font-size:0.85rem;line-height:1.6;color:rgba(255,255,255,0.7)">'
+                    + esc(intel.company_description || org.short_description || 'No description available.') + '</div></div>'
+                    + '</div></div></div>'
+                    + eliteSectionHtml
+                    + careerHtml
+                + '</div>'
+                + '<div class="' + colClass + '">'
+                    + '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+                    + '<div class="section-label">User Journey</div>'
+                    + '<div class="mt-3">' + journeyHtml + '</div>'
+                    + '</div></div>'
+                + '</div>'
+                + '</div>';
+
             container.innerHTML = html;
+
+            // Bind copy buttons after render
+            const copyEmailBtn = document.getElementById('copyEmailBtn');
+            if (copyEmailBtn) {
+                copyEmailBtn.addEventListener('click', function() { copyToClipboard(intel.email || '', this); });
+            }
+            const copyPhoneBtn = document.getElementById('copyPhoneBtn');
+            if (copyPhoneBtn) {
+                copyPhoneBtn.addEventListener('click', function() { copyToClipboard(intel.phone_number || '', this); });
+            }
+
+            // Bind AI summary buttons
+            const genBtn = document.getElementById('genSummaryBtn');
+            if (genBtn) {
+                genBtn.addEventListener('click', function() {
+                    generateAISummary(intel.email, insightsLabels, grade, totalScore, logsForAI);
+                });
+            }
+            const regenBtn = document.getElementById('regenSummaryBtn');
+            if (regenBtn) {
+                regenBtn.addEventListener('click', function() {
+                    generateAISummary(intel.email, insightsLabels, grade, totalScore, logsForAI);
+                });
+            }
         }
 
+        // ── Journey Panel (Slide-out) ──
         async function viewJourney(sessionId, email) {
             const panel = document.getElementById('journeyPanel');
-            panel.innerHTML = `<div style="padding: 2rem; text-align: center; color: rgba(255,255,255,0.2)">Generating profile...</div>`;
+            panel.innerHTML = '<div class="text-center text-body-tertiary py-5">Generating profile...</div>';
             panel.classList.add('active');
 
             try {
                 const { intel, logs } = await fetchLeadData(email);
                 renderLeadProfile(intel, logs, panel, true);
             } catch (err) {
-                panel.innerHTML = `<div style="color: #ef4444; padding: 2rem">Error.</div>`;
+                panel.innerHTML = '<div class="alert alert-danger m-3">Error loading profile.</div>';
             }
         }
 
@@ -992,43 +1317,48 @@ requireAdmin();
             document.getElementById('journeyPanel').classList.remove('active');
         }
 
-        async function generateAISummary(email, insightsRaw = '', grade = 'N/A', score = 0, logs = []) {
+        // ── AI Summary Generation ──
+        async function generateAISummary(email, insightsRaw, grade, score, logs) {
+            if (insightsRaw === undefined) insightsRaw = '';
+            if (grade === undefined) grade = 'N/A';
+            if (score === undefined) score = 0;
+            if (logs === undefined) logs = [];
+
             const btn = document.getElementById('genSummaryBtn');
             const section = document.getElementById('aiSummarySection');
             const originalHtml = btn ? btn.innerHTML : '';
-            
-            // Convert piped string back to array
-            const insights = typeof insightsRaw === 'string' ? insightsRaw.split('|').filter(i => i) : insightsRaw;
+
+            const insights = typeof insightsRaw === 'string' ? insightsRaw.split('|').filter(function(i) { return i; }) : insightsRaw;
 
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span><svg class="spin" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:8px"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Generating...</span>';
+                btn.innerHTML = '<span><i class="bi bi-arrow-repeat spin me-2"></i>Generating...</span>';
             }
 
             try {
-                const response = await fetch(`../api/ai-summary.php`, {
+                const response = await fetch('../api/ai-summary.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, insights, grade, score, logs })
+                    body: JSON.stringify({ email: email, insights: insights, grade: grade, score: score, logs: logs })
                 });
                 const result = await response.json();
-                
+
                 if (result.success) {
-                    section.innerHTML = `
-                        <div class="ai-summary-box" style="animation: fadeIn 0.8s ease-out; position:relative">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
-                                <div style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600">
-                                    ✨ Prospect Summary
-                                </div>
-                                <button class="mini-copy-btn" onclick="generateAISummary('${email}', '${insights.join('|')}', '${grade}', ${score}, ${JSON.stringify(logs).replace(/"/g, '&quot;')})" title="Regenerate Summary">
-                                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                </button>
-                            </div>
-                            <div style="font-size: 0.85rem; line-height: 1.6; color: rgba(255,255,255,0.7); text-align: left">
-                                ${result.summary.split('\n').map(line => `<div style="margin-bottom:0.4rem">${line}</div>`).join('')}
-                            </div>
-                        </div>
-                    `;
+                    const summaryLines = result.summary.split('\n').map(function(line) { return '<div class="mb-1">' + esc(line) + '</div>'; }).join('');
+                    section.innerHTML = '<div class="ai-summary-box" style="animation:fadeIn 0.8s ease-out">'
+                        + '<div class="d-flex justify-content-between align-items-center mb-2">'
+                        + '<small class="text-primary text-uppercase fw-semibold" style="letter-spacing:0.1em;font-size:0.7rem">Prospect Summary</small>'
+                        + '<button class="mini-copy-btn" id="regenSummaryBtn2" title="Regenerate Summary"><i class="bi bi-arrow-repeat" style="font-size:0.8rem"></i></button>'
+                        + '</div>'
+                        + '<div style="font-size:0.85rem;line-height:1.6;color:rgba(255,255,255,0.7);text-align:left">' + summaryLines + '</div>'
+                        + '</div>';
+                    // Re-bind the regenerate button
+                    var regenBtn2 = document.getElementById('regenSummaryBtn2');
+                    if (regenBtn2) {
+                        regenBtn2.addEventListener('click', function() {
+                            generateAISummary(email, insights.join('|'), grade, score, logs);
+                        });
+                    }
                 } else {
                     console.error("Narrative Error:", result);
                     alert('Error: ' + (result.error || 'Unknown error'));
@@ -1046,7 +1376,7 @@ requireAdmin();
             }
         }
 
-        // Auto Refresh every 30s
+        // ── Auto Refresh every 30s ──
         fetchData();
         setInterval(fetchData, 30000);
     </script>
