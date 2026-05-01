@@ -1441,6 +1441,26 @@ requireAdmin();
                 + (intel.message ? '<tr><td class="text-white-50">Message</td><td style="white-space:pre-wrap">' + esc(intel.message) + '</td></tr>' : '')
                 + '</tbody></table></div></div>';
 
+            // Grade Explanation
+            html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+                + '<div class="d-flex justify-content-between align-items-center mb-3">'
+                + '<h6 class="text-white-50 text-uppercase fw-semibold mb-0" style="font-size:0.7rem;letter-spacing:0.1em">Grade Breakdown</h6>'
+                + '<div class="d-flex align-items-center gap-2"><span class="grade-pill ' + (gradeInfo.score >= 80 ? 'elite' : '') + '" style="width:36px;height:36px;font-size:1rem">' + esc(gradeInfo.letter) + '</span><span class="text-white-50" style="font-size:0.8rem">' + gradeInfo.score + '/100</span></div>'
+                + '</div>'
+                + '<div class="d-flex flex-column gap-2">';
+            gradeInfo.insights.forEach(function(i) {
+                const color = i.points > 0 ? 'text-success' : (i.points < 0 ? 'text-danger' : 'text-white-50');
+                const sign = i.points > 0 ? '+' : '';
+                html += '<div class="d-flex justify-content-between align-items-center">'
+                    + '<span style="font-size:0.85rem">' + i.icon + ' ' + esc(i.label) + '</span>'
+                    + '<span class="' + color + ' fw-semibold" style="font-size:0.85rem">' + sign + i.points + '</span>'
+                    + '</div>';
+            });
+            if (gradeInfo.insights.length === 0) {
+                html += '<div class="text-white-50 text-center" style="font-size:0.85rem">No scoring signals available</div>';
+            }
+            html += '</div></div></div>';
+
             // Education
             if (educations.length > 0) {
                 html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
