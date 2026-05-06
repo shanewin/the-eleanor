@@ -1,6 +1,12 @@
 // API base path
 const API = '/api/admin-api.php';
 
+// ── Supabase Realtime Client ──
+let supabaseClient = null;
+if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
 // ── HTML Escaping ──
 function esc(str) {
     if (str === null || str === undefined) return '';

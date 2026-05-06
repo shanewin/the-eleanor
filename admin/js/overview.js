@@ -409,9 +409,38 @@ async function toggleOverviewSMS() {
     }
 }
 
-// ── Auto-refresh & Init ──
-setInterval(fetchData, 30000);
-
+// ── Realtime Subscriptions + Init ──
 document.addEventListener('DOMContentLoaded', function() {
     fetchData();
+
+    // Subscribe to realtime changes on key tables
+    if (supabaseClient) {
+        supabaseClient
+            .channel('overview-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'waitlist_submissions' }, () => {
+                console.log('Realtime: new waitlist submission');
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_inquiries' }, () => {
+                console.log('Realtime: new unit inquiry');
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_enrichment' }, () => {
+                console.log('Realtime: enrichment updated');
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'communications' }, () => {
+                console.log('Realtime: new communication');
+                fetchData();
+            })
+            .subscribe((status) => {
+                console.log('Realtime subscription status:', status);
+            });
+
+        console.log('Realtime subscriptions active — no polling needed');
+    } else {
+        // Fallback to polling if Supabase client unavailable
+        console.log('Supabase Realtime unavailable — falling back to 30s polling');
+        setInterval(fetchData, 30000);
+    }
 });

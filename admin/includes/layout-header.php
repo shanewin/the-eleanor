@@ -19,6 +19,10 @@ if (isset($_GET['logout'])) { logout(); }
     <?php if (!empty($extraCss)): foreach ($extraCss as $css): ?>
     <link href="<?= htmlspecialchars($css) ?>" rel="stylesheet">
     <?php endforeach; endif; ?>
+    <script>
+        const SUPABASE_URL = '<?= defined("SUPABASE_URL") ? SUPABASE_URL : "" ?>';
+        const SUPABASE_KEY = '<?= defined("SUPABASE_PUBLISHABLE_KEY") ? SUPABASE_PUBLISHABLE_KEY : "" ?>';
+    </script>
 </head>
 <body>
 

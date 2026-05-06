@@ -4,6 +4,7 @@
 <?php if (!empty($useCalendar)): ?>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
 <?php endif; ?>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="/admin/js/admin-shared.js"></script>
 <?php if (!empty($extraJs)): foreach ($extraJs as $js): ?>
 <script src="<?= htmlspecialchars($js) ?>"></script>
