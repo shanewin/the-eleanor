@@ -3,6 +3,7 @@ $pageTitle = 'Brokers';
 $activePage = 'brokers';
 $extraJs = ['/admin/js/brokers.js'];
 include __DIR__ . '/includes/layout-header.php';
+if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner only.</div>'; include __DIR__ . '/includes/layout-footer.php'; exit; }
 ?>
 
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -52,6 +53,10 @@ include __DIR__ . '/includes/layout-header.php';
             <div class="mb-3">
               <label class="form-label small text-white-50">Phone</label>
               <input type="text" class="form-control bg-dark border-secondary text-white" id="brokerPhone">
+            </div>
+            <div class="mb-3" id="brokerPasswordGroup">
+              <label class="form-label small text-white-50">Password <small class="text-white-50">(for dashboard login)</small></label>
+              <input type="password" class="form-control bg-dark border-secondary text-white" id="brokerPassword" placeholder="Min 6 characters">
             </div>
             <div class="mb-3">
               <label class="form-label small text-white-50">Role</label>

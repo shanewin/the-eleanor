@@ -3,6 +3,7 @@ $pageTitle = 'Settings';
 $activePage = 'settings';
 $extraJs = ['/admin/js/settings.js'];
 include __DIR__ . '/includes/layout-header.php';
+if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner only.</div>'; include __DIR__ . '/includes/layout-footer.php'; exit; }
 ?>
 
             <h1 class="h3 fw-bold mb-4">Settings</h1>

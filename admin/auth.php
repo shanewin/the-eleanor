@@ -118,6 +118,40 @@ function requireAdmin() {
     }
 }
 
+/**
+ * Get the current user's role ('owner' or 'broker').
+ * Caches in session to avoid repeated API calls.
+ */
+function getUserRole() {
+    if (!empty($_SESSION['user_role'])) {
+        return $_SESSION['user_role'];
+    }
+    $user = $_SESSION['supabase_user'] ?? null;
+    $email = $user['email'] ?? '';
+    if (!$email) return 'broker';
+
+    // Look up broker record by email
+    require_once __DIR__ . '/../api/db_config.php';
+    global $sb;
+    $broker = $sb->selectOne('brokers', 'role', ['email=eq.' . urlencode($email)]);
+    $role = $broker['role'] ?? 'broker';
+    $_SESSION['user_role'] = $role;
+    return $role;
+}
+
+function isOwner() {
+    return getUserRole() === 'owner';
+}
+
+function requireOwner() {
+    requireAdmin();
+    if (!isOwner()) {
+        http_response_code(403);
+        echo 'Access denied. Owner only.';
+        exit;
+    }
+}
+
 function logout() {
     // Sign out from Supabase
     if (!empty($_SESSION['supabase_access_token'])) {
