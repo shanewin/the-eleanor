@@ -130,10 +130,18 @@ function getUserRole() {
     $email = $user['email'] ?? '';
     if (!$email) return 'broker';
 
-    // Look up broker record by email
-    require_once __DIR__ . '/../api/db_config.php';
-    global $sb;
-    $broker = $sb->selectOne('brokers', 'role', ['email=eq.' . urlencode($email)]);
+    // Look up broker record via Supabase REST directly (avoid $sb dependency)
+    $url = SUPABASE_URL . '/rest/v1/brokers?select=role&email=eq.' . urlencode($email) . '&limit=1';
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'apikey: ' . SUPABASE_SECRET_KEY,
+        'Authorization: Bearer ' . SUPABASE_SECRET_KEY
+    ]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    $rows = json_decode($response, true);
+    $broker = is_array($rows) && !empty($rows) ? $rows[0] : null;
     $role = $broker['role'] ?? 'broker';
     $_SESSION['user_role'] = $role;
     return $role;
