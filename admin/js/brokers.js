@@ -32,11 +32,10 @@ function showBrokerModal(brokerId) {
     document.getElementById('brokerName').value = '';
     document.getElementById('brokerEmail').value = '';
     document.getElementById('brokerPhone').value = '';
-    document.getElementById('brokerPassword').value = '';
     document.getElementById('brokerRole').value = 'broker';
     document.getElementById('brokerModalTitle').textContent = 'Add Broker';
 
-    const pwGroup = document.getElementById('brokerPasswordGroup');
+    const inviteNote = document.getElementById('brokerInviteNote');
 
     if (brokerId) {
         const broker = brokersCache.find(b => b.id == brokerId);
@@ -48,9 +47,9 @@ function showBrokerModal(brokerId) {
             document.getElementById('brokerRole').value = broker.role || 'broker';
             document.getElementById('brokerModalTitle').textContent = 'Edit Broker';
         }
-        pwGroup.style.display = 'none'; // Hide password when editing
+        if (inviteNote) inviteNote.style.display = 'none';
     } else {
-        pwGroup.style.display = 'block'; // Show password when adding
+        if (inviteNote) inviteNote.style.display = 'block';
     }
     modal.show();
 }
@@ -69,15 +68,6 @@ async function saveBroker() {
         return;
     }
 
-    // Include password when creating new broker
-    if (!id) {
-        const pw = document.getElementById('brokerPassword').value;
-        if (!pw || pw.length < 6) {
-            alert('Password is required (min 6 characters) to create a dashboard login.');
-            return;
-        }
-        payload.password = pw;
-    }
 
     try {
         const action = id ? 'update_broker' : 'add_broker';

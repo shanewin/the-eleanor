@@ -463,34 +463,30 @@ function addBroker() {
     }
 
     $email = $input['email'];
-    $password = $input['password'] ?? null;
 
-    // Create Supabase Auth account for the broker
+    // Invite broker via Supabase Auth — sends email with link to set password
     $authUserId = null;
-    if ($password) {
-        $ch = curl_init(SUPABASE_URL . '/auth/v1/admin/users');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-            'email' => $email,
-            'password' => $password,
-            'email_confirm' => true
-        ]));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'apikey: ' . SUPABASE_SECRET_KEY,
-            'Authorization: Bearer ' . SUPABASE_SECRET_KEY
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+    $ch = curl_init(SUPABASE_URL . '/auth/v1/invite');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+        'email' => $email
+    ]));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'apikey: ' . SUPABASE_SECRET_KEY,
+        'Authorization: Bearer ' . SUPABASE_SECRET_KEY
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-        if ($httpCode === 200 || $httpCode === 201) {
-            $authData = json_decode($response, true);
-            $authUserId = $authData['id'] ?? null;
-        } else {
-            error_log("Failed to create Supabase Auth user for $email: $response");
-        }
+    if ($httpCode === 200 || $httpCode === 201) {
+        $authData = json_decode($response, true);
+        $authUserId = $authData['id'] ?? null;
+        error_log("Supabase invite sent to $email");
+    } else {
+        error_log("Failed to invite $email via Supabase: $response");
     }
 
     $brokerData = [

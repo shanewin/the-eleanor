@@ -54,10 +54,7 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
               <label class="form-label small text-white-50">Phone</label>
               <input type="text" class="form-control bg-dark border-secondary text-white" id="brokerPhone">
             </div>
-            <div class="mb-3" id="brokerPasswordGroup">
-              <label class="form-label small text-white-50">Password <small class="text-white-50">(for dashboard login)</small></label>
-              <input type="password" class="form-control bg-dark border-secondary text-white" id="brokerPassword" placeholder="Min 6 characters">
-            </div>
+            <p class="small text-white-50 mb-0" id="brokerInviteNote">An invite email will be sent to this address to set up their login.</p>
             <div class="mb-3">
               <label class="form-label small text-white-50">Role</label>
               <select class="form-select bg-dark border-secondary text-white" id="brokerRole">
