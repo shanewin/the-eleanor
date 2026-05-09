@@ -66,24 +66,49 @@ function getStats() {
     $sessions = $sb->select('tracking_sessions', 'id', [], null, null);
     $sessionCount = count($sessions);
 
-    // Get unique emails across all 3 tables
-    $emails = [];
+    // Pull all rows across all 3 tables (with phone) so we can dedupe consistently with getLeads()
+    $allRows = [];
     foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
-        $rows = $sb->select($table, 'email');
-        foreach ($rows as $r) $emails[strtolower($r['email'])] = true;
+        // mailing_list has no phone column — skip the phone field for it to avoid an error
+        $fields = $table === 'mailing_list' ? 'email,created_at' : 'email,phone,created_at';
+        $rows = $sb->select($table, $fields);
+        foreach ($rows as $r) $allRows[] = $r;
     }
-    $leadCount = count($emails);
+
+    // Dedupe by email AND phone (last 10 digits), matching the table view
+    $seenEmails = [];
+    $seenPhones = [];
+    $todayEmails = [];
+    $todayPhones = [];
+    $today = date('Y-m-d');
+
+    $leadCount = 0;
+    $newToday = 0;
+
+    foreach ($allRows as $r) {
+        $email = strtolower($r['email'] ?? '');
+        $phoneDigits = preg_replace('/\D/', '', $r['phone'] ?? '');
+        $phoneTail = $phoneDigits && strlen($phoneDigits) >= 10 ? substr($phoneDigits, -10) : null;
+
+        $isDup = isset($seenEmails[$email]) || ($phoneTail && isset($seenPhones[$phoneTail]));
+        if (!$isDup) {
+            $leadCount++;
+            $seenEmails[$email] = true;
+            if ($phoneTail) $seenPhones[$phoneTail] = true;
+        }
+
+        // Today bucket — same dedup, but only for rows submitted today
+        if (!empty($r['created_at']) && strpos($r['created_at'], $today) === 0) {
+            $isDupToday = isset($todayEmails[$email]) || ($phoneTail && isset($todayPhones[$phoneTail]));
+            if (!$isDupToday) {
+                $newToday++;
+                $todayEmails[$email] = true;
+                if ($phoneTail) $todayPhones[$phoneTail] = true;
+            }
+        }
+    }
 
     $convRate = ($sessionCount > 0) ? min(100, round(($leadCount / $sessionCount) * 100, 1)) : 0;
-
-    // New today — count UNIQUE emails submitted today
-    $today = date('Y-m-d');
-    $todayEmails = [];
-    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
-        $rows = $sb->select($table, 'email', ['created_at=gte.' . $today . 'T00:00:00'], null, null);
-        foreach ($rows as $r) $todayEmails[strtolower($r['email'])] = true;
-    }
-    $newToday = count($todayEmails);
 
     echo json_encode([
         'totalSessions' => $sessionCount,
