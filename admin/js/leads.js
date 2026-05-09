@@ -160,28 +160,29 @@ function renderLeadsTable() {
 }
 
 // ── Delete Lead ──
-async function deleteLead(email, source) {
-    if (!confirm('Are you sure you want to permanently delete this lead from the ' + source + ' list?')) return;
-
-    try {
-        const formData = new FormData();
-        formData.append('email', email);
-        formData.append('source', source);
-
-        const response = await fetch(API + '?action=delete_lead', {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.json();
-        if (result.success) {
-            fetchLeadsData();
-        } else {
-            alert('Error deleting lead: ' + (result.error || 'Unknown error'));
+function deleteLead(email, source) {
+    showConfirm({
+        title: 'Delete Lead',
+        message: 'This will permanently remove this lead and their data. This cannot be undone.',
+        icon: '<i class="bi bi-trash text-danger"></i>',
+        btnText: 'Delete Lead',
+        onConfirm: async () => {
+            try {
+                const formData = new FormData();
+                formData.append('email', email);
+                formData.append('source', source);
+                const res = await fetch(API + '?action=delete_lead', { method: 'POST', body: formData });
+                const result = await res.json();
+                if (result.success) {
+                    fetchLeadsData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown'));
+                }
+            } catch(err) {
+                alert('Connection error deleting lead.');
+            }
         }
-    } catch (err) {
-        alert('Connection error while deleting lead');
-    }
+    });
 }
 
 // ── Fetch Leads Data ──

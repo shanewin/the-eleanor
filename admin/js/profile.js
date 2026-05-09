@@ -207,7 +207,17 @@ async function handleAvatarUpload(input) {
 }
 
 async function removeAvatar() {
-    if (!confirm('Remove your profile photo?')) return;
+    showConfirm({
+        title: 'Remove Photo',
+        message: 'Your profile will use initials instead.',
+        icon: '<i class="bi bi-image text-warning"></i>',
+        btnText: 'Remove',
+        btnClass: 'btn-warning',
+        onConfirm: () => _removeAvatarConfirmed()
+    });
+}
+
+async function _removeAvatarConfirmed() {
     try {
         const res = await fetch(API + '?action=upload_profile_picture', {
             method: 'POST',
@@ -246,7 +256,17 @@ async function connectGoogleCalendar() {
 }
 
 async function disconnectGoogleCalendar() {
-    if (!confirm('Disconnect your Google Calendar?')) return;
+    showConfirm({
+        title: 'Disconnect Calendar',
+        message: 'Your availability will no longer sync. You can reconnect anytime.',
+        icon: '<i class="bi bi-calendar-x text-warning"></i>',
+        btnText: 'Disconnect',
+        btnClass: 'btn-warning',
+        onConfirm: () => _disconnectGcalConfirmed()
+    });
+}
+
+async function _disconnectGcalConfirmed() {
     try {
         const res = await fetch(API + '?action=google_calendar_disconnect', {
             method: 'POST',

@@ -182,6 +182,21 @@ async function respondLead(email, source, method) {
     }
 }
 
+// ── Custom Confirm Dialog ──
+function showConfirm({ title, message, icon, btnText, btnClass, onConfirm }) {
+    document.getElementById('confirmTitle').textContent = title || 'Are you sure?';
+    document.getElementById('confirmMessage').textContent = message || '';
+    document.getElementById('confirmIcon').innerHTML = icon || '<i class="bi bi-exclamation-triangle text-danger"></i>';
+    const btn = document.getElementById('confirmActionBtn');
+    btn.textContent = btnText || 'Delete';
+    btn.className = 'btn btn-sm px-4 ' + (btnClass || 'btn-danger');
+    btn.onclick = function() {
+        bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
+        if (onConfirm) onConfirm();
+    };
+    new bootstrap.Modal(document.getElementById('confirmModal')).show();
+}
+
 // ── Notifications ──
 let notifDropdownOpen = false;
 

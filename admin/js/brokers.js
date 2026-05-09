@@ -184,7 +184,16 @@ function showBrokerAlert(msg, type) {
 
 // ── Delete Broker ──
 async function deleteBroker(id) {
-    if (!confirm('Are you sure you want to delete this broker?')) return;
+    showConfirm({
+        title: 'Delete Broker',
+        message: 'This will remove this broker and unassign all their leads. This cannot be undone.',
+        icon: '<i class="bi bi-person-x text-danger"></i>',
+        btnText: 'Delete Broker',
+        onConfirm: async () => { await _deleteBrokerConfirmed(id); }
+    });
+}
+
+async function _deleteBrokerConfirmed(id) {
     try {
         const res = await fetch('/api/admin-api.php?action=delete_broker', {
             method: 'POST',

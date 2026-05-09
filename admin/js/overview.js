@@ -412,22 +412,29 @@ async function toggleOverviewSMS() {
 }
 
 // ── Delete Lead ──
-async function deleteLeadFromOverview(email, source) {
-    if (!confirm('Permanently delete this lead?')) return;
-    try {
-        const formData = new FormData();
-        formData.append('email', email);
-        formData.append('source', source);
-        const res = await fetch(API + '?action=delete_lead', { method: 'POST', body: formData });
-        const result = await res.json();
-        if (result.success) {
-            fetchData();
-        } else {
-            alert('Error: ' + (result.error || 'Unknown'));
+function deleteLeadFromOverview(email, source) {
+    showConfirm({
+        title: 'Delete Lead',
+        message: 'This will permanently remove this lead and their data. This cannot be undone.',
+        icon: '<i class="bi bi-trash text-danger"></i>',
+        btnText: 'Delete Lead',
+        onConfirm: async () => {
+            try {
+                const formData = new FormData();
+                formData.append('email', email);
+                formData.append('source', source);
+                const res = await fetch(API + '?action=delete_lead', { method: 'POST', body: formData });
+                const result = await res.json();
+                if (result.success) {
+                    fetchData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown'));
+                }
+            } catch(err) {
+                alert('Connection error deleting lead.');
+            }
         }
-    } catch(err) {
-        alert('Connection error deleting lead.');
-    }
+    });
 }
 
 // ── Realtime Subscriptions + Init ──
