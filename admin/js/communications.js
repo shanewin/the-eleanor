@@ -116,6 +116,7 @@ async function showCommTimeline(email) {
 
         currentTimelineData = data;
         renderTimelineHeader(data);
+        renderFormSubmissions(data.submissions || []);
         renderTimeline(data.timeline);
         setupReplyBox(data.lead);
         setupAIToggle(data);
@@ -136,6 +137,69 @@ function renderTimelineHeader(data) {
     document.getElementById('timelineLeadName').textContent = lead.name || lead.email;
     document.getElementById('timelineLeadEmail').textContent = lead.email;
     document.getElementById('timelineLeadPhone').textContent = lead.phone ? ' · ' + lead.phone : '';
+}
+
+// ── Form Submissions Section ──
+const SUBMISSION_FIELDS = [
+    { key: 'first_name', label: 'First Name' },
+    { key: 'last_name',  label: 'Last Name' },
+    { key: 'email',      label: 'Email' },
+    { key: 'phone',      label: 'Phone' },
+    { key: 'unit',       label: 'Unit' },
+    { key: 'unit_type',  label: 'Unit Type' },
+    { key: 'budget',     label: 'Budget' },
+    { key: 'move_in_date', label: 'Move-in Date' },
+    { key: 'hear_about_us', label: 'Heard About Us' },
+    { key: 'message',    label: 'Message' }
+];
+
+function renderFormSubmissions(submissions) {
+    const card = document.getElementById('formSubmissionsCard');
+    const countEl = document.getElementById('formSubmissionsCount');
+    const list = document.getElementById('formSubmissionsList');
+    const chevron = document.getElementById('formSubmissionsChevron');
+    if (!card) return;
+
+    if (!submissions || submissions.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = '';
+    countEl.textContent = submissions.length + (submissions.length === 1 ? ' submission' : ' submissions');
+
+    // Auto-expand if there are multiple submissions, collapse if single
+    const expanded = submissions.length > 1;
+    list.style.display = expanded ? '' : 'none';
+    if (chevron) chevron.className = 'bi text-white-50 ' + (expanded ? 'bi-chevron-up' : 'bi-chevron-down');
+
+    list.innerHTML = submissions.map((s, i) => {
+        const dt = s.created_at ? new Date(s.created_at) : null;
+        const timeStr = dt ? dt.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+        const sourceColor = s.source === 'Waitlist' ? 'primary' : 'success';
+
+        const fieldRows = SUBMISSION_FIELDS
+            .filter(f => s[f.key] && String(s[f.key]).trim() !== '')
+            .map(f => '<div class="row g-2 mb-1"><div class="col-4 small text-white-50">' + esc(f.label) + '</div><div class="col-8 small text-white">' + esc(String(s[f.key])) + '</div></div>')
+            .join('');
+
+        return '<div class="border border-secondary rounded-3 p-3 mb-2" style="background:rgba(255,255,255,0.02)">'
+            + '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<span class="badge bg-' + sourceColor + ' bg-opacity-25 text-' + sourceColor + '" style="font-size:0.7rem">' + esc(s.source || '') + '</span>'
+            + '<span class="text-white-50" style="font-size:0.75rem">' + esc(timeStr) + '</span>'
+            + '</div>'
+            + fieldRows
+            + '</div>';
+    }).join('');
+}
+
+function toggleSubmissionsList() {
+    const list = document.getElementById('formSubmissionsList');
+    const chevron = document.getElementById('formSubmissionsChevron');
+    if (!list) return;
+    const isOpen = list.style.display !== 'none';
+    list.style.display = isOpen ? 'none' : '';
+    if (chevron) chevron.className = 'bi text-white-50 ' + (isOpen ? 'bi-chevron-down' : 'bi-chevron-up');
 }
 
 function renderTimeline(items) {

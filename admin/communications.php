@@ -61,6 +61,21 @@ include __DIR__ . '/includes/layout-header.php';
         </div>
     </div>
 
+    <!-- Form Submissions -->
+    <div id="formSubmissionsCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2" style="cursor:pointer" onclick="toggleSubmissionsList()">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-text text-info"></i>
+                    <span class="small fw-semibold text-white">Form Submissions</span>
+                    <span class="badge bg-info bg-opacity-25 text-info" id="formSubmissionsCount" style="font-size:0.65rem"></span>
+                </div>
+                <i class="bi bi-chevron-down text-white-50" id="formSubmissionsChevron"></i>
+            </div>
+            <div id="formSubmissionsList" style="display:none"></div>
+        </div>
+    </div>
+
     <!-- Timeline Container -->
     <div class="card bg-body-tertiary border-0" style="min-height:400px;max-height:calc(100vh - 300px);display:flex;flex-direction:column;">
         <div class="card-body p-4 flex-grow-1" style="overflow-y:auto" id="timelineContainer">

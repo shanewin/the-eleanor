@@ -130,22 +130,47 @@ function getLeads() {
             $enrichmentByEmail[strtolower($e['email'])] = $e;
         }
 
-        // Deduplicate by email AND phone number
+        // Deduplicate by email AND phone number, but collect all submissions per primary lead
         $seenEmails = [];
         $seenPhones = [];
         $unique = [];
+        // Map primary email -> index in $unique (so we can attach later submissions to the right primary lead)
+        $primaryByEmail = [];
+        $primaryByPhone = [];
+
         foreach ($allLeads as $lead) {
             $email = strtolower($lead['email']);
             $phone = preg_replace('/\D/', '', $lead['phone'] ?? '');
+            $source = $lead['source'] ?? '';
 
-            // Skip if we've seen this email
-            if (isset($seenEmails[$email])) continue;
+            // Capture the raw submission row for the submissions array (Waitlist + Unit Interest only)
+            $isTrackedForm = ($source === 'Waitlist' || $source === 'Unit Interest');
+            $submissionRow = $isTrackedForm ? $lead : null;
 
-            // Skip if we've seen this phone number (and it's not empty)
-            if ($phone && strlen($phone) >= 10 && isset($seenPhones[$phone])) continue;
+            // Find the primary lead this submission belongs to (if it's a duplicate)
+            $primaryIdx = null;
+            if (isset($seenEmails[$email])) {
+                $primaryIdx = $primaryByEmail[$email];
+            } elseif ($phone && strlen($phone) >= 10 && isset($seenPhones[$phone])) {
+                $primaryIdx = $primaryByPhone[$phone];
+            }
 
+            // If this is a duplicate, attach as a submission to the primary lead and skip
+            if ($primaryIdx !== null) {
+                if ($submissionRow) {
+                    $unique[$primaryIdx]['submissions'][] = $submissionRow;
+                    $unique[$primaryIdx]['submission_count'] = count($unique[$primaryIdx]['submissions']);
+                }
+                continue;
+            }
+
+            // First time we've seen this email/phone — make it the primary
             $seenEmails[$email] = true;
-            if ($phone && strlen($phone) >= 10) $seenPhones[$phone] = true;
+            $primaryByEmail[$email] = count($unique);
+            if ($phone && strlen($phone) >= 10) {
+                $seenPhones[$phone] = true;
+                $primaryByPhone[$phone] = count($unique);
+            }
 
             // Merge enrichment from pre-fetched data
             if (isset($enrichmentByEmail[$email])) {
@@ -158,6 +183,9 @@ function getLeads() {
             }
 
             $lead['event_count'] = 0;
+            $lead['submissions'] = $submissionRow ? [$submissionRow] : [];
+            $lead['submission_count'] = $submissionRow ? 1 : 0;
+
             $unique[] = $lead;
             if (count($unique) >= 50) break;
         }
@@ -894,6 +922,42 @@ function getUnifiedTimeline($email) {
         $brokerName = $broker['name'] ?? null;
     }
 
+    // Fetch all form submissions for this lead (Waitlist + Unit Interest only)
+    // Match by email OR phone (normalised, last 10 digits) so we catch entries with different emails
+    $submissions = [];
+    $phoneDigits = preg_replace('/\D/', '', $leadPhone);
+    $phoneTail = $phoneDigits && strlen($phoneDigits) >= 10 ? substr($phoneDigits, -10) : null;
+
+    foreach ([
+        ['table' => 'waitlist_submissions', 'source' => 'Waitlist'],
+        ['table' => 'unit_inquiries', 'source' => 'Unit Interest']
+    ] as $src) {
+        $rows = $sb->select($src['table'], '*',
+            ['email=eq.' . urlencode($email)], 'created_at.asc');
+        foreach ($rows as $r) {
+            $r['source'] = $src['source'];
+            $submissions[] = $r;
+        }
+
+        // Also pick up rows that share the phone but have a different email
+        if ($phoneTail) {
+            $allRows = $sb->select($src['table'], '*');
+            foreach ($allRows as $r) {
+                $rPhone = preg_replace('/\D/', '', $r['phone'] ?? '');
+                if ($rPhone && substr($rPhone, -10) === $phoneTail
+                    && strtolower($r['email']) !== strtolower($email)) {
+                    $r['source'] = $src['source'];
+                    $submissions[] = $r;
+                }
+            }
+        }
+    }
+
+    // Sort submissions chronologically
+    usort($submissions, function($a, $b) {
+        return strtotime($a['created_at']) - strtotime($b['created_at']);
+    });
+
     // Fetch manual communications
     $comms = $sb->select('communications', '*',
         ['lead_email=eq.' . urlencode($email)],
@@ -984,8 +1048,9 @@ function getUnifiedTimeline($email) {
             'assigned_to' => $lead['assigned_to'] ?? null,
             'broker_name' => $brokerName
         ],
-        'ai_status' => $aiStatus,
-        'timeline'  => $timeline
+        'ai_status'   => $aiStatus,
+        'submissions' => $submissions,
+        'timeline'    => $timeline
     ]);
 }
 

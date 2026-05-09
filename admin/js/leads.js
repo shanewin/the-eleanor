@@ -145,8 +145,12 @@ function renderLeadsTable() {
         const escapedEmailForDelete = esc(lead.email || '').replace(/'/g, "\\'");
         const escapedSourceForDelete = esc(lead.source || '').replace(/'/g, "\\'");
 
+        const submissionBadge = (lead.submission_count > 1)
+            ? ' <span class="badge bg-info bg-opacity-25 text-info ms-1" title="' + esc(String(lead.submission_count)) + ' form submissions" style="font-size:0.65rem">' + esc(String(lead.submission_count)) + 'x</span>'
+            : '';
+
         row.innerHTML = '<td>' + timestamp + '</td>'
-            + '<td><div class="d-flex align-items-center gap-2">' + avatar + '<div><span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span></div></div></td>'
+            + '<td><div class="d-flex align-items-center gap-2">' + avatar + '<div><span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span>' + submissionBadge + '</div></div></td>'
             + '<td>' + contactHtml + '</td>'
             + '<td>' + intentHtml + '</td>'
             + '<td>' + engagementLabel + '</td>'
