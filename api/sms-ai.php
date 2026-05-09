@@ -199,6 +199,29 @@ function getCalendarToolDefinitions() {
                 'properties' => new \stdClass(),
                 'required' => []
             ]
+        ],
+        [
+            'name' => 'cancel_tour',
+            'description' => 'Cancel an existing tour for a lead. Only call this when the lead explicitly says they want to cancel and NOT reschedule.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'reason' => ['type' => 'string', 'description' => 'Brief reason for cancellation, if given']
+                ],
+                'required' => []
+            ]
+        ],
+        [
+            'name' => 'reschedule_tour',
+            'description' => 'Reschedule an existing tour to a new date/time. Cancels the old tour and books the new one. Only call this after the lead has confirmed the new time.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'new_datetime' => ['type' => 'string', 'description' => 'New confirmed tour datetime in ISO 8601 format'],
+                    'lead_name'    => ['type' => 'string', 'description' => 'The lead\'s full name']
+                ],
+                'required' => ['new_datetime', 'lead_name']
+            ]
         ]
     ];
 }
@@ -347,6 +370,172 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
             return [
                 'success'    => true,
                 'event_time' => $tourTime->format('l, F j \\a\\t g:ia'),
+                'calendar_event_created' => !!$eventId
+            ];
+
+        case 'cancel_tour':
+            $reason = $input['reason'] ?? 'Lead requested cancellation';
+            $leadEmail = $leadContext['email'] ?? '';
+
+            // Find their confirmed tour
+            $tour = null;
+            if ($leadEmail) {
+                $tour = $sb->selectOne('tour_requests', 'id,scheduled_at,google_event_id,broker_id',
+                    ['lead_email=eq.' . urlencode($leadEmail), 'status=eq.confirmed']);
+            }
+            if (!$tour && $leadPhone) {
+                $tour = $sb->selectOne('tour_requests', 'id,scheduled_at,google_event_id,broker_id',
+                    ['lead_phone=eq.' . urlencode($leadPhone), 'status=eq.confirmed']);
+            }
+
+            if (!$tour) {
+                return ['success' => false, 'error' => 'No confirmed tour found for this lead'];
+            }
+
+            // Cancel the tour
+            $sb->update('tour_requests', [
+                'status' => 'cancelled',
+                'notes' => $reason,
+                'updated_at' => date('c')
+            ], ['id=eq.' . $tour['id']]);
+
+            // Delete Google Calendar event if exists
+            if (!empty($tour['google_event_id']) && !empty($tour['broker_id'])) {
+                $accessToken = googleGetValidToken($tour['broker_id']);
+                if ($accessToken) {
+                    $ch = curl_init('https://www.googleapis.com/calendar/v3/calendars/primary/events/' . urlencode($tour['google_event_id']));
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $accessToken]);
+                    curl_exec($ch);
+                    curl_close($ch);
+                }
+            }
+
+            // Log
+            $tz = new DateTimeZone('America/New_York');
+            $tourTime = new DateTime($tour['scheduled_at'], $tz);
+            $sb->insert('communications', [
+                'lead_email' => $leadEmail,
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'Tour Cancelled',
+                'body'       => 'Tour on ' . $tourTime->format('l, F j \\a\\t g:ia') . ' cancelled. Reason: ' . $reason,
+                'sender'     => 'Eleanor AI',
+                'status'     => 'system'
+            ]);
+
+            return ['success' => true, 'cancelled_time' => $tourTime->format('l, F j \\a\\t g:ia')];
+
+        case 'reschedule_tour':
+            $newDatetime = $input['new_datetime'] ?? '';
+            $leadName = $input['lead_name'] ?? 'Lead';
+            $leadEmail = $leadContext['email'] ?? '';
+
+            if (!$newDatetime) {
+                return ['success' => false, 'error' => 'New datetime is required'];
+            }
+
+            // Find and cancel existing tour
+            $oldTour = null;
+            if ($leadEmail) {
+                $oldTour = $sb->selectOne('tour_requests', 'id,scheduled_at,google_event_id,broker_id,unit',
+                    ['lead_email=eq.' . urlencode($leadEmail), 'status=eq.confirmed']);
+            }
+            if (!$oldTour && $leadPhone) {
+                $oldTour = $sb->selectOne('tour_requests', 'id,scheduled_at,google_event_id,broker_id,unit',
+                    ['lead_phone=eq.' . urlencode($leadPhone), 'status=eq.confirmed']);
+            }
+
+            $brokerId = $oldTour['broker_id'] ?? ($leadContext['assigned_to'] ?? null);
+            $unit = $oldTour['unit'] ?? ($input['unit_interest'] ?? '');
+
+            // Cancel old tour if exists
+            if ($oldTour) {
+                $sb->update('tour_requests', [
+                    'status' => 'cancelled',
+                    'notes' => 'Rescheduled',
+                    'updated_at' => date('c')
+                ], ['id=eq.' . $oldTour['id']]);
+
+                // Delete old Google Calendar event
+                if (!empty($oldTour['google_event_id']) && $brokerId) {
+                    $accessToken = googleGetValidToken($brokerId);
+                    if ($accessToken) {
+                        $ch = curl_init('https://www.googleapis.com/calendar/v3/calendars/primary/events/' . urlencode($oldTour['google_event_id']));
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $accessToken]);
+                        curl_exec($ch);
+                        curl_close($ch);
+                    }
+                }
+            }
+
+            // Book new tour (reuse book_tour logic)
+            $tz = new DateTimeZone('America/New_York');
+            $tourTime = new DateTime($newDatetime, $tz);
+            $now = new DateTime('now', $tz);
+            if ($tourTime <= $now) {
+                return ['success' => false, 'error' => 'Cannot schedule a tour in the past'];
+            }
+
+            // Create Google Calendar event
+            $eventId = null;
+            if ($brokerId) {
+                $accessToken = googleGetValidToken($brokerId);
+                if ($accessToken) {
+                    $startISO = $tourTime->format('c');
+                    $endTime = clone $tourTime;
+                    $endTime->modify('+30 minutes');
+                    $summary = "Tour — {$leadName} — The Eleanor";
+                    $description = "Rescheduled tour with {$leadName}\nPhone: {$leadPhone}\nUnit: {$unit}";
+                    $eventId = googleCreateEvent($accessToken, $summary, $startISO, $endTime->format('c'), $description, $leadEmail ?: null);
+                }
+            }
+
+            // Create new tour request
+            $sb->insert('tour_requests', [
+                'lead_email'       => $leadEmail ?: null,
+                'lead_phone'       => $leadPhone,
+                'unit'             => $unit ?: null,
+                'broker_id'        => $brokerId,
+                'scheduled_at'     => $tourTime->format('c'),
+                'duration_minutes' => 30,
+                'status'           => 'confirmed',
+                'google_event_id'  => $eventId,
+                'source'           => 'sms_ai',
+                'notes'            => 'Rescheduled via SMS'
+            ]);
+
+            // Log
+            $oldTimeStr = $oldTour ? (new DateTime($oldTour['scheduled_at'], $tz))->format('l, F j \\a\\t g:ia') : 'N/A';
+            $sb->insert('communications', [
+                'lead_email' => $leadEmail,
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'Tour Rescheduled',
+                'body'       => "Tour rescheduled from {$oldTimeStr} to {$tourTime->format('l, F j \\a\\t g:ia')} — {$leadName}",
+                'sender'     => 'Eleanor AI',
+                'status'     => 'system'
+            ]);
+
+            // Notify broker
+            if ($brokerId) {
+                $broker = $sb->selectOne('brokers', 'name,phone', ['id=eq.' . intval($brokerId)]);
+                if ($broker && !empty($broker['phone'])) {
+                    require_once __DIR__ . '/telnyx-sms.php';
+                    $brokerPhone = normalizePhone($broker['phone']);
+                    if ($brokerPhone) {
+                        sendSMS($brokerPhone, "Eleanor Alert: {$leadName} rescheduled their tour to {$tourTime->format('l, F j \\a\\t g:ia')}.");
+                    }
+                }
+            }
+
+            return [
+                'success'    => true,
+                'old_time'   => $oldTimeStr,
+                'new_time'   => $tourTime->format('l, F j \\a\\t g:ia'),
                 'calendar_event_created' => !!$eventId
             ];
 
@@ -604,6 +793,9 @@ function buildSystemPrompt($lead) {
         . "a tour, use check_tour_availability to find open slots, then offer 2-3 specific times. "
         . "When the lead confirms a time, use book_tour to finalize it. Only book when they've clearly confirmed.\n"
         . "- If no slots are available in their preferred window, suggest alternatives.\n"
+        . "- If the lead asks to cancel their tour, use cancel_tour.\n"
+        . "- If the lead asks to reschedule, use check_tour_availability to find new slots, "
+        . "then once they confirm, use reschedule_tour to cancel the old one and book the new one in one step.\n"
         . "- If they say STOP or ask to stop texting, acknowledge it gracefully and end the conversation.\n"
         . "- Match their energy. If they're brief, be brief. If they have questions, answer them.\n"
         . "- Don't overwhelm them with info they didn't ask for. If they ask about a 1-bed, don't list every 1-bed — "
