@@ -131,6 +131,17 @@ function handleInboundSMS($payload) {
         'status'           => 'received'
     ]);
 
+    // Track last lead message time + reset follow-up counter
+    $existingAuto = $sb->selectOne('sms_automation', 'id', ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+    if ($existingAuto) {
+        $sb->update('sms_automation', [
+            'last_lead_message_at' => date('c'),
+            'followup_count'       => 0,
+            'followup_status'      => 'none',
+            'updated_at'           => date('c')
+        ], ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+    }
+
     // Check if SMS is intentionally enabled (master toggle + campaign dates)
     if (!isSMSMasterEnabled()) {
         error_log("SMS automation disabled (master off or outside campaign) — skipping for $normalizedPhone");

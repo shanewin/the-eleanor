@@ -13,10 +13,10 @@ require_once __DIR__ . '/telnyx-sms.php';
 
 // Only process if we're within the send window now
 if (!isSMSMasterEnabled()) {
-    exit;
+    return;
 }
 if (!isWithinSendWindow()) {
-    exit;
+    return;
 }
 
 // Fetch pending messages whose scheduled_for has passed (limit 10 per run)
@@ -30,7 +30,7 @@ $pending = $sb->select(
 );
 
 if (empty($pending)) {
-    exit;
+    return;
 }
 
 foreach ($pending as $queued) {

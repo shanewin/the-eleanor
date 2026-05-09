@@ -413,6 +413,80 @@ function generateInitialMessage($leadPhone, $leadEmail) {
 }
 
 /**
+ * Generate a follow-up message for a stale lead.
+ * $attemptNumber: 1 = first follow-up (day 3), 2 = final follow-up (day 6)
+ */
+function generateFollowupMessage($leadPhone, $attemptNumber = 1) {
+    global $sb;
+
+    $leadContext = getLeadContext($leadPhone);
+
+    // Load conversation history
+    $history = $sb->select('sms_messages', 'direction,sender_type,body,created_at',
+        ['lead_phone=eq.' . urlencode($leadPhone)],
+        'created_at.asc', 20);
+
+    $messages = [];
+    foreach ($history as $msg) {
+        if ($msg['direction'] === 'inbound') {
+            $messages[] = ['role' => 'user', 'content' => $msg['body']];
+        } else {
+            $messages[] = ['role' => 'assistant', 'content' => $msg['body']];
+        }
+    }
+
+    $systemPrompt = buildSystemPrompt($leadContext);
+
+    if ($attemptNumber === 1) {
+        $messages[] = ['role' => 'user', 'content' =>
+            "[SYSTEM: It's been a few days since this person last responded. Send a brief, natural check-in. "
+            . "Reference something specific from the conversation if possible — a unit they liked, a question they asked, "
+            . "or the tour they mentioned. Keep it casual, 1-2 sentences. Don't be pushy. "
+            . "Do NOT reveal that this is an automated follow-up. Sound like you just thought of them.]"
+        ];
+    } else {
+        $messages[] = ['role' => 'user', 'content' =>
+            "[SYSTEM: This is your final follow-up with this person. They haven't responded in almost a week. "
+            . "Send a warm, low-pressure message — let them know you're here if they need anything, "
+            . "and maybe mention something timely like a unit getting interest or availability changing. "
+            . "1 sentence max. This is your last message unless they respond. "
+            . "Do NOT reveal that this is an automated follow-up.]"
+        ];
+    }
+
+    $payload = [
+        'model'      => 'claude-sonnet-4-20250514',
+        'max_tokens' => 200,
+        'system'     => $systemPrompt,
+        'messages'   => $messages
+    ];
+
+    $response = callClaudeAPI($payload);
+    if (!$response) return null;
+
+    $reply = null;
+    foreach ($response['content'] as $block) {
+        if ($block['type'] === 'text') {
+            $reply = $block['text'];
+            break;
+        }
+    }
+
+    // Truncate if needed
+    if ($reply && strlen($reply) > 320) {
+        $truncated = substr($reply, 0, 320);
+        $lastPeriod = strrpos($truncated, '.');
+        $lastQuestion = strrpos($truncated, '?');
+        $cutAt = max($lastPeriod ?: 0, $lastQuestion ?: 0);
+        if ($cutAt > 50) {
+            $reply = substr($reply, 0, $cutAt + 1);
+        }
+    }
+
+    return $reply;
+}
+
+/**
  * Look up everything we know about a lead by phone (or email).
  */
 function getLeadContext($phone, $email = null) {

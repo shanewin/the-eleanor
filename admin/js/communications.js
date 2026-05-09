@@ -42,8 +42,16 @@ async function loadCommPipeline() {
             if (sms) {
                 const aiColor = sms.ai_status === 'active' ? 'success' : sms.ai_status === 'paused_handoff' ? 'warning' : 'secondary';
                 const aiLabel = sms.ai_status === 'active' ? 'AI Active' : sms.ai_status === 'paused_handoff' ? 'Handoff' : 'Paused';
-                smsBadge = '<span class="badge bg-' + aiColor + ' bg-opacity-25 text-' + aiColor + '" style="font-size:0.7rem">' + aiLabel + '</span>'
-                    + '<div class="text-white-50 mt-1" style="font-size:0.7rem">' + sms.message_count + ' msgs</div>';
+                smsBadge = '<span class="badge bg-' + aiColor + ' bg-opacity-25 text-' + aiColor + '" style="font-size:0.7rem">' + aiLabel + '</span>';
+
+                // Follow-up status badge
+                if (sms.followup_status === 'sent_1') {
+                    smsBadge += '<div class="mt-1"><span class="badge bg-warning bg-opacity-25 text-warning" style="font-size:0.6rem">Follow-up 1 sent</span></div>';
+                } else if (sms.followup_status === 'sent_2' || sms.followup_status === 'cold') {
+                    smsBadge += '<div class="mt-1"><span class="badge bg-secondary bg-opacity-50 text-white-50" style="font-size:0.6rem">Gone Cold</span></div>';
+                } else {
+                    smsBadge += '<div class="text-white-50 mt-1" style="font-size:0.7rem">' + sms.message_count + ' msgs</div>';
+                }
             }
 
             // Last activity — check both comm and SMS timestamps

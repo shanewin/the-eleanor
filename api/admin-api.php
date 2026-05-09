@@ -964,10 +964,12 @@ function getSMSConversations() {
         $convo['lead_name'] = $lead ? trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? '')) : '';
         $convo['lead_source'] = $lead['source'] ?? '';
 
-        // Get AI automation status
-        $automation = $sb->selectOne('sms_automation', 'status',
+        // Get AI automation status + follow-up status
+        $automation = $sb->selectOne('sms_automation', 'status,followup_status,followup_count',
             ['lead_phone=eq.' . urlencode($phone)]);
         $convo['ai_status'] = $automation['status'] ?? 'active';
+        $convo['followup_status'] = $automation['followup_status'] ?? 'none';
+        $convo['followup_count'] = $automation['followup_count'] ?? 0;
 
         $result[] = $convo;
     }
