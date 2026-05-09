@@ -132,7 +132,7 @@ th.sortable.active { color: #6366f1; }
     flex-shrink: 0;
 }
 
-/* Grade pill */
+/* Grade pill — color-coded by letter */
 .grade-pill {
     display: inline-flex;
     align-items: center;
@@ -145,10 +145,34 @@ th.sortable.active { color: #6366f1; }
     background: rgba(255,255,255,0.06);
     color: rgba(255,255,255,0.6);
 }
-.grade-pill.elite {
-    background: rgba(99,102,241,0.2);
-    color: #a5b4fc;
-    box-shadow: 0 0 12px rgba(99,102,241,0.15);
+.grade-pill.elite,
+.grade-pill.grade-a-plus,
+.grade-pill.grade-a {
+    background: rgba(34,197,94,0.18);
+    color: #86efac;
+    box-shadow: 0 0 12px rgba(34,197,94,0.2);
+}
+.grade-pill.grade-b-plus,
+.grade-pill.grade-b {
+    background: rgba(59,130,246,0.18);
+    color: #93c5fd;
+    box-shadow: 0 0 10px rgba(59,130,246,0.18);
+}
+.grade-pill.grade-c-plus,
+.grade-pill.grade-c {
+    background: rgba(234,179,8,0.18);
+    color: #fde047;
+    box-shadow: 0 0 10px rgba(234,179,8,0.18);
+}
+.grade-pill.grade-d {
+    background: rgba(249,115,22,0.18);
+    color: #fdba74;
+    box-shadow: 0 0 10px rgba(249,115,22,0.18);
+}
+.grade-pill.grade-f {
+    background: rgba(239,68,68,0.18);
+    color: #fca5a5;
+    box-shadow: 0 0 10px rgba(239,68,68,0.18);
 }
 
 /* Mini copy button */

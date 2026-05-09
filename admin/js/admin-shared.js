@@ -43,61 +43,136 @@ function formatElapsed(ms) {
 
 // ── Lead Grading Algorithm (Leasing-Focused) ──
 function calculateLeadGrade(lead) {
-    let insights = [];
+    const insights = [];        // Earned signals (with details)
+    const missed = [];          // Missed-opportunity signals
     const source = (lead.source || lead.submission_type || '').toLowerCase();
 
-    // 1. Affordability Check (30 pts max)
-    // Industry standard: rent should be no more than 1/40th of annual salary
+    // 1. Affordability Check (30 pts max, -10 worst case)
     const salary = lead.inferred_salary || '';
     const budget = parseFloat((lead.budget || '0').replace(/[^0-9.]/g, ''));
     if (salary && budget > 0) {
-        // Parse salary range like "100,000-150,000" -> use lower bound
         const salaryMatch = salary.replace(/,/g, '').match(/(\d+)/);
         const annualSalary = salaryMatch ? parseInt(salaryMatch[1]) : 0;
         const requiredSalary = budget * 40; // 40x rule
 
+        const reqK = Math.round(requiredSalary / 1000);
+        const haveK = Math.round(annualSalary / 1000);
+        const monthly = '$' + budget.toLocaleString();
+
         if (annualSalary >= requiredSalary) {
-            insights.push({ label: "Can Afford", type: "success", icon: "\u2705", points: 30 });
+            insights.push({
+                label: "Can Afford", type: "success", icon: "\u2705", points: 30,
+                reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ clears the 40x rule.`
+            });
         } else if (annualSalary >= requiredSalary * 0.6) {
-            insights.push({ label: "Borderline Afford", type: "warning", icon: "\u26A0\uFE0F", points: 15 });
+            insights.push({
+                label: "Borderline Afford", type: "warning", icon: "\u26A0\uFE0F", points: 15,
+                reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is below the 40x rule but within reach with a guarantor or partner.`
+            });
         } else {
-            insights.push({ label: "Budget Risk", type: "danger", icon: "\u274C", points: -10 });
+            insights.push({
+                label: "Budget Risk", type: "danger", icon: "\u274C", points: -10,
+                reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is well below \u2014 likely needs guarantor or higher co-signer income.`
+            });
         }
+    } else {
+        missed.push({
+            label: "Affordability unknown",
+            reason: !budget
+                ? "No budget submitted, so we can't run the 40x affordability check."
+                : "No inferred salary in enrichment data \u2014 affordability skipped."
+        });
     }
 
     // 2. Intent Signal (20 pts)
     if (source.includes('unit interest')) {
-        insights.push({ label: "High Intent", type: "success", icon: "\u{1F525}", points: 20 });
+        insights.push({
+            label: "High Intent", type: "success", icon: "\u{1F525}", points: 20,
+            reason: `Filled out the Unit Interest form${lead.unit ? ' for Unit ' + lead.unit : ''} \u2014 strongest intent signal we capture.`
+        });
     } else if (source.includes('waitlist')) {
-        insights.push({ label: "Waitlist", type: "info", icon: "\u{1F4CB}", points: 10 });
+        insights.push({
+            label: "Waitlist", type: "info", icon: "\u{1F4CB}", points: 10,
+            reason: "Joined the general Waitlist \u2014 interested but not tied to a specific unit yet."
+        });
+    } else {
+        missed.push({
+            label: "Low intent signal",
+            reason: "Mailing list signup or unknown source \u2014 no intent points."
+        });
     }
 
     // 3. Verified Professional (15 pts)
     if (lead.job_title && lead.company) {
-        insights.push({ label: "Verified Professional", type: "success", icon: "\u{1F4BC}", points: 15 });
+        insights.push({
+            label: "Verified Professional", type: "success", icon: "\u{1F4BC}", points: 15,
+            reason: `Identified as ${lead.job_title} at ${lead.company} via enrichment.`
+        });
+    } else {
+        missed.push({
+            label: "Not professionally verified (+15 missed)",
+            reason: "Enrichment couldn't match a job title and company \u2014 common for personal email addresses or low-data profiles."
+        });
     }
 
     // 4. Engagement (15 pts)
     const events = lead.event_count || 0;
     if (events >= 10) {
-        insights.push({ label: "Highly Engaged", type: "success", icon: "\u{1F4CA}", points: 15 });
+        insights.push({
+            label: "Highly Engaged", type: "success", icon: "\u{1F4CA}", points: 15,
+            reason: `${events} tracked events on the site \u2014 they explored multiple sections before submitting.`
+        });
     } else if (events >= 5) {
-        insights.push({ label: "Engaged", type: "info", icon: "\u{1F4CA}", points: 10 });
+        insights.push({
+            label: "Engaged", type: "info", icon: "\u{1F4CA}", points: 10,
+            reason: `${events} tracked events on the site \u2014 moderate browsing activity.`
+        });
+    } else {
+        missed.push({
+            label: events > 0 ? `Low engagement (${events} events, +10 missed)` : "No engagement data (+10 missed)",
+            reason: events > 0
+                ? `Only ${events} tracked events. Threshold is 5 for partial credit, 10 for full.`
+                : "No tracking events recorded \u2014 submitted without exploring or behaviour wasn't captured."
+        });
     }
 
     // 5. Budget Provided (5 pts)
     if (budget > 0) {
-        insights.push({ label: "Budget Provided", type: "info", icon: "\u{1F4B0}", points: 5 });
+        insights.push({
+            label: "Budget Provided", type: "info", icon: "\u{1F4B0}", points: 5,
+            reason: `Budget on file: $${budget.toLocaleString()}/month.`
+        });
+    } else {
+        missed.push({
+            label: "No budget (+5 missed)",
+            reason: "Lead didn't fill in a budget \u2014 harder to qualify."
+        });
     }
 
     // 6. Move-In Timeline (5 pts)
     if (lead.move_in_date) {
-        insights.push({ label: "Timeline Set", type: "info", icon: "\u{1F4C5}", points: 5 });
+        insights.push({
+            label: "Timeline Set", type: "info", icon: "\u{1F4C5}", points: 5,
+            reason: `Target move-in: ${lead.move_in_date}.`
+        });
+    } else {
+        missed.push({
+            label: "No move-in date (+5 missed)",
+            reason: "Lead didn't provide a target move-in date \u2014 timeline unclear."
+        });
     }
 
-    // 7. Enrichment Quality (10 pts)
+    // 7. LinkedIn Verified (10 pts)
     if (lead.linkedin_url) {
-        insights.push({ label: "LinkedIn Verified", type: "info", icon: "\u{1F517}", points: 10 });
+        insights.push({
+            label: "LinkedIn Verified", type: "info", icon: "\u{1F517}", points: 10,
+            reason: "Identity confirmed via LinkedIn profile match in enrichment."
+        });
+    } else {
+        missed.push({
+            label: "No LinkedIn match (+10 missed)",
+            reason: "Enrichment didn't surface a LinkedIn profile \u2014 identity not independently verified."
+        });
     }
 
     const totalScore = Math.max(0, Math.min(100, insights.reduce((sum, i) => sum + (i.points || 0), 0)));
@@ -113,7 +188,10 @@ function calculateLeadGrade(lead) {
         return 'F';
     };
 
-    return { score: totalScore, letter: getLetter(totalScore), insights: insights };
+    const letter = getLetter(totalScore);
+    const gradeClass = 'grade-' + letter.toLowerCase().replace('+', '-plus');
+
+    return { score: totalScore, letter, insights, missed, gradeClass };
 }
 
 // ── Clipboard ──
