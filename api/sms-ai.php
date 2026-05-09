@@ -326,6 +326,11 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
                 'status'     => 'system'
             ]);
 
+            // Auto-update lead status to Showing Scheduled
+            if (!empty($leadContext['email'])) {
+                autoUpdateLeadStatusFromWebhook($leadContext['email'], 'Showing Scheduled');
+            }
+
             // Notify broker
             if ($brokerId) {
                 $broker = $sb->selectOne('brokers', 'name,phone', ['id=eq.' . intval($brokerId)]);
@@ -985,4 +990,36 @@ function isAIActiveForLead($phone) {
 // Import normalizePhone from telnyx-sms.php if not already loaded
 if (!function_exists('normalizePhone')) {
     require_once __DIR__ . '/telnyx-sms.php';
+}
+
+// Auto-update lead status (safe to call from any context)
+if (!function_exists('autoUpdateLeadStatusFromWebhook')) {
+    function autoUpdateLeadStatusFromWebhook($email, $newStatus) {
+        global $sb;
+        if (!$email) return;
+
+        $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Applied' => 4, 'Leased' => 5, 'Lost' => 6];
+        $newRank = $hierarchy[$newStatus] ?? -1;
+        if ($newRank < 0) return;
+
+        foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+            $lead = $sb->selectOne($table, 'lead_status', ['email=eq.' . urlencode($email)]);
+            if ($lead) {
+                $currentStatus = $lead['lead_status'] ?? 'New';
+                $currentRank = $hierarchy[$currentStatus] ?? 0;
+                if ($newRank > $currentRank) {
+                    $sb->update($table, ['lead_status' => $newStatus], ['email=eq.' . urlencode($email)]);
+                    $sb->insert('communications', [
+                        'lead_email' => $email,
+                        'direction'  => 'internal',
+                        'channel'    => 'note',
+                        'subject'    => 'Status auto-updated to: ' . $newStatus,
+                        'sender'     => 'System',
+                        'status'     => 'system'
+                    ]);
+                }
+                return;
+            }
+        }
+    }
 }

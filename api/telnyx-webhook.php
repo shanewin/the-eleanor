@@ -205,6 +205,11 @@ function handleInboundSMS($payload) {
             'status'            => $result['success'] ? 'sent' : 'failed'
         ]);
 
+        // Auto-update lead status to Contacted
+        if ($result['success'] && $leadEmail) {
+            autoUpdateLeadStatusFromWebhook($leadEmail, 'Contacted');
+        }
+
         // Handle handoff or not-interested
         if ($handoff || $notInterested) {
             $newStatus = $handoff ? 'paused_handoff' : 'paused_manual';
@@ -355,4 +360,37 @@ function findLeadEmailByPhone($phone) {
     }
 
     return null;
+}
+
+/**
+ * Auto-update lead status (webhook-safe — no auth dependency).
+ * Only upgrades, never downgrades.
+ */
+function autoUpdateLeadStatusFromWebhook($email, $newStatus) {
+    global $sb;
+    if (!$email) return;
+
+    $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Applied' => 4, 'Leased' => 5, 'Lost' => 6];
+    $newRank = $hierarchy[$newStatus] ?? -1;
+    if ($newRank < 0) return;
+
+    foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+        $lead = $sb->selectOne($table, 'lead_status', ['email=eq.' . urlencode($email)]);
+        if ($lead) {
+            $currentStatus = $lead['lead_status'] ?? 'New';
+            $currentRank = $hierarchy[$currentStatus] ?? 0;
+            if ($newRank > $currentRank) {
+                $sb->update($table, ['lead_status' => $newStatus], ['email=eq.' . urlencode($email)]);
+                $sb->insert('communications', [
+                    'lead_email' => $email,
+                    'direction'  => 'internal',
+                    'channel'    => 'note',
+                    'subject'    => 'Status auto-updated to: ' . $newStatus,
+                    'sender'     => 'System',
+                    'status'     => 'system'
+                ]);
+            }
+            return;
+        }
+    }
 }

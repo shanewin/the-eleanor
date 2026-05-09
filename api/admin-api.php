@@ -666,6 +666,40 @@ function updateLeadStatus() {
     echo json_encode(['success' => true]);
 }
 
+/**
+ * Auto-update lead status based on system events.
+ * Only upgrades — never moves backward in the pipeline.
+ */
+function autoUpdateLeadStatus($email, $newStatus) {
+    global $sb;
+    if (!$email) return;
+
+    $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Applied' => 4, 'Leased' => 5, 'Lost' => 6];
+    $newRank = $hierarchy[$newStatus] ?? -1;
+    if ($newRank < 0) return;
+
+    foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+        $lead = $sb->selectOne($table, 'lead_status', ['email=eq.' . urlencode($email)]);
+        if ($lead) {
+            $currentStatus = $lead['lead_status'] ?? 'New';
+            $currentRank = $hierarchy[$currentStatus] ?? 0;
+
+            if ($newRank > $currentRank) {
+                $sb->update($table, ['lead_status' => $newStatus], ['email=eq.' . urlencode($email)]);
+                $sb->insert('communications', [
+                    'lead_email' => $email,
+                    'direction'  => 'internal',
+                    'channel'    => 'note',
+                    'subject'    => 'Status auto-updated to: ' . $newStatus,
+                    'sender'     => 'System',
+                    'status'     => 'system'
+                ]);
+            }
+            return;
+        }
+    }
+}
+
 /* ── Communications ── */
 
 function getCommunications($email) {
@@ -1047,6 +1081,11 @@ function sendSMSFromDashboard() {
         'status'            => 'sent'
     ]);
 
+    // Auto-update lead status to Contacted
+    if ($leadEmail) {
+        autoUpdateLeadStatus($leadEmail, 'Contacted');
+    }
+
     // Pause AI automation for this lead (broker took over)
     $existing = $sb->selectOne('sms_automation', 'id',
         ['lead_phone=eq.' . urlencode($normalizedPhone)]);
@@ -1281,6 +1320,9 @@ function engageAISend() {
         'status'     => 'active',
         'updated_at' => date('c')
     ], 'lead_phone');
+
+    // Auto-update lead status to Contacted
+    autoUpdateLeadStatus($email, 'Contacted');
 
     echo json_encode(['success' => true]);
 }
