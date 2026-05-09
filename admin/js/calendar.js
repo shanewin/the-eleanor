@@ -111,7 +111,7 @@ async function initShowingsCalendar() {
             }
         },
         dateClick: function(info) {
-            // Future: open new showing form with date pre-filled
+            openNewShowingModal(info.dateStr);
         }
     });
 
@@ -299,8 +299,104 @@ function renderUpcomingShowings() {
     }).join('');
 }
 
-function openNewShowingModal() {
-    alert('New Showing form coming soon — tours can now be booked via SMS AI.');
+function openNewShowingModal(dateStr) {
+    // Clear form
+    document.getElementById('newShowingEmail').value = '';
+    document.getElementById('newShowingPhone').value = '';
+    document.getElementById('newShowingDate').value = dateStr || '';
+    document.getElementById('newShowingTime').value = '10:00';
+    document.getElementById('newShowingUnit').value = '';
+    document.getElementById('newShowingNotes').value = '';
+    const alert = document.getElementById('newShowingAlert');
+    if (alert) alert.style.display = 'none';
+
+    // Populate broker dropdown
+    const brokerSelect = document.getElementById('newShowingBroker');
+    brokerSelect.innerHTML = '<option value="">Unassigned</option>';
+    if (connectedBrokers.length > 0) {
+        connectedBrokers.forEach(b => {
+            brokerSelect.innerHTML += '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+        });
+    } else {
+        fetchBrokers(function(brokers) {
+            brokers.forEach(b => {
+                brokerSelect.innerHTML += '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+            });
+        });
+    }
+
+    // Phone formatting
+    const phoneInput = document.getElementById('newShowingPhone');
+    if (!phoneInput._formatted) {
+        phoneInput.addEventListener('input', function(e) {
+            let val = e.target.value.replace(/\D/g, '');
+            if (val.length > 10) val = val.slice(0, 10);
+            if (val.length >= 7) e.target.value = '(' + val.slice(0, 3) + ') ' + val.slice(3, 6) + '-' + val.slice(6);
+            else if (val.length >= 4) e.target.value = '(' + val.slice(0, 3) + ') ' + val.slice(3);
+            else if (val.length > 0) e.target.value = '(' + val;
+            else e.target.value = '';
+        });
+        phoneInput._formatted = true;
+    }
+
+    new bootstrap.Modal(document.getElementById('newShowingModal')).show();
+}
+
+async function saveNewShowing() {
+    const date = document.getElementById('newShowingDate').value;
+    const time = document.getElementById('newShowingTime').value;
+    const alertEl = document.getElementById('newShowingAlert');
+
+    if (!date || !time) {
+        alertEl.className = 'alert alert-danger small';
+        alertEl.textContent = 'Date and time are required.';
+        alertEl.style.display = '';
+        return;
+    }
+
+    const scheduledAt = date + 'T' + time + ':00';
+    const payload = {
+        lead_email: document.getElementById('newShowingEmail').value.trim(),
+        lead_phone: document.getElementById('newShowingPhone').value.trim(),
+        unit: document.getElementById('newShowingUnit').value.trim(),
+        broker_id: document.getElementById('newShowingBroker').value || null,
+        scheduled_at: scheduledAt,
+        notes: document.getElementById('newShowingNotes').value.trim()
+    };
+
+    const btn = document.querySelector('#newShowingModal .btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scheduling...';
+
+    try {
+        const res = await fetch(API + '?action=add_tour_request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('newShowingModal')).hide();
+            // Refresh calendar
+            await loadTourRequests();
+            showingsCalendar.removeAllEvents();
+            showingsCalendar.addEventSource(tourRequestsToEvents(tourRequests));
+            updateCalendarStats();
+            renderUpcomingShowings();
+        } else {
+            alertEl.className = 'alert alert-danger small';
+            alertEl.textContent = 'Error: ' + (result.error || 'Unknown');
+            alertEl.style.display = '';
+        }
+    } catch(err) {
+        alertEl.className = 'alert alert-danger small';
+        alertEl.textContent = 'Connection error.';
+        alertEl.style.display = '';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Schedule Tour';
 }
 
 document.addEventListener('DOMContentLoaded', initShowingsCalendar);

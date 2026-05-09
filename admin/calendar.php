@@ -86,6 +86,61 @@ include __DIR__ . '/includes/layout-header.php';
     </div>
 </div>
 
+<!-- New Showing Modal -->
+<div class="modal fade" id="newShowingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Schedule a Tour</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label small text-white-50">Lead Email</label>
+                        <input type="email" class="form-control bg-dark border-secondary text-white" id="newShowingEmail" placeholder="lead@example.com">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-white-50">Lead Phone</label>
+                        <input type="tel" class="form-control bg-dark border-secondary text-white" id="newShowingPhone" placeholder="(555) 555-5555" maxlength="14">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label small text-white-50">Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control bg-dark border-secondary text-white" id="newShowingDate">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-white-50">Time <span class="text-danger">*</span></label>
+                        <input type="time" class="form-control bg-dark border-secondary text-white" id="newShowingTime" value="10:00">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label small text-white-50">Unit</label>
+                        <input type="text" class="form-control bg-dark border-secondary text-white" id="newShowingUnit" placeholder="e.g., 4B">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-white-50">Assign Broker</label>
+                        <select class="form-select bg-dark border-secondary text-white" id="newShowingBroker">
+                            <option value="">Unassigned</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-white-50">Notes</label>
+                    <textarea class="form-control bg-dark border-secondary text-white" id="newShowingNotes" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+                <div id="newShowingAlert" class="alert small" style="display:none"></div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveNewShowing()">Schedule Tour</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Showing Detail Modal -->
 <div class="modal fade" id="showingDetailModal" tabindex="-1">
     <div class="modal-dialog modal-sm">

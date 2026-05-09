@@ -48,6 +48,7 @@ switch ($action) {
     case 'get_unified_timeline': getUnifiedTimeline($_GET['email'] ?? ''); break;
     case 'mark_sms_read': markSMSRead(); break;
     case 'get_tour_requests': getTourRequests(); break;
+    case 'add_tour_request': addTourRequest(); break;
     case 'update_tour_request': updateTourRequest(); break;
     case 'google_calendar_connect': googleCalendarConnect(); break;
     case 'google_calendar_disconnect': googleCalendarDisconnect(); break;
@@ -932,6 +933,64 @@ function getTourRequests() {
     unset($tour);
 
     echo json_encode($tours);
+}
+
+function addTourRequest() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $email = $input['lead_email'] ?? '';
+    $phone = $input['lead_phone'] ?? '';
+    $unit = $input['unit'] ?? '';
+    $brokerId = $input['broker_id'] ?? null;
+    $scheduledAt = $input['scheduled_at'] ?? '';
+    $notes = $input['notes'] ?? '';
+
+    if (empty($scheduledAt)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Scheduled date/time is required']);
+        return;
+    }
+
+    // Normalize phone if provided
+    if ($phone) {
+        require_once __DIR__ . '/telnyx-sms.php';
+        $phone = normalizePhone($phone) ?: $phone;
+    }
+
+    $result = $sb->insert('tour_requests', [
+        'lead_email'       => $email ?: null,
+        'lead_phone'       => $phone ?: null,
+        'unit'             => $unit ?: null,
+        'broker_id'        => $brokerId ?: null,
+        'scheduled_at'     => $scheduledAt,
+        'duration_minutes' => 30,
+        'status'           => 'confirmed',
+        'source'           => 'manual',
+        'notes'            => $notes ?: null
+    ]);
+
+    // Auto-update lead status
+    if ($email) {
+        autoUpdateLeadStatus($email, 'Showing Scheduled');
+    }
+
+    // Log in communications
+    if ($email) {
+        $tz = new DateTimeZone('America/New_York');
+        $dt = new DateTime($scheduledAt, $tz);
+        $sb->insert('communications', [
+            'lead_email' => $email,
+            'direction'  => 'internal',
+            'channel'    => 'note',
+            'subject'    => 'Tour Scheduled',
+            'body'       => 'Tour manually scheduled for ' . $dt->format('l, F j \\a\\t g:ia') . ($unit ? " (Unit {$unit})" : ''),
+            'sender'     => 'System',
+            'status'     => 'system'
+        ]);
+    }
+
+    echo json_encode(['success' => true, 'tour' => $result]);
 }
 
 function updateTourRequest() {
