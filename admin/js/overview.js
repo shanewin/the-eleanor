@@ -153,16 +153,15 @@ function renderOverviewTable(leads) {
             const elapsedMs = Date.now() - createdAt.getTime();
             firstResponseHtml = '<div class="d-flex align-items-center gap-2">'
                 + '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>' + formatElapsed(elapsedMs) + '</span>'
-                + '<div class="dropdown" onclick="event.stopPropagation()">'
-                + '<button class="btn btn-outline-secondary btn-sm dropdown-toggle" style="font-size:0.7rem;padding:0.15rem 0.4rem;" data-bs-toggle="dropdown" data-bs-boundary="viewport">Mark</button>'
-                + '<ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" style="z-index:1080">'
-                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'SMS\')">SMS</a></li>'
-                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Email\')">Email</a></li>'
-                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Phone\')">Phone</a></li>'
-                + '<li><hr class="dropdown-divider"></li>'
-                + '<li><a class="dropdown-item text-info" href="#" onclick="event.preventDefault(); engageAI(\'' + escapedLeadEmail + '\')"><i class="bi bi-robot me-1"></i>Auto Text</a></li>'
-                + (USER_ROLE === 'owner' ? '<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); deleteLeadFromOverview(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\')"><i class="bi bi-trash me-1"></i>Delete</a></li>' : '')
-                + '</ul></div></div>';
+                + '<select class="form-select form-select-sm bg-dark border-secondary text-white" style="width:auto;font-size:0.75rem;" onclick="event.stopPropagation()" onchange="handleMarkAction(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', this.value); this.value=\'\'">'
+                + '<option value="" selected>Mark</option>'
+                + '<option value="sms">SMS</option>'
+                + '<option value="email">Email</option>'
+                + '<option value="phone">Phone</option>'
+                + '<option value="auto_text">Auto Text</option>'
+                + (USER_ROLE === 'owner' ? '<option value="delete">Delete</option>' : '')
+                + '</select>'
+                + '</div>';
         }
 
         const submissionBadge = (lead.submission_count > 1)
@@ -411,6 +410,18 @@ async function toggleOverviewSMS() {
     } catch (e) {
         statusEl.innerHTML = '<span class="badge bg-danger bg-opacity-25 text-danger">Error</span>';
         toggle.checked = !toggle.checked;
+    }
+}
+
+// ── Mark dropdown dispatcher (native <select>) ──
+function handleMarkAction(email, source, action) {
+    if (!action) return;
+    switch (action) {
+        case 'sms':       respondLead(email, source, 'SMS'); break;
+        case 'email':     respondLead(email, source, 'Email'); break;
+        case 'phone':     respondLead(email, source, 'Phone'); break;
+        case 'auto_text': engageAI(email); break;
+        case 'delete':    deleteLeadFromOverview(email, source); break;
     }
 }
 
