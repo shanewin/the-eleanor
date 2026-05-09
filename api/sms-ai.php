@@ -1215,7 +1215,7 @@ if (!function_exists('autoUpdateLeadStatusFromWebhook')) {
         global $sb;
         if (!$email) return;
 
-        $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Applied' => 4, 'Leased' => 5, 'Lost' => 6];
+        $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Lost' => 4];
         $newRank = $hierarchy[$newStatus] ?? -1;
         if ($newRank < 0) return;
 

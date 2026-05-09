@@ -144,14 +144,12 @@ function renderLeadsTable() {
         const statusValue = lead.lead_status || 'New';
         const escapedEmailForStatus = esc(lead.email || '').replace(/'/g, "\\'");
         const escapedSourceForStatus = esc(lead.source || '').replace(/'/g, "\\'");
-        const statusOptions = ['New','Contacted','Showing Scheduled','Showed','Applied','Leased','Lost'];
+        const statusOptions = ['New','Contacted','Showing Scheduled','Showed','Lost'];
         const statusColor = {
             'New': 'primary',
             'Contacted': 'info',
             'Showing Scheduled': 'warning',
-            'Showed': 'secondary',
-            'Applied': 'success',
-            'Leased': 'success',
+            'Showed': 'success',
             'Lost': 'danger'
         }[statusValue] || 'secondary';
         const statusHtml = '<select class="form-select form-select-sm bg-dark border-' + statusColor + ' text-' + statusColor + '" '

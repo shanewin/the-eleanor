@@ -34,7 +34,7 @@ async function loadCommPipeline() {
             const status = lead.lead_status || 'New';
             const statusColors = {
                 'New': 'primary', 'Contacted': 'info', 'Showing Scheduled': 'warning',
-                'Showed': 'secondary', 'Applied': 'success', 'Leased': 'success', 'Lost': 'danger'
+                'Showed': 'success', 'Lost': 'danger'
             };
 
             // SMS badge
@@ -77,7 +77,7 @@ async function loadCommPipeline() {
             row.innerHTML = '<td><div class="fw-semibold text-white">' + esc(lead.first_name + ' ' + lead.last_name) + '</div><small class="text-white-50">' + esc(lead.source || '') + '</small></td>'
                 + '<td><div style="font-size:0.8rem">' + esc(lead.email) + '</div><small class="text-white-50">' + esc(lead.phone || '') + '</small></td>'
                 + '<td><select class="form-select form-select-sm bg-dark border-secondary text-white" style="width:auto;font-size:0.75rem" onchange="event.stopPropagation(); updateLeadStatus(\'' + esc(lead.email).replace(/'/g, "\\'") + '\', \'' + esc(lead.source || '').replace(/'/g, "\\'") + '\', this.value)">'
-                + ['New','Contacted','Showing Scheduled','Showed','Applied','Leased','Lost'].map(s => '<option value="' + s + '"' + (s === status ? ' selected' : '') + '>' + s + '</option>').join('')
+                + ['New','Contacted','Showing Scheduled','Showed','Lost'].map(s => '<option value="' + s + '"' + (s === status ? ' selected' : '') + '>' + s + '</option>').join('')
                 + '</select></td>'
                 + '<td>' + smsBadge + '</td>'
                 + '<td>' + lastActivity + '</td>'

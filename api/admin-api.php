@@ -898,7 +898,7 @@ function autoUpdateLeadStatus($email, $newStatus) {
     global $sb;
     if (!$email) return;
 
-    $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Applied' => 4, 'Leased' => 5, 'Lost' => 6];
+    $hierarchy = ['New' => 0, 'Contacted' => 1, 'Showing Scheduled' => 2, 'Showed' => 3, 'Lost' => 4];
     $newRank = $hierarchy[$newStatus] ?? -1;
     if ($newRank < 0) return;
 
@@ -1362,7 +1362,51 @@ function updateTourRequest() {
     $data['updated_at'] = date('c');
 
     $sb->update('tour_requests', $data, ['id=eq.' . $id]);
+
+    // Sync lead_status when tour status changes
+    if (isset($input['status'])) {
+        $tour = $sb->selectOne('tour_requests', 'lead_email', ['id=eq.' . $id]);
+        if ($tour && !empty($tour['lead_email'])) {
+            $email = $tour['lead_email'];
+            $newTourStatus = $input['status'];
+
+            if ($newTourStatus === 'completed') {
+                // Tour happened — advance to Showed
+                forceUpdateLeadStatus($email, 'Showed');
+            } elseif ($newTourStatus === 'no_show' || $newTourStatus === 'cancelled') {
+                // Tour did not happen — return lead to Contacted
+                forceUpdateLeadStatus($email, 'Contacted');
+            }
+        }
+    }
+
     echo json_encode(['success' => true]);
+}
+
+/**
+ * Force-set a lead's status (used by system events like tour completion or no-show).
+ * Unlike autoUpdateLeadStatus, this can move backward in the pipeline
+ * (e.g. Showing Scheduled → Contacted on a no-show).
+ */
+function forceUpdateLeadStatus($email, $newStatus) {
+    global $sb;
+    if (!$email) return;
+    foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+        $lead = $sb->selectOne($table, 'id,lead_status', ['email=eq.' . urlencode($email)]);
+        if ($lead) {
+            if (($lead['lead_status'] ?? '') === $newStatus) return;
+            $sb->update($table, ['lead_status' => $newStatus], ['email=eq.' . urlencode($email)]);
+            $sb->insert('communications', [
+                'lead_email' => $email,
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'Status updated to: ' . $newStatus,
+                'sender'     => 'System',
+                'status'     => 'system'
+            ]);
+            return;
+        }
+    }
 }
 
 /**
