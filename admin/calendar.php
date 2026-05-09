@@ -52,6 +52,23 @@ include __DIR__ . '/includes/layout-header.php';
     </div>
 </div>
 
+<!-- Broker Availability Toggles -->
+<div class="card bg-body-tertiary border-0 mb-4">
+    <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3">
+                <span class="small fw-semibold text-white-50"><i class="bi bi-calendar-check me-1"></i>Broker Availability</span>
+                <div id="brokerAvailToggles" class="d-flex gap-2 flex-wrap">
+                    <span class="small text-white-50">Loading...</span>
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadBrokerAvailability()" title="Refresh availability">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Calendar Container -->
 <div class="card bg-body-tertiary border-0">
     <div class="card-body p-4">

@@ -26,6 +26,9 @@
         <?php endif; ?>
     </nav>
     <div class="mt-auto pt-4">
+        <a href="/admin/profile.php" class="nav-link<?= ($activePage ?? '') === 'profile' ? ' active' : '' ?>">
+            <i class="bi bi-person-circle"></i> My Profile
+        </a>
         <a href="?logout=1" class="nav-link text-danger opacity-50" style="font-size:0.8rem;">
             <i class="bi bi-box-arrow-right"></i> Sign Out
         </a>

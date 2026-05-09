@@ -131,9 +131,16 @@ function handleInboundSMS($payload) {
         'status'           => 'received'
     ]);
 
-    // Check if AI automation is allowed globally AND for this lead
-    if (!isSMSAutomationAllowed()) {
-        error_log("SMS automation disabled globally — skipping AI response for $normalizedPhone");
+    // Check if SMS is intentionally enabled (master toggle + campaign dates)
+    if (!isSMSMasterEnabled()) {
+        error_log("SMS automation disabled (master off or outside campaign) — skipping for $normalizedPhone");
+        return;
+    }
+
+    // Check if within send window — if not, queue for later
+    if (!isWithinSendWindow()) {
+        queueSMSResponse($normalizedPhone, $leadEmail, $text, $messageId);
+        error_log("Outside send window — queued AI response for $normalizedPhone");
         return;
     }
 
@@ -142,10 +149,37 @@ function handleInboundSMS($payload) {
         return;
     }
 
+    // Rate limit: skip AI response if we replied to this phone in the last 60 seconds
+    $recentReply = $sb->selectOne('sms_messages', 'created_at', [
+        'lead_phone=eq.' . urlencode($normalizedPhone),
+        'direction=eq.outbound',
+        'sender_type=eq.ai',
+        'created_at=gte.' . date('c', time() - 60)
+    ]);
+    if ($recentReply) {
+        error_log("Rate limit — AI replied to $normalizedPhone within last 60s, skipping");
+        return;
+    }
+
     // Generate and send AI response
     $reply = generateAIResponse($normalizedPhone, $text);
 
     if ($reply) {
+        // Check for handoff/not-interested tags
+        $handoff = false;
+        $notInterested = false;
+        $handoffReason = null;
+
+        if (strpos($reply, '[HANDOFF]') !== false) {
+            $handoff = true;
+            $reply = trim(str_replace('[HANDOFF]', '', $reply));
+            $handoffReason = 'AI detected handoff trigger';
+        } elseif (strpos($reply, '[NOT_INTERESTED]') !== false) {
+            $notInterested = true;
+            $reply = trim(str_replace('[NOT_INTERESTED]', '', $reply));
+            $handoffReason = 'Lead not interested';
+        }
+
         $result = sendSMS($normalizedPhone, $reply);
 
         // Store the outbound AI message
@@ -159,8 +193,93 @@ function handleInboundSMS($payload) {
             'telnyx_message_id' => $result['message_id'] ?? null,
             'status'            => $result['success'] ? 'sent' : 'failed'
         ]);
+
+        // Handle handoff or not-interested
+        if ($handoff || $notInterested) {
+            $newStatus = $handoff ? 'paused_handoff' : 'paused_manual';
+
+            // Pause AI automation
+            $existing = $sb->selectOne('sms_automation', 'id',
+                ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+            if ($existing) {
+                $sb->update('sms_automation', [
+                    'status'         => $newStatus,
+                    'paused_by'      => 'AI System',
+                    'handoff_reason' => $handoffReason,
+                    'updated_at'     => date('c')
+                ], ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+            } else {
+                $sb->insert('sms_automation', [
+                    'lead_phone'     => $normalizedPhone,
+                    'lead_email'     => $leadEmail,
+                    'status'         => $newStatus,
+                    'paused_by'      => 'AI System',
+                    'handoff_reason' => $handoffReason
+                ]);
+            }
+
+            // Log system message in communications
+            $sb->insert('communications', [
+                'lead_email' => $leadEmail,
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => $handoff ? 'AI Handoff' : 'Lead Not Interested',
+                'body'       => $handoff
+                    ? 'AI automation paused — lead needs broker follow-up. Last message: "' . substr($text, 0, 200) . '"'
+                    : 'AI automation paused — lead indicated they are not interested.',
+                'sender'     => 'Eleanor AI',
+                'status'     => 'system'
+            ]);
+
+            // Notify assigned broker via SMS
+            if ($handoff) {
+                notifyBrokerOfHandoff($normalizedPhone, $leadEmail, $text);
+            }
+
+            error_log("AI handoff triggered for $normalizedPhone — reason: $handoffReason");
+        }
     } else {
         error_log("AI failed to generate response for $normalizedPhone");
+    }
+}
+
+/**
+ * Notify the assigned broker when AI triggers a handoff.
+ */
+function notifyBrokerOfHandoff($leadPhone, $leadEmail, $lastMessage) {
+    global $sb;
+
+    // Find the lead's assigned broker
+    $lead = null;
+    foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+        if ($leadEmail) {
+            $lead = $sb->selectOne($table, 'first_name,last_name,assigned_to',
+                ['email=eq.' . urlencode($leadEmail)]);
+            if ($lead) break;
+        }
+    }
+
+    if (!$lead || empty($lead['assigned_to'])) {
+        error_log("Handoff notification: no assigned broker for $leadEmail");
+        return;
+    }
+
+    $broker = $sb->selectOne('brokers', 'name,phone', ['id=eq.' . $lead['assigned_to']]);
+    if (!$broker || empty($broker['phone'])) {
+        error_log("Handoff notification: broker has no phone number");
+        return;
+    }
+
+    $leadName = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
+    $preview = substr($lastMessage, 0, 100);
+
+    $notifyMsg = "Eleanor Alert: {$leadName} needs follow-up. Their last message: \"{$preview}\" — Open the dashboard to respond.";
+
+    require_once __DIR__ . '/telnyx-sms.php';
+    $brokerPhone = normalizePhone($broker['phone']);
+    if ($brokerPhone) {
+        sendSMS($brokerPhone, $notifyMsg);
+        error_log("Handoff notification sent to broker {$broker['name']} at {$brokerPhone}");
     }
 }
 

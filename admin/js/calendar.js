@@ -1,20 +1,55 @@
 // ── Showings Calendar ──
 let showingsCalendar = null;
+let availabilityEventSource = null;
+let connectedBrokers = [];
+let selectedBrokerIds = [];
+let tourRequests = [];
 
-// Sample data for UI preview — will be replaced with Supabase data later
-const sampleShowings = [
-    { id: 1, title: 'Unit 4B — Sarah Chen', start: new Date().toISOString().split('T')[0] + 'T10:00:00', end: new Date().toISOString().split('T')[0] + 'T10:30:00', status: 'confirmed', unit: '4B', lead: 'Sarah Chen', broker: 'James Rivera' },
-    { id: 2, title: 'Unit 2A — Michael Torres', start: (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })() + 'T14:00:00', end: (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })() + 'T14:30:00', status: 'pending', unit: '2A', lead: 'Michael Torres', broker: 'Unassigned' },
-    { id: 3, title: 'Unit 6C — Priya Patel', start: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0]; })() + 'T11:00:00', end: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0]; })() + 'T11:30:00', status: 'confirmed', unit: '6C', lead: 'Priya Patel', broker: 'James Rivera' },
-    { id: 4, title: 'Unit 3A — David Kim', start: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString().split('T')[0]; })() + 'T16:00:00', end: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString().split('T')[0]; })() + 'T16:30:00', status: 'pending', unit: '3A', lead: 'David Kim', broker: 'Unassigned' },
-    { id: 5, title: 'Unit 5D — Emma Wilson', start: (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })() + 'T09:00:00', end: (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })() + 'T09:30:00', status: 'cancelled', unit: '5D', lead: 'Emma Wilson', broker: 'James Rivera' },
-];
+const BROKER_COLORS = ['#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-function initShowingsCalendar() {
+// ── Load Tour Requests from Supabase ──
+async function loadTourRequests() {
+    try {
+        const res = await fetch(API + '?action=get_tour_requests');
+        const data = await res.json();
+        tourRequests = Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error('Error loading tour requests:', err);
+        tourRequests = [];
+    }
+}
+
+function tourRequestsToEvents(requests) {
+    return requests.map(t => {
+        const endTime = new Date(new Date(t.scheduled_at).getTime() + (t.duration_minutes || 30) * 60000);
+        const title = (t.unit ? 'Unit ' + t.unit + ' — ' : '') + (t.lead_name || 'Tour');
+        return {
+            id: t.id,
+            title: title,
+            start: t.scheduled_at,
+            end: endTime.toISOString(),
+            classNames: ['fc-event-' + (t.status || 'confirmed')],
+            extendedProps: {
+                status: t.status || 'confirmed',
+                unit: t.unit || '',
+                lead: t.lead_name || 'Unknown',
+                broker: t.broker_name || 'Unassigned',
+                source: t.source || '',
+                notes: t.notes || '',
+                tourId: t.id
+            }
+        };
+    });
+}
+
+// ── Init Calendar ──
+async function initShowingsCalendar() {
     if (showingsCalendar) {
         showingsCalendar.render();
         return;
     }
+
+    await loadTourRequests();
 
     const calEl = document.getElementById('showingsCalendar');
     showingsCalendar = new FullCalendar.Calendar(calEl, {
@@ -27,29 +62,30 @@ function initShowingsCalendar() {
         height: 'auto',
         nowIndicator: true,
         eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
-        events: sampleShowings.map(s => ({
-            id: s.id,
-            title: s.title,
-            start: s.start,
-            end: s.end,
-            classNames: ['fc-event-' + s.status],
-            extendedProps: { status: s.status, unit: s.unit, lead: s.lead, broker: s.broker }
-        })),
+        events: tourRequestsToEvents(tourRequests),
         eventClick: function(info) {
+            if (info.event.display === 'background') return;
+
             const p = info.event.extendedProps;
             const time = info.event.start.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
             const statusBadge = p.status === 'confirmed'
                 ? '<span class="badge bg-success bg-opacity-25 text-success">Confirmed</span>'
-                : p.status === 'pending'
-                ? '<span class="badge bg-warning bg-opacity-25 text-warning">Pending</span>'
-                : '<span class="badge bg-danger bg-opacity-25 text-danger">Cancelled</span>';
+                : p.status === 'completed'
+                ? '<span class="badge bg-info bg-opacity-25 text-info">Completed</span>'
+                : p.status === 'cancelled'
+                ? '<span class="badge bg-danger bg-opacity-25 text-danger">Cancelled</span>'
+                : p.status === 'no_show'
+                ? '<span class="badge bg-warning bg-opacity-25 text-warning">No Show</span>'
+                : '<span class="badge bg-secondary">' + esc(p.status) + '</span>';
+
+            const sourceLabel = p.source === 'sms_ai' ? '<span class="badge bg-purple bg-opacity-25 text-purple-300" style="font-size:0.65rem">Booked by AI</span>' : '';
 
             document.getElementById('showingDetailBody').innerHTML = `
-                <div class="mb-3">${statusBadge}</div>
+                <div class="mb-3">${statusBadge} ${sourceLabel}</div>
                 <div class="row g-3">
                     <div class="col-6">
                         <div class="small text-white-50">Unit</div>
-                        <div class="fw-semibold">${esc(p.unit)}</div>
+                        <div class="fw-semibold">${esc(p.unit || 'Not specified')}</div>
                     </div>
                     <div class="col-6">
                         <div class="small text-white-50">Applicant</div>
@@ -64,8 +100,15 @@ function initShowingsCalendar() {
                         <div class="fw-semibold">${esc(p.broker)}</div>
                     </div>
                 </div>
+                ${p.notes ? '<div class="mt-3"><div class="small text-white-50">Notes</div><div class="text-white-50 small">' + esc(p.notes) + '</div></div>' : ''}
+                ${p.tourId ? '<div class="mt-3"><select class="form-select form-select-sm bg-dark border-secondary text-white" onchange="updateTourStatus(\'' + esc(p.tourId) + '\', this.value)"><option value="confirmed"' + (p.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option><option value="completed"' + (p.status === 'completed' ? ' selected' : '') + '>Completed</option><option value="cancelled"' + (p.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option><option value="no_show"' + (p.status === 'no_show' ? ' selected' : '') + '>No Show</option></select></div>' : ''}
             `;
             new bootstrap.Modal(document.getElementById('showingDetailModal')).show();
+        },
+        datesSet: function(info) {
+            if (selectedBrokerIds.length > 0) {
+                loadBrokerAvailability();
+            }
         },
         dateClick: function(info) {
             // Future: open new showing form with date pre-filled
@@ -75,30 +118,162 @@ function initShowingsCalendar() {
     showingsCalendar.render();
     updateCalendarStats();
     renderUpcomingShowings();
+    initBrokerToggles();
 }
 
+// ── Update Tour Status ──
+async function updateTourStatus(tourId, status) {
+    try {
+        await fetch(API + '?action=update_tour_request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: tourId, status: status })
+        });
+        // Refresh
+        await loadTourRequests();
+        showingsCalendar.removeAllEvents();
+        showingsCalendar.addEventSource(tourRequestsToEvents(tourRequests));
+        updateCalendarStats();
+        renderUpcomingShowings();
+    } catch (err) {
+        console.error('Error updating tour:', err);
+    }
+}
+
+// ── Broker Availability Toggles ──
+async function initBrokerToggles() {
+    try {
+        const res = await fetch(API + '?action=google_calendar_status');
+        const brokers = await res.json();
+        connectedBrokers = Array.isArray(brokers) ? brokers : [];
+    } catch (err) {
+        connectedBrokers = [];
+    }
+
+    const container = document.getElementById('brokerAvailToggles');
+
+    if (connectedBrokers.length === 0) {
+        container.innerHTML = '<span class="small text-white-50">No brokers configured</span>';
+        return;
+    }
+
+    container.innerHTML = connectedBrokers.map((b, i) => {
+        const color = BROKER_COLORS[i % BROKER_COLORS.length];
+        const connected = b.google_calendar_connected;
+        const tooltip = connected ? 'Google Calendar connected' : 'Using default availability';
+        const icon = connected ? 'bi-calendar-check' : 'bi-calendar';
+        return `
+            <label class="btn btn-sm btn-outline-secondary broker-avail-toggle" title="${esc(tooltip)}" style="--toggle-color:${color}">
+                <input type="checkbox" class="d-none broker-avail-check" value="${b.id}" data-color="${color}">
+                <i class="${icon} me-1" style="color:${color}"></i>${esc(b.name)}
+            </label>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.broker-avail-check').forEach(cb => {
+        cb.addEventListener('change', () => {
+            cb.closest('.broker-avail-toggle').classList.toggle('active', cb.checked);
+            updateSelectedBrokers();
+            loadBrokerAvailability();
+        });
+    });
+}
+
+function updateSelectedBrokers() {
+    selectedBrokerIds = [];
+    document.querySelectorAll('.broker-avail-check:checked').forEach(cb => {
+        selectedBrokerIds.push(parseInt(cb.value));
+    });
+}
+
+async function loadBrokerAvailability() {
+    if (!showingsCalendar || selectedBrokerIds.length === 0) {
+        if (availabilityEventSource) {
+            availabilityEventSource.remove();
+            availabilityEventSource = null;
+        }
+        return;
+    }
+
+    const view = showingsCalendar.view;
+    const timeMin = view.activeStart.toISOString();
+    const timeMax = view.activeEnd.toISOString();
+
+    try {
+        const res = await fetch(API + '?action=google_calendar_availability', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ broker_ids: selectedBrokerIds, time_min: timeMin, time_max: timeMax })
+        });
+        const data = await res.json();
+        if (data.error) return;
+        renderAvailabilityEvents(data.brokers || {});
+    } catch (err) {
+        console.error('Error loading availability:', err);
+    }
+}
+
+function renderAvailabilityEvents(brokersData) {
+    if (availabilityEventSource) {
+        availabilityEventSource.remove();
+        availabilityEventSource = null;
+    }
+
+    const events = [];
+    let brokerIndex = 0;
+
+    for (const [brokerId, info] of Object.entries(brokersData)) {
+        const checkbox = document.querySelector(`.broker-avail-check[value="${brokerId}"]`);
+        const color = checkbox ? checkbox.dataset.color : BROKER_COLORS[brokerIndex % BROKER_COLORS.length];
+
+        if (info.connected && info.busy) {
+            info.busy.forEach(block => {
+                events.push({
+                    title: esc(info.name) + ' — Busy',
+                    start: block.start,
+                    end: block.end,
+                    display: 'background',
+                    backgroundColor: color,
+                    borderColor: color,
+                    extendedProps: { type: 'busy', broker: info.name }
+                });
+            });
+        }
+        brokerIndex++;
+    }
+
+    if (events.length > 0) {
+        availabilityEventSource = showingsCalendar.addEventSource(events);
+    }
+}
+
+// ── Stats & Upcoming ──
 function updateCalendarStats() {
     const today = new Date().toISOString().split('T')[0];
     const weekEnd = new Date();
     weekEnd.setDate(weekEnd.getDate() + 7);
     const weekEndStr = weekEnd.toISOString().split('T')[0];
 
-    const pending = sampleShowings.filter(s => s.status === 'pending').length;
-    const confirmed = sampleShowings.filter(s => s.status === 'confirmed').length;
-    const todayCount = sampleShowings.filter(s => s.start.startsWith(today) && s.status !== 'cancelled').length;
-    const weekCount = sampleShowings.filter(s => s.start.split('T')[0] >= today && s.start.split('T')[0] <= weekEndStr && s.status !== 'cancelled').length;
+    const active = tourRequests.filter(t => t.status !== 'cancelled' && t.status !== 'no_show');
+    const confirmed = active.filter(t => t.status === 'confirmed').length;
+    const completed = active.filter(t => t.status === 'completed').length;
+    const todayCount = active.filter(t => t.scheduled_at && t.scheduled_at.startsWith(today)).length;
+    const weekCount = active.filter(t => {
+        const d = t.scheduled_at ? t.scheduled_at.split('T')[0] : '';
+        return d >= today && d <= weekEndStr;
+    }).length;
 
-    document.getElementById('calStatPending').textContent = pending;
-    document.getElementById('calStatConfirmed').textContent = confirmed;
+    document.getElementById('calStatPending').textContent = confirmed;
+    document.getElementById('calStatConfirmed').textContent = completed;
     document.getElementById('calStatToday').textContent = todayCount;
     document.getElementById('calStatThisWeek').textContent = weekCount;
 }
 
 function renderUpcomingShowings() {
     const today = new Date().toISOString().split('T')[0];
-    const upcoming = sampleShowings
-        .filter(s => s.start.split('T')[0] >= today && s.status !== 'cancelled')
-        .sort((a, b) => a.start.localeCompare(b.start));
+    const upcoming = tourRequests
+        .filter(t => t.scheduled_at && t.scheduled_at.split('T')[0] >= today && t.status !== 'cancelled')
+        .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
 
     const container = document.getElementById('upcomingShowingsList');
     if (upcoming.length === 0) {
@@ -106,25 +281,26 @@ function renderUpcomingShowings() {
         return;
     }
 
-    container.innerHTML = upcoming.map(s => {
-        const dt = new Date(s.start);
+    container.innerHTML = upcoming.map(t => {
+        const dt = new Date(t.scheduled_at);
         const time = dt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const statusClass = t.status === 'confirmed' ? 'confirmed' : t.status === 'completed' ? 'confirmed' : 'pending';
+        const badgeClass = t.status === 'confirmed' ? 'bg-success bg-opacity-25 text-success' : 'bg-info bg-opacity-25 text-info';
         return `
             <div class="showing-item">
-                <div class="showing-dot ${s.status}"></div>
+                <div class="showing-dot ${statusClass}"></div>
                 <div class="flex-grow-1">
-                    <div class="fw-semibold small">${esc(s.lead)} — Unit ${esc(s.unit)}</div>
-                    <div class="text-white-50" style="font-size:0.75rem">${time} &middot; ${esc(s.broker)}</div>
+                    <div class="fw-semibold small">${esc(t.lead_name || 'Unknown')} ${t.unit ? '— Unit ' + esc(t.unit) : ''}</div>
+                    <div class="text-white-50" style="font-size:0.75rem">${time} &middot; ${esc(t.broker_name || 'Unassigned')}</div>
                 </div>
-                <span class="badge ${s.status === 'confirmed' ? 'bg-success bg-opacity-25 text-success' : 'bg-warning bg-opacity-25 text-warning'}" style="font-size:0.7rem">${s.status}</span>
+                <span class="badge ${badgeClass}" style="font-size:0.7rem">${esc(t.status)}</span>
             </div>
         `;
     }).join('');
 }
 
 function openNewShowingModal() {
-    // Placeholder — will wire up to new showing form later
-    alert('New Showing form coming soon — will connect to tour_requests table.');
+    alert('New Showing form coming soon — tours can now be booked via SMS AI.');
 }
 
 document.addEventListener('DOMContentLoaded', initShowingsCalendar);

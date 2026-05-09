@@ -5,6 +5,7 @@
 header('Content-Type: application/json');
 require_once 'db_config.php';
 require_once '../admin/auth.php';
+require_once 'google-calendar.php';
 
 if (!isAdmin()) {
     http_response_code(401);
@@ -41,6 +42,16 @@ switch ($action) {
     case 'engage_ai_preview': engageAIPreview(); break;
     case 'engage_ai_send': engageAISend(); break;
     case 'update_lead_status': updateLeadStatus(); break;
+    case 'get_my_profile': getMyProfile(); break;
+    case 'update_my_profile': updateMyProfile(); break;
+    case 'upload_profile_picture': uploadProfilePicture(); break;
+    case 'get_unified_timeline': getUnifiedTimeline($_GET['email'] ?? ''); break;
+    case 'get_tour_requests': getTourRequests(); break;
+    case 'update_tour_request': updateTourRequest(); break;
+    case 'google_calendar_connect': googleCalendarConnect(); break;
+    case 'google_calendar_disconnect': googleCalendarDisconnect(); break;
+    case 'google_calendar_status': googleCalendarStatus(); break;
+    case 'google_calendar_availability': googleCalendarAvailability(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -718,6 +729,199 @@ function deleteCommunication() {
     echo json_encode(['success' => true]);
 }
 
+/* ── Unified Timeline ── */
+
+/**
+ * Get a unified timeline merging communications + sms_messages for a lead.
+ */
+function getUnifiedTimeline($email) {
+    global $sb;
+
+    if (empty($email)) {
+        echo json_encode(['error' => 'Email is required']);
+        return;
+    }
+
+    // Look up lead info
+    $lead = null;
+    foreach ([
+        ['table' => 'waitlist_submissions', 'source' => 'Waitlist'],
+        ['table' => 'unit_inquiries', 'source' => 'Unit Interest'],
+        ['table' => 'mailing_list', 'source' => 'Mailing List']
+    ] as $src) {
+        $row = $sb->selectOne($src['table'], 'first_name,last_name,email,phone,assigned_to,lead_status',
+            ['email=eq.' . urlencode($email)]);
+        if ($row) {
+            $row['source'] = $src['source'];
+            $lead = $row;
+            break;
+        }
+    }
+
+    if (!$lead) {
+        echo json_encode(['error' => 'Lead not found']);
+        return;
+    }
+
+    $leadName = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
+    $leadPhone = $lead['phone'] ?? '';
+
+    // Get assigned broker info
+    $brokerName = null;
+    if (!empty($lead['assigned_to'])) {
+        $broker = $sb->selectOne('brokers', 'name,phone', ['id=eq.' . $lead['assigned_to']]);
+        $brokerName = $broker['name'] ?? null;
+    }
+
+    // Fetch manual communications
+    $comms = $sb->select('communications', '*',
+        ['lead_email=eq.' . urlencode($email)],
+        'created_at.asc');
+
+    // Fetch SMS messages (by email OR phone)
+    $smsMessages = [];
+    if ($email) {
+        $smsMessages = $sb->select('sms_messages', '*',
+            ['lead_email=eq.' . urlencode($email)],
+            'created_at.asc');
+    }
+    // Also try by phone if we have one and got no results by email
+    if (empty($smsMessages) && $leadPhone) {
+        require_once __DIR__ . '/telnyx-sms.php';
+        $normalizedPhone = normalizePhone($leadPhone);
+        if ($normalizedPhone) {
+            $smsMessages = $sb->select('sms_messages', '*',
+                ['lead_phone=eq.' . urlencode($normalizedPhone)],
+                'created_at.asc');
+        }
+    }
+
+    // Normalize both into a common shape
+    $timeline = [];
+
+    foreach ($comms as $c) {
+        $timeline[] = [
+            'id'         => $c['id'] ?? null,
+            'type'       => $c['channel'] ?? 'note',
+            'direction'  => $c['direction'] ?? 'outbound',
+            'sender'     => $c['sender'] ?? null,
+            'body'       => $c['body'] ?? '',
+            'subject'    => $c['subject'] ?? null,
+            'source'     => 'manual',
+            'status'     => $c['status'] ?? null,
+            'created_at' => $c['created_at'],
+            'raw_table'  => 'communications'
+        ];
+    }
+
+    foreach ($smsMessages as $m) {
+        $sender = 'Unknown';
+        if ($m['direction'] === 'inbound') {
+            $sender = $leadName ?: 'Lead';
+        } else {
+            $sender = $m['sender_name'] ?? ($m['sender_type'] === 'ai' ? 'Eleanor AI' : 'Broker');
+        }
+
+        $timeline[] = [
+            'id'         => $m['id'] ?? null,
+            'type'       => 'sms',
+            'direction'  => $m['direction'],
+            'sender'     => $sender,
+            'body'       => $m['body'] ?? '',
+            'subject'    => null,
+            'source'     => $m['sender_type'] ?? 'unknown',
+            'status'     => $m['status'] ?? null,
+            'created_at' => $m['created_at'],
+            'raw_table'  => 'sms_messages'
+        ];
+    }
+
+    // Sort chronologically
+    usort($timeline, function($a, $b) {
+        return strtotime($a['created_at']) - strtotime($b['created_at']);
+    });
+
+    // Get AI automation status
+    $aiStatus = ['status' => 'active', 'paused_by' => null, 'handoff_reason' => null];
+    if ($leadPhone) {
+        require_once __DIR__ . '/telnyx-sms.php';
+        $normalizedPhone = normalizePhone($leadPhone);
+        if ($normalizedPhone) {
+            $record = $sb->selectOne('sms_automation', 'status,paused_by,handoff_reason',
+                ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+            if ($record) $aiStatus = $record;
+        }
+    }
+
+    echo json_encode([
+        'lead' => [
+            'name'        => $leadName,
+            'email'       => $email,
+            'phone'       => $leadPhone,
+            'source'      => $lead['source'] ?? '',
+            'lead_status' => $lead['lead_status'] ?? 'New',
+            'assigned_to' => $lead['assigned_to'] ?? null,
+            'broker_name' => $brokerName
+        ],
+        'ai_status' => $aiStatus,
+        'timeline'  => $timeline
+    ]);
+}
+
+/* ── Tour Requests ── */
+
+function getTourRequests() {
+    global $sb;
+    $tours = $sb->select('tour_requests', '*', [], 'scheduled_at.asc', 100);
+
+    // Enrich with lead names and broker names
+    $brokerRows = $sb->select('brokers', 'id,name', []);
+    $brokerLookup = [];
+    foreach ($brokerRows as $b) $brokerLookup[$b['id']] = $b['name'];
+
+    foreach ($tours as &$tour) {
+        $tour['broker_name'] = isset($brokerLookup[$tour['broker_id']]) ? $brokerLookup[$tour['broker_id']] : 'Unassigned';
+
+        // Find lead name
+        $leadName = '';
+        if (!empty($tour['lead_email'])) {
+            $lead = findLeadByPhoneOrEmail(null, $tour['lead_email']);
+            if ($lead) $leadName = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
+        }
+        if (!$leadName && !empty($tour['lead_phone'])) {
+            $lead = findLeadByPhoneOrEmail($tour['lead_phone'], null);
+            if ($lead) $leadName = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
+        }
+        $tour['lead_name'] = $leadName ?: 'Unknown';
+    }
+    unset($tour);
+
+    echo json_encode($tours);
+}
+
+function updateTourRequest() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (empty($input['id'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tour request id is required']);
+        return;
+    }
+
+    $id = $input['id'];
+    $data = [];
+    foreach (['status', 'notes', 'scheduled_at'] as $field) {
+        if (array_key_exists($field, $input)) {
+            $data[$field] = $input[$field];
+        }
+    }
+    $data['updated_at'] = date('c');
+
+    $sb->update('tour_requests', $data, ['id=eq.' . $id]);
+    echo json_encode(['success' => true]);
+}
+
 /* ── SMS Conversations ── */
 
 /**
@@ -1077,4 +1281,203 @@ function engageAISend() {
     ], 'lead_phone');
 
     echo json_encode(['success' => true]);
+}
+
+// ── Profile Endpoints ──
+
+function getCurrentUserEmail() {
+    return $_SESSION['supabase_user']['email'] ?? '';
+}
+
+function getCurrentBroker() {
+    global $sb;
+    $email = getCurrentUserEmail();
+    if (!$email) return null;
+    return $sb->selectOne('brokers', '*', ['email=eq.' . $email]);
+}
+
+function getMyProfile() {
+    $broker = getCurrentBroker();
+    if (!$broker) {
+        echo json_encode(['error' => 'Profile not found']);
+        return;
+    }
+    // Parse JSONB fields
+    if (is_string($broker['default_availability_days'])) {
+        $broker['default_availability_days'] = json_decode($broker['default_availability_days'], true);
+    }
+    // Never expose tokens to frontend
+    unset($broker['google_calendar_token']);
+    echo json_encode($broker);
+}
+
+function updateMyProfile() {
+    global $sb;
+    $broker = getCurrentBroker();
+    if (!$broker) {
+        echo json_encode(['error' => 'Profile not found']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $allowed = ['name', 'title', 'phone', 'license_number', 'company', 'bio', 'preferred_contact', 'default_availability_start', 'default_availability_end', 'default_availability_days'];
+
+    $data = [];
+    foreach ($allowed as $field) {
+        if (array_key_exists($field, $input)) {
+            $data[$field] = $input[$field];
+        }
+    }
+
+    if (empty($data)) {
+        echo json_encode(['error' => 'No fields to update']);
+        return;
+    }
+
+    // Encode JSON fields
+    if (isset($data['default_availability_days']) && is_array($data['default_availability_days'])) {
+        $data['default_availability_days'] = json_encode($data['default_availability_days']);
+    }
+
+    $sb->update('brokers', $data, ['id=eq.' . $broker['id']]);
+
+    // Clear cached role in case name changed
+    unset($_SESSION['user_role']);
+
+    echo json_encode(['success' => true]);
+}
+
+function uploadProfilePicture() {
+    global $sb;
+    $broker = getCurrentBroker();
+    if (!$broker) {
+        echo json_encode(['error' => 'Profile not found']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $image = $input['image'] ?? null;
+
+    // Validate base64 if provided
+    if ($image !== null && !preg_match('/^data:image\/(png|jpeg|jpg|gif|webp);base64,/', $image)) {
+        echo json_encode(['error' => 'Invalid image format']);
+        return;
+    }
+
+    $sb->update('brokers', ['profile_picture' => $image], ['id=eq.' . $broker['id']]);
+    echo json_encode(['success' => true]);
+}
+
+// ── Google Calendar Endpoints ──
+
+function googleCalendarConnect() {
+    $broker = getCurrentBroker();
+    if (!$broker) {
+        echo json_encode(['error' => 'Profile not found']);
+        return;
+    }
+
+    $url = googleBuildAuthUrl($broker['id']);
+    echo json_encode(['url' => $url]);
+}
+
+function googleCalendarDisconnect() {
+    global $sb;
+    $broker = getCurrentBroker();
+    if (!$broker) {
+        echo json_encode(['error' => 'Profile not found']);
+        return;
+    }
+
+    // Optionally allow owner to disconnect another broker
+    $input = json_decode(file_get_contents('php://input'), true);
+    $targetId = $input['broker_id'] ?? $broker['id'];
+
+    // Only allow disconnecting others if owner
+    if ($targetId != $broker['id'] && !isOwner()) {
+        echo json_encode(['error' => 'Unauthorized']);
+        return;
+    }
+
+    // Revoke token (best-effort)
+    $targetBroker = $sb->selectOne('brokers', 'google_calendar_token', ['id=eq.' . intval($targetId)]);
+    if ($targetBroker && $targetBroker['google_calendar_token']) {
+        $tokenData = is_string($targetBroker['google_calendar_token'])
+            ? json_decode($targetBroker['google_calendar_token'], true)
+            : $targetBroker['google_calendar_token'];
+        if (!empty($tokenData['access_token'])) {
+            googleRevokeToken($tokenData['access_token']);
+        }
+    }
+
+    $sb->update('brokers', [
+        'google_calendar_token'     => null,
+        'google_calendar_email'     => null,
+        'google_calendar_connected' => false
+    ], ['id=eq.' . intval($targetId)]);
+
+    echo json_encode(['success' => true]);
+}
+
+function googleCalendarStatus() {
+    global $sb;
+    $brokers = $sb->select('brokers', 'id,name,email,role,google_calendar_connected,google_calendar_email', [], 'name.asc');
+    echo json_encode($brokers);
+}
+
+function googleCalendarAvailability() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $brokerIds = $input['broker_ids'] ?? [];
+    $timeMin = $input['time_min'] ?? '';
+    $timeMax = $input['time_max'] ?? '';
+
+    if (empty($brokerIds) || !$timeMin || !$timeMax) {
+        echo json_encode(['error' => 'broker_ids, time_min, and time_max are required']);
+        return;
+    }
+
+    // Limit date range to 31 days
+    $minDate = strtotime($timeMin);
+    $maxDate = strtotime($timeMax);
+    if ($maxDate - $minDate > 31 * 86400) {
+        echo json_encode(['error' => 'Date range cannot exceed 31 days']);
+        return;
+    }
+
+    $result = [];
+    foreach ($brokerIds as $brokerId) {
+        $brokerId = intval($brokerId);
+        $accessToken = googleGetValidToken($brokerId);
+
+        if (!$accessToken) {
+            // Broker not connected or token invalid — return default availability
+            $broker = $sb->selectOne('brokers', 'id,name,google_calendar_connected,default_availability_start,default_availability_end,default_availability_days', ['id=eq.' . $brokerId]);
+            $result[$brokerId] = [
+                'name'      => $broker['name'] ?? 'Unknown',
+                'connected' => false,
+                'busy'      => [],
+                'defaults'  => [
+                    'start' => $broker['default_availability_start'] ?? '09:00',
+                    'end'   => $broker['default_availability_end'] ?? '18:00',
+                    'days'  => is_string($broker['default_availability_days'] ?? '')
+                        ? json_decode($broker['default_availability_days'], true)
+                        : ($broker['default_availability_days'] ?? [1,2,3,4,5])
+                ]
+            ];
+            continue;
+        }
+
+        $busy = googleQueryFreeBusy($accessToken, $timeMin, $timeMax);
+        $broker = $sb->selectOne('brokers', 'name', ['id=eq.' . $brokerId]);
+
+        $result[$brokerId] = [
+            'name'      => $broker['name'] ?? 'Unknown',
+            'connected' => true,
+            'busy'      => $busy ?: []
+        ];
+    }
+
+    echo json_encode(['brokers' => $result]);
 }

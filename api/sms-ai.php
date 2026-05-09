@@ -60,41 +60,65 @@ function generateAIResponse($leadPhone, $inboundText) {
     // 4. Build the system prompt
     $systemPrompt = buildSystemPrompt($leadContext);
 
-    // 5. Call Claude API
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'x-api-key: ' . ANTHROPIC_API_KEY,
-        'anthropic-version: 2023-06-01',
-        'Content-Type: application/json'
-    ]);
+    // 5. Build tool definitions
+    $tools = getCalendarToolDefinitions();
 
+    // 6. Call Claude API with tool use loop
     $payload = [
         'model'      => 'claude-sonnet-4-20250514',
         'max_tokens' => 300,
         'system'     => $systemPrompt,
+        'tools'      => $tools,
         'messages'   => $messages
     ];
 
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    $reply = null;
+    $maxLoops = 3;
 
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    for ($i = 0; $i < $maxLoops; $i++) {
+        $response = callClaudeAPI($payload);
 
-    if ($httpCode < 200 || $httpCode >= 300) {
-        error_log("Claude AI SMS response failed ($httpCode): $response");
-        return null;
+        if (!$response) {
+            error_log("Claude AI SMS response failed on loop $i");
+            return null;
+        }
+
+        // Extract text from response
+        $textParts = [];
+        $toolCalls = [];
+        foreach ($response['content'] as $block) {
+            if ($block['type'] === 'text') {
+                $textParts[] = $block['text'];
+            } elseif ($block['type'] === 'tool_use') {
+                $toolCalls[] = $block;
+            }
+        }
+
+        // If no tool calls, we're done
+        if ($response['stop_reason'] !== 'tool_use' || empty($toolCalls)) {
+            $reply = implode(' ', $textParts);
+            break;
+        }
+
+        // Execute each tool call
+        $toolResults = [];
+        foreach ($toolCalls as $call) {
+            $result = executeCalendarTool($call['name'], $call['input'], $leadPhone, $leadContext);
+            $toolResults[] = [
+                'type'        => 'tool_result',
+                'tool_use_id' => $call['id'],
+                'content'     => json_encode($result)
+            ];
+        }
+
+        // Append assistant response + tool results to messages for next loop
+        $payload['messages'][] = ['role' => 'assistant', 'content' => $response['content']];
+        $payload['messages'][] = ['role' => 'user', 'content' => $toolResults];
     }
 
-    $data = json_decode($response, true);
-    $reply = $data['content'][0]['text'] ?? null;
-
-    // Trim to SMS-friendly length — cut at last sentence boundary
+    // Trim to SMS-friendly length
     if ($reply && strlen($reply) > 480) {
         $truncated = substr($reply, 0, 480);
-        // Find the last sentence-ending punctuation
         $lastPeriod = strrpos($truncated, '.');
         $lastQuestion = strrpos($truncated, '?');
         $lastExclaim = strrpos($truncated, '!');
@@ -102,13 +126,228 @@ function generateAIResponse($leadPhone, $inboundText) {
         if ($cutAt > 100) {
             $reply = substr($reply, 0, $cutAt + 1);
         } else {
-            // No good sentence break — cut at last space
             $lastSpace = strrpos($truncated, ' ');
             $reply = substr($reply, 0, $lastSpace ?: 477) . '...';
         }
     }
 
     return $reply;
+}
+
+/**
+ * Call the Claude Messages API and return parsed response.
+ */
+function callClaudeAPI($payload) {
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'x-api-key: ' . ANTHROPIC_API_KEY,
+        'anthropic-version: 2023-06-01',
+        'Content-Type: application/json'
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode < 200 || $httpCode >= 300) {
+        error_log("Claude API failed ($httpCode): $response");
+        return null;
+    }
+
+    return json_decode($response, true);
+}
+
+/**
+ * Define the calendar tools available to Claude.
+ */
+function getCalendarToolDefinitions() {
+    return [
+        [
+            'name' => 'check_tour_availability',
+            'description' => 'Check available tour time slots for The Eleanor. Returns open 30-minute slots within the assigned broker\'s calendar for the given date range. Only call this when the conversation is heading toward scheduling a tour.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'start_date' => ['type' => 'string', 'description' => 'Start date in YYYY-MM-DD format'],
+                    'end_date'   => ['type' => 'string', 'description' => 'End date in YYYY-MM-DD format (max 14 days from start)']
+                ],
+                'required' => ['start_date', 'end_date']
+            ]
+        ],
+        [
+            'name' => 'book_tour',
+            'description' => 'Book a confirmed tour at The Eleanor. Creates a calendar event and notifies the broker. Only call this after the lead has explicitly confirmed a specific date and time.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'datetime'      => ['type' => 'string', 'description' => 'Confirmed tour datetime in ISO 8601 format (e.g. 2026-05-13T14:00:00)'],
+                    'lead_name'     => ['type' => 'string', 'description' => 'The lead\'s full name'],
+                    'unit_interest' => ['type' => 'string', 'description' => 'Unit or unit type they\'re interested in, if known']
+                ],
+                'required' => ['datetime', 'lead_name']
+            ]
+        ],
+        [
+            'name' => 'get_tour_hours',
+            'description' => 'Get the building\'s general tour availability hours and days. Use this when the lead asks about tour hours in general, before checking specific availability.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => new \stdClass(),
+                'required' => []
+            ]
+        ]
+    ];
+}
+
+/**
+ * Execute a calendar tool call and return the result.
+ */
+function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
+    global $sb;
+
+    require_once __DIR__ . '/google-calendar.php';
+
+    switch ($toolName) {
+        case 'get_tour_hours':
+            $settings = getSMSSettings();
+            $tourHours = $settings['ai_tour_hours'] ?? 'Weekdays 10am-6pm, Saturdays 11am-4pm';
+            return ['tour_hours' => $tourHours];
+
+        case 'check_tour_availability':
+            $startDate = $input['start_date'] ?? date('Y-m-d');
+            $endDate = $input['end_date'] ?? date('Y-m-d', strtotime('+7 days'));
+
+            // Limit range to 14 days
+            if (strtotime($endDate) - strtotime($startDate) > 14 * 86400) {
+                $endDate = date('Y-m-d', strtotime($startDate . ' +14 days'));
+            }
+
+            $brokerId = $leadContext['assigned_to'] ?? null;
+            if (!$brokerId) {
+                // No broker assigned — try to find any active broker
+                $anyBroker = $sb->selectOne('brokers', 'id', ['is_active=neq.false'], 'id.asc');
+                $brokerId = $anyBroker['id'] ?? null;
+            }
+
+            if (!$brokerId) {
+                return ['available_slots' => [], 'note' => 'No broker available. Suggest the lead contact the leasing office directly.'];
+            }
+
+            $slots = getAvailableTourSlots($brokerId, $startDate, $endDate);
+
+            // Format slots for readability
+            $formatted = [];
+            $tz = new DateTimeZone('America/New_York');
+            foreach ($slots as $slot) {
+                $dt = new DateTime($slot, $tz);
+                $day = $dt->format('l, F j');
+                $time = $dt->format('g:ia');
+                $formatted[$day][] = $time;
+            }
+
+            $readable = [];
+            foreach ($formatted as $day => $times) {
+                $readable[] = $day . ': ' . implode(', ', array_slice($times, 0, 6));
+            }
+
+            return [
+                'available_slots' => array_slice($slots, 0, 30),
+                'formatted' => $readable,
+                'note' => empty($slots) ? 'No available slots in this range. Try a different date range.' : null
+            ];
+
+        case 'book_tour':
+            $datetime = $input['datetime'] ?? '';
+            $leadName = $input['lead_name'] ?? 'Lead';
+            $unitInterest = $input['unit_interest'] ?? '';
+
+            if (!$datetime) {
+                return ['success' => false, 'error' => 'Datetime is required'];
+            }
+
+            // Validate datetime is in the future
+            $tz = new DateTimeZone('America/New_York');
+            $tourTime = new DateTime($datetime, $tz);
+            $now = new DateTime('now', $tz);
+            if ($tourTime <= $now) {
+                return ['success' => false, 'error' => 'Cannot book a tour in the past'];
+            }
+
+            $brokerId = $leadContext['assigned_to'] ?? null;
+            if (!$brokerId) {
+                $anyBroker = $sb->selectOne('brokers', 'id', ['is_active=neq.false'], 'id.asc');
+                $brokerId = $anyBroker['id'] ?? null;
+            }
+
+            // Create Google Calendar event
+            $eventId = null;
+            if ($brokerId) {
+                $accessToken = googleGetValidToken($brokerId);
+                if ($accessToken) {
+                    $startISO = $tourTime->format('c');
+                    $endTime = clone $tourTime;
+                    $endTime->modify('+30 minutes');
+                    $endISO = $endTime->format('c');
+
+                    $summary = "Tour — {$leadName} — The Eleanor";
+                    $description = "Tour with {$leadName}\nPhone: {$leadPhone}\nUnit Interest: {$unitInterest}";
+                    $attendeeEmail = $leadContext['email'] ?? null;
+
+                    $eventId = googleCreateEvent($accessToken, $summary, $startISO, $endISO, $description, $attendeeEmail);
+                }
+            }
+
+            // Create tour_requests record
+            $sb->insert('tour_requests', [
+                'lead_email'       => $leadContext['email'] ?? null,
+                'lead_phone'       => $leadPhone,
+                'unit'             => $unitInterest,
+                'broker_id'        => $brokerId,
+                'scheduled_at'     => $tourTime->format('c'),
+                'duration_minutes' => 30,
+                'status'           => 'confirmed',
+                'google_event_id'  => $eventId,
+                'source'           => 'sms_ai',
+                'notes'            => "Booked via SMS AI conversation"
+            ]);
+
+            // Log in communications
+            $sb->insert('communications', [
+                'lead_email' => $leadContext['email'] ?? null,
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'Tour Booked',
+                'body'       => "Tour booked for {$tourTime->format('l, F j \\a\\t g:ia')} — {$leadName}" . ($unitInterest ? " (interested in {$unitInterest})" : ''),
+                'sender'     => 'Eleanor AI',
+                'status'     => 'system'
+            ]);
+
+            // Notify broker
+            if ($brokerId) {
+                $broker = $sb->selectOne('brokers', 'name,phone', ['id=eq.' . intval($brokerId)]);
+                if ($broker && !empty($broker['phone'])) {
+                    require_once __DIR__ . '/telnyx-sms.php';
+                    $brokerPhone = normalizePhone($broker['phone']);
+                    if ($brokerPhone) {
+                        $notifyMsg = "Eleanor Alert: Tour booked with {$leadName} on {$tourTime->format('l, F j \\a\\t g:ia')}." . ($unitInterest ? " Interest: {$unitInterest}." : '') . " Check the dashboard for details.";
+                        sendSMS($brokerPhone, $notifyMsg);
+                    }
+                }
+            }
+
+            return [
+                'success'    => true,
+                'event_time' => $tourTime->format('l, F j \\a\\t g:ia'),
+                'calendar_event_created' => !!$eventId
+            ];
+
+        default:
+            return ['error' => 'Unknown tool: ' . $toolName];
+    }
 }
 
 /**
@@ -238,6 +477,7 @@ function getLeadContext($phone, $email = null) {
         'unit_type'    => $lead['unit_type'] ?? '',
         'message'      => $lead['message'] ?? '',
         'source'       => $source,
+        'assigned_to'  => $lead['assigned_to'] ?? null,
         'job_title'    => $enrichment['job_title'] ?? '',
         'company'      => $enrichment['company'] ?? '',
         'inferred_salary' => $enrichment['inferred_salary'] ?? '',
@@ -281,12 +521,23 @@ function buildSystemPrompt($lead) {
         . "- For things you do NOT know — exact lease terms, guarantor requirements, application fees, "
         . "broker fees, move-in costs, pet deposit amounts — say you'll have someone from the team follow up, "
         . "or suggest they come see the building to discuss details in person.\n"
-        . "- If they want to schedule a tour, be enthusiastic and suggest a few time windows ({$tourHours}). "
-        . "Don't commit to exact times — say the team will confirm.\n"
+        . "- You have access to tour scheduling tools. When the conversation naturally leads to scheduling "
+        . "a tour, use check_tour_availability to find open slots, then offer 2-3 specific times. "
+        . "When the lead confirms a time, use book_tour to finalize it. Only book when they've clearly confirmed.\n"
+        . "- If no slots are available in their preferred window, suggest alternatives.\n"
         . "- If they say STOP or ask to stop texting, acknowledge it gracefully and end the conversation.\n"
         . "- Match their energy. If they're brief, be brief. If they have questions, answer them.\n"
         . "- Don't overwhelm them with info they didn't ask for. If they ask about a 1-bed, don't list every 1-bed — "
-        . "pick 2-3 that fit their budget or preference and mention those.\n";
+        . "pick 2-3 that fit their budget or preference and mention those.\n"
+        . "- HANDOFF RULES: If ANY of these apply, append the exact tag [HANDOFF] at the very end of your message "
+        . "(after your normal response text):\n"
+        . "  1. The person explicitly asks to speak with a real person or a broker.\n"
+        . "  2. The person seems frustrated, upset, or unhappy with the conversation.\n"
+        . "  3. The conversation topic requires detailed lease terms, fees, or legal info you can't provide.\n"
+        . "- If the person says they are NOT interested, no longer looking, or already found a place, "
+        . "append [NOT_INTERESTED] at the end of your response instead.\n"
+        . "- NEVER include [HANDOFF] or [NOT_INTERESTED] in the visible message text — "
+        . "always place the tag AFTER your natural reply, separated by a space.\n";
 
     // Admin-configured topics to avoid
     if ($offLimits) {
@@ -500,65 +751,143 @@ function fetchAvailableUnits() {
 }
 
 /**
- * Check if SMS automation is currently allowed by global settings.
- * Cached for 60 seconds to avoid DB query on every inbound message.
+ * Load SMS settings from DB (cached 60 seconds).
  */
-function isSMSAutomationAllowed() {
+function getSMSSettings() {
     global $sb;
-    static $cachedResult = null;
+    static $cachedConfig = null;
     static $cachedAt = 0;
 
-    if ($cachedResult !== null && (time() - $cachedAt) < 60) {
-        return $cachedResult;
+    if ($cachedConfig !== null && (time() - $cachedAt) < 60) {
+        return $cachedConfig;
     }
 
-    // Check master toggle
     $settings = $sb->select('settings', '*');
     $config = [];
     foreach ($settings as $s) {
         $config[$s['key']] = $s['value'];
     }
 
-    // Evaluate all checks
-    $allowed = true;
+    $cachedConfig = $config;
+    $cachedAt = time();
+    return $config;
+}
+
+/**
+ * Check if SMS is intentionally enabled (master toggle + campaign dates).
+ * If this returns false, messages should NOT be queued.
+ */
+function isSMSMasterEnabled() {
+    $config = getSMSSettings();
 
     // Master toggle
     if (($config['sms_enabled'] ?? 'off') !== 'on') {
-        $allowed = false;
+        return false;
     }
+
+    // Campaign date range (optional)
+    $campaignStart = $config['sms_campaign_start'] ?? '';
+    $campaignEnd   = $config['sms_campaign_end'] ?? '';
+    $today = date('Y-m-d');
+    if ($campaignStart && $today < $campaignStart) return false;
+    if ($campaignEnd && $today > $campaignEnd) return false;
+
+    return true;
+}
+
+/**
+ * Check if current time is within the send window (day + hours).
+ * If this returns false but master is enabled, messages should be queued.
+ */
+function isWithinSendWindow() {
+    $config = getSMSSettings();
 
     // Check active days (0=Sun, 1=Mon, ..., 6=Sat)
-    if ($allowed) {
-        $activeDays = $config['sms_active_days'] ?? '1,2,3,4,5';
-        $allowedDays = array_map('trim', explode(',', $activeDays));
-        $currentDay = (string) date('w');
-        if (!in_array($currentDay, $allowedDays)) {
-            $allowed = false;
+    $activeDays = $config['sms_active_days'] ?? '1,2,3,4,5';
+    $allowedDays = array_map('trim', explode(',', $activeDays));
+    $currentDay = (string) date('w');
+    if (!in_array($currentDay, $allowedDays)) {
+        return false;
+    }
+
+    // Check send window hours
+    $windowStart = $config['sms_window_start'] ?? '09:00';
+    $windowEnd   = $config['sms_window_end'] ?? '19:00';
+    $now = date('H:i');
+    if ($now < $windowStart || $now > $windowEnd) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Check if SMS automation is currently allowed (master + window).
+ * Backward-compatible wrapper.
+ */
+function isSMSAutomationAllowed() {
+    return isSMSMasterEnabled() && isWithinSendWindow();
+}
+
+/**
+ * Calculate the next datetime when the send window opens.
+ * Returns ISO 8601 timestamp.
+ */
+function getNextWindowOpen() {
+    $config = getSMSSettings();
+    $windowStart = $config['sms_window_start'] ?? '09:00';
+    $activeDays = $config['sms_active_days'] ?? '1,2,3,4,5';
+    $allowedDays = array_map('trim', explode(',', $activeDays));
+
+    $now = new DateTime('now', new DateTimeZone('America/New_York'));
+
+    // Check up to 8 days ahead (covers full week + 1)
+    for ($i = 0; $i <= 7; $i++) {
+        $candidate = clone $now;
+        if ($i > 0) {
+            $candidate->modify("+{$i} days");
+        }
+        $dayOfWeek = (string) $candidate->format('w');
+
+        if (in_array($dayOfWeek, $allowedDays)) {
+            $openTime = clone $candidate;
+            $openTime->setTime(
+                (int) explode(':', $windowStart)[0],
+                (int) explode(':', $windowStart)[1]
+            );
+
+            // If it's today and window hasn't opened yet, use today
+            // If it's a future day, use that day's window start
+            if ($openTime > $now) {
+                return $openTime->format('c');
+            }
         }
     }
 
-    // Check send window
-    if ($allowed) {
-        $windowStart = $config['sms_window_start'] ?? '09:00';
-        $windowEnd   = $config['sms_window_end'] ?? '19:00';
-        $now = date('H:i');
-        if ($now < $windowStart || $now > $windowEnd) {
-            $allowed = false;
-        }
-    }
+    // Fallback: tomorrow at window start
+    $fallback = clone $now;
+    $fallback->modify('+1 day');
+    $fallback->setTime(
+        (int) explode(':', $windowStart)[0],
+        (int) explode(':', $windowStart)[1]
+    );
+    return $fallback->format('c');
+}
 
-    // Check campaign date range (optional)
-    if ($allowed) {
-        $campaignStart = $config['sms_campaign_start'] ?? '';
-        $campaignEnd   = $config['sms_campaign_end'] ?? '';
-        $today = date('Y-m-d');
-        if ($campaignStart && $today < $campaignStart) $allowed = false;
-        if ($campaignEnd && $today > $campaignEnd) $allowed = false;
-    }
-
-    $cachedResult = $allowed;
-    $cachedAt = time();
-    return $allowed;
+/**
+ * Queue an inbound message for AI response when the send window opens.
+ */
+function queueSMSResponse($phone, $email, $inboundBody, $telnyxMessageId) {
+    global $sb;
+    $scheduledFor = getNextWindowOpen();
+    $sb->insert('sms_queue', [
+        'lead_phone'        => $phone,
+        'lead_email'        => $email,
+        'inbound_body'      => $inboundBody,
+        'telnyx_message_id' => $telnyxMessageId,
+        'scheduled_for'     => $scheduledFor,
+        'status'            => 'pending'
+    ]);
 }
 
 /**

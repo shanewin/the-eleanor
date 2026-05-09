@@ -35,6 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['supabase_access_token'] = $result['access_token'];
             $_SESSION['supabase_refresh_token'] = $result['refresh_token'] ?? null;
             $_SESSION['supabase_user'] = $result['user'] ?? null;
+
+            // Update last_login_at for this broker
+            require_once __DIR__ . '/../api/db_config.php';
+            global $sb;
+            $sb->update('brokers', ['last_login_at' => date('c')], ['email=eq.' . urlencode($email)]);
+
             header('Location: /admin/index.php');
             exit;
         } else {
