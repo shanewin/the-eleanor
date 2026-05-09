@@ -367,6 +367,13 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
                 }
             }
 
+            // Create notification
+            createNotificationFromWebhook('tour_booked',
+                'Tour Booked: ' . $leadName . ' — ' . $tourTime->format('D \\a\\t g:ia'),
+                $unitInterest ? 'Interested in ' . $unitInterest : null,
+                $leadContext['email'] ?? null, $brokerId,
+                $leadContext['email'] ? '/admin/calendar.php' : null);
+
             return [
                 'success'    => true,
                 'event_time' => $tourTime->format('l, F j \\a\\t g:ia'),
@@ -424,6 +431,19 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
                 'sender'     => 'Eleanor AI',
                 'status'     => 'system'
             ]);
+
+            // Find lead name for notification
+            $cancelLeadName = '';
+            if ($leadEmail) {
+                foreach (['waitlist_submissions', 'unit_inquiries'] as $t) {
+                    $l = $sb->selectOne($t, 'first_name,last_name', ['email=eq.' . urlencode($leadEmail)]);
+                    if ($l) { $cancelLeadName = trim(($l['first_name'] ?? '') . ' ' . ($l['last_name'] ?? '')); break; }
+                }
+            }
+            createNotificationFromWebhook('tour_cancelled',
+                'Tour Cancelled: ' . ($cancelLeadName ?: 'Lead'),
+                'Was scheduled for ' . $tourTime->format('l, F j \\a\\t g:ia') . '. Reason: ' . $reason,
+                $leadEmail, $tour['broker_id'] ?? null, '/admin/calendar.php');
 
             return ['success' => true, 'cancelled_time' => $tourTime->format('l, F j \\a\\t g:ia')];
 
@@ -531,6 +551,11 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
                     }
                 }
             }
+
+            createNotificationFromWebhook('tour_rescheduled',
+                'Tour Rescheduled: ' . $leadName . ' — ' . $tourTime->format('D \\a\\t g:ia'),
+                'Moved from ' . $oldTimeStr,
+                $leadEmail ?: null, $brokerId, '/admin/calendar.php');
 
             return [
                 'success'    => true,
@@ -1213,5 +1238,21 @@ if (!function_exists('autoUpdateLeadStatusFromWebhook')) {
                 return;
             }
         }
+    }
+}
+
+// Notification helper (safe to call from any context)
+if (!function_exists('createNotificationFromWebhook')) {
+    function createNotificationFromWebhook($type, $title, $body, $leadEmail = null, $brokerId = null, $link = null) {
+        global $sb;
+        $sb->insert('notifications', [
+            'type'       => $type,
+            'title'      => $title,
+            'body'       => $body,
+            'lead_email' => $leadEmail,
+            'broker_id'  => $brokerId,
+            'is_read'    => false,
+            'link'       => $link
+        ]);
     }
 }

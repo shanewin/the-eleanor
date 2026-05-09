@@ -182,6 +182,113 @@ async function respondLead(email, source, method) {
     }
 }
 
+// ── Notifications ──
+let notifDropdownOpen = false;
+
+const NOTIF_ICONS = {
+    new_lead:         { icon: 'bi-person-plus-fill', bg: 'rgba(59,130,246,0.2)', color: '#93c5fd' },
+    handoff:          { icon: 'bi-arrow-left-right', bg: 'rgba(234,179,8,0.2)', color: '#fde047' },
+    tour_booked:      { icon: 'bi-calendar-check', bg: 'rgba(34,197,94,0.2)', color: '#86efac' },
+    tour_cancelled:   { icon: 'bi-calendar-x', bg: 'rgba(239,68,68,0.2)', color: '#fca5a5' },
+    tour_rescheduled: { icon: 'bi-calendar2-range', bg: 'rgba(139,92,246,0.2)', color: '#c4b5fd' },
+    follow_up_cold:   { icon: 'bi-snow', bg: 'rgba(107,114,128,0.2)', color: '#9ca3af' }
+};
+
+function toggleNotifDropdown() {
+    const dd = document.getElementById('notifDropdown');
+    notifDropdownOpen = !notifDropdownOpen;
+    dd.style.display = notifDropdownOpen ? 'block' : 'none';
+    if (notifDropdownOpen) fetchNotifications();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (notifDropdownOpen && !e.target.closest('#notifBellBtn') && !e.target.closest('#notifDropdown')) {
+        document.getElementById('notifDropdown').style.display = 'none';
+        notifDropdownOpen = false;
+    }
+});
+
+async function fetchNotifications() {
+    try {
+        const res = await fetch(API + '?action=get_notifications');
+        const data = await res.json();
+
+        // Update bell badge
+        const badge = document.getElementById('notifBellBadge');
+        if (badge) {
+            if (data.unread_count > 0) {
+                badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Render dropdown if open
+        if (notifDropdownOpen) {
+            renderNotifDropdown(data.notifications || []);
+        }
+    } catch(e) {}
+}
+
+function renderNotifDropdown(notifications) {
+    const list = document.getElementById('notifList');
+    if (!notifications.length) {
+        list.innerHTML = '<div class="text-center text-white-50 small py-4">No notifications</div>';
+        return;
+    }
+
+    list.innerHTML = notifications.slice(0, 30).map(n => {
+        const config = NOTIF_ICONS[n.type] || NOTIF_ICONS.new_lead;
+        const timeAgo = formatTimeAgo(n.created_at);
+        const unreadClass = n.is_read ? '' : ' unread';
+        const link = n.link || '#';
+
+        return '<a href="' + esc(link) + '" class="notif-item' + unreadClass + '" onclick="markNotifRead(\'' + esc(n.id) + '\')">'
+            + '<div class="notif-icon" style="background:' + config.bg + ';color:' + config.color + '"><i class="bi ' + config.icon + '"></i></div>'
+            + '<div class="flex-grow-1 min-width-0">'
+            + '<div class="text-white small" style="font-size:0.8rem;line-height:1.3">' + esc(n.title) + '</div>'
+            + (n.body ? '<div class="text-white-50" style="font-size:0.7rem;line-height:1.3;margin-top:1px">' + esc(n.body).substring(0, 80) + '</div>' : '')
+            + '<div class="text-white-50" style="font-size:0.65rem;margin-top:2px">' + timeAgo + '</div>'
+            + '</div>'
+            + '</a>';
+    }).join('');
+}
+
+function formatTimeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return mins + 'm ago';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    if (days < 7) return days + 'd ago';
+    return new Date(dateStr).toLocaleDateString();
+}
+
+async function markNotifRead(id) {
+    try {
+        await fetch(API + '?action=mark_notifications_read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [id] })
+        });
+    } catch(e) {}
+}
+
+async function markAllNotifRead() {
+    try {
+        await fetch(API + '?action=mark_notifications_read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        fetchNotifications();
+    } catch(e) {}
+}
+
 // ── Unread SMS Badge (sidebar) ──
 async function updateSidebarUnreadBadge() {
     try {
@@ -202,8 +309,12 @@ async function updateSidebarUnreadBadge() {
     } catch(e) {}
 }
 
-// Update badge on load and every 30 seconds
+// Update badges on load and every 30 seconds
 document.addEventListener('DOMContentLoaded', () => {
     updateSidebarUnreadBadge();
-    setInterval(updateSidebarUnreadBadge, 30000);
+    fetchNotifications();
+    setInterval(() => {
+        updateSidebarUnreadBadge();
+        fetchNotifications();
+    }, 30000);
 });

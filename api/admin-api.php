@@ -46,6 +46,8 @@ switch ($action) {
     case 'update_my_profile': updateMyProfile(); break;
     case 'upload_profile_picture': uploadProfilePicture(); break;
     case 'get_unified_timeline': getUnifiedTimeline($_GET['email'] ?? ''); break;
+    case 'get_notifications': getNotifications(); break;
+    case 'mark_notifications_read': markNotificationsRead(); break;
     case 'mark_sms_read': markSMSRead(); break;
     case 'get_tour_requests': getTourRequests(); break;
     case 'add_tour_request': addTourRequest(); break;
@@ -702,6 +704,83 @@ function autoUpdateLeadStatus($email, $newStatus) {
     }
 }
 
+/* ── Notifications ── */
+
+/**
+ * Create a notification. Safe to call from any context.
+ */
+function createNotification($type, $title, $body, $leadEmail = null, $brokerId = null, $link = null) {
+    global $sb;
+    $sb->insert('notifications', [
+        'type'       => $type,
+        'title'      => $title,
+        'body'       => $body,
+        'lead_email' => $leadEmail,
+        'broker_id'  => $brokerId,
+        'is_read'    => false,
+        'link'       => $link
+    ]);
+}
+
+function getNotifications() {
+    global $sb;
+
+    $broker = getCurrentBroker();
+    $isOwner = isOwner();
+
+    if ($isOwner) {
+        $notifications = $sb->select('notifications', '*', [], 'created_at.desc', 50);
+    } else {
+        $brokerId = $broker['id'] ?? 0;
+        // Broker sees: their notifications + notifications with no broker_id (global)
+        $own = $sb->select('notifications', '*', ['broker_id=eq.' . intval($brokerId)], 'created_at.desc', 50);
+        $global = $sb->select('notifications', '*', ['broker_id=is.null'], 'created_at.desc', 25);
+        $notifications = array_merge($own, $global);
+        // Sort by created_at desc
+        usort($notifications, function($a, $b) {
+            return strtotime($b['created_at']) - strtotime($a['created_at']);
+        });
+        $notifications = array_slice($notifications, 0, 50);
+    }
+
+    $unreadCount = 0;
+    foreach ($notifications as $n) {
+        if (empty($n['is_read'])) $unreadCount++;
+    }
+
+    echo json_encode([
+        'notifications' => $notifications,
+        'unread_count'   => $unreadCount
+    ]);
+}
+
+function markNotificationsRead() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+    $ids = $input['ids'] ?? null;
+
+    $broker = getCurrentBroker();
+    $isOwner = isOwner();
+
+    if ($ids && is_array($ids)) {
+        // Mark specific notifications
+        foreach ($ids as $id) {
+            $sb->update('notifications', ['is_read' => true], ['id=eq.' . $id]);
+        }
+    } else {
+        // Mark all visible notifications as read
+        if ($isOwner) {
+            $sb->update('notifications', ['is_read' => true], ['is_read=eq.false']);
+        } else {
+            $brokerId = $broker['id'] ?? 0;
+            $sb->update('notifications', ['is_read' => true], ['broker_id=eq.' . intval($brokerId), 'is_read=eq.false']);
+            $sb->update('notifications', ['is_read' => true], ['broker_id=is.null', 'is_read=eq.false']);
+        }
+    }
+
+    echo json_encode(['success' => true]);
+}
+
 /* ── Communications ── */
 
 function getCommunications($email) {
@@ -989,6 +1068,19 @@ function addTourRequest() {
             'status'     => 'system'
         ]);
     }
+
+    // Create notification
+    $leadName = '';
+    if ($email) {
+        $l = findLeadByPhoneOrEmail(null, $email);
+        if ($l) $leadName = trim(($l['first_name'] ?? '') . ' ' . ($l['last_name'] ?? ''));
+    }
+    $tz2 = new DateTimeZone('America/New_York');
+    $dt2 = new DateTime($scheduledAt, $tz2);
+    createNotification('tour_booked',
+        'Tour Booked: ' . ($leadName ?: 'Lead') . ' — ' . $dt2->format('D \\a\\t g:ia'),
+        $unit ? 'Unit ' . $unit : null,
+        $email, $brokerId, '/admin/calendar.php');
 
     echo json_encode(['success' => true, 'tour' => $result]);
 }

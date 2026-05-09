@@ -98,11 +98,30 @@ foreach ($toProcess as $item) {
             'updated_at'      => date('c')
         ], ['lead_phone=eq.' . urlencode($phone)]);
 
-        // If second attempt, mark as cold
+        // If second attempt, mark as cold and notify
         if ($attempt === 2) {
             $sb->update('sms_automation', [
                 'followup_status' => 'cold'
             ], ['lead_phone=eq.' . urlencode($phone)]);
+
+            // Find lead name and assigned broker for notification
+            $coldLeadName = '';
+            $coldBrokerId = null;
+            if ($email) {
+                foreach (['waitlist_submissions', 'unit_inquiries'] as $t) {
+                    $l = $sb->selectOne($t, 'first_name,last_name,assigned_to', ['email=eq.' . urlencode($email)]);
+                    if ($l) {
+                        $coldLeadName = trim(($l['first_name'] ?? '') . ' ' . ($l['last_name'] ?? ''));
+                        $coldBrokerId = $l['assigned_to'] ?? null;
+                        break;
+                    }
+                }
+            }
+            createNotificationFromWebhook('follow_up_cold',
+                'Lead Gone Cold: ' . ($coldLeadName ?: 'Lead'),
+                'No response after 2 follow-ups',
+                $email, $coldBrokerId,
+                $email ? '/admin/communications.php?email=' . urlencode($email) : null);
         }
 
         error_log("Follow-up $attempt sent to $phone");

@@ -1,7 +1,26 @@
 <div class="sidebar">
-    <div class="brand">THE ELEANOR</div>
-    <div class="brand-sub">Command Center</div>
-    <nav class="nav nav-pills flex-column gap-1">
+    <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <div class="brand">THE ELEANOR</div>
+            <div class="brand-sub">Command Center</div>
+        </div>
+        <div class="position-relative" style="margin-top:2px">
+            <button class="btn btn-link text-white-50 p-0 position-relative" id="notifBellBtn" onclick="toggleNotifDropdown()" style="font-size:1.1rem" title="Notifications">
+                <i class="bi bi-bell"></i>
+                <span class="badge bg-danger rounded-pill position-absolute" id="notifBellBadge" style="display:none;top:-4px;right:-8px;font-size:0.55rem;padding:2px 5px"></span>
+            </button>
+        </div>
+    </div>
+    <div id="notifDropdown" class="notif-dropdown" style="display:none">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-secondary">
+            <span class="small fw-semibold text-white">Notifications</span>
+            <a href="#" class="small text-primary text-decoration-none" onclick="event.preventDefault(); markAllNotifRead()">Mark all read</a>
+        </div>
+        <div id="notifList" style="max-height:350px;overflow-y:auto">
+            <div class="text-center text-white-50 small py-4">No notifications</div>
+        </div>
+    </div>
+    <nav class="nav nav-pills flex-column gap-1 mt-3">
         <a href="/admin/" class="nav-link<?= ($activePage ?? '') === 'overview' ? ' active' : '' ?>">
             <i class="bi bi-grid-1x2"></i> Overview
         </a>

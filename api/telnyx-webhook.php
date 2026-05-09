@@ -253,6 +253,26 @@ function handleInboundSMS($payload) {
                 notifyBrokerOfHandoff($normalizedPhone, $leadEmail, $text);
             }
 
+            // Create notification
+            $leadName = '';
+            $assignedBrokerId = null;
+            if ($leadEmail) {
+                foreach (['waitlist_submissions', 'unit_inquiries'] as $_t) {
+                    $_l = $sb->selectOne($_t, 'first_name,last_name,assigned_to', ['email=eq.' . urlencode($leadEmail)]);
+                    if ($_l) {
+                        $leadName = trim(($_l['first_name'] ?? '') . ' ' . ($_l['last_name'] ?? ''));
+                        $assignedBrokerId = $_l['assigned_to'] ?? null;
+                        break;
+                    }
+                }
+            }
+            $notifType = $handoff ? 'handoff' : 'follow_up_cold';
+            $notifTitle = $handoff
+                ? 'Handoff: ' . ($leadName ?: 'Lead') . ' needs follow-up'
+                : 'Not Interested: ' . ($leadName ?: 'Lead');
+            createNotificationFromWebhook($notifType, $notifTitle, substr($text, 0, 100), $leadEmail, $assignedBrokerId,
+                $leadEmail ? '/admin/communications.php?email=' . urlencode($leadEmail) : null);
+
             error_log("AI handoff triggered for $normalizedPhone — reason: $handoffReason");
         }
     } else {

@@ -22,6 +22,8 @@ if (isset($_GET['logout'])) { logout(); }
     <script>
         const SUPABASE_URL = '<?= defined("SUPABASE_URL") ? SUPABASE_URL : "" ?>';
         const SUPABASE_KEY = '<?= defined("SUPABASE_PUBLISHABLE_KEY") ? SUPABASE_PUBLISHABLE_KEY : "" ?>';
+        const USER_ROLE = '<?= getUserRole() ?>';
+        const USER_EMAIL = '<?= htmlspecialchars($_SESSION["supabase_user"]["email"] ?? "") ?>';
     </script>
 </head>
 <body>
