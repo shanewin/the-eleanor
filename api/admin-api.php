@@ -1248,15 +1248,18 @@ function engageAIPreview() {
     // Check for existing conversation
     $existingMessages = $sb->select('sms_messages', 'id',
         ['lead_phone=eq.' . urlencode($phone)], null, 1);
-    if (!empty($existingMessages)) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Conversation already exists for this lead. Check Communications.']);
-        return;
+    $hasConversation = !empty($existingMessages);
+
+    // Generate the right type of message
+    if ($hasConversation) {
+        // Re-engagement message — contextual, based on conversation history
+        $msg = generateFollowupMessage($phone, 1);
+    } else {
+        // Welcome message — first contact
+        $msg = generateInitialMessage($phone, $email);
     }
 
-    // Generate the message (but don't send it)
-    $welcomeMsg = generateInitialMessage($phone, $email);
-    if (!$welcomeMsg) {
+    if (!$msg) {
         http_response_code(500);
         echo json_encode(['error' => 'AI failed to generate message. Try again.']);
         return;
@@ -1265,10 +1268,11 @@ function engageAIPreview() {
     $name = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
 
     echo json_encode([
-        'success' => true,
-        'phone'   => $phone,
-        'name'    => $name,
-        'message' => $welcomeMsg
+        'success'        => true,
+        'phone'          => $phone,
+        'name'           => $name,
+        'message'        => $msg,
+        'is_reengagement' => $hasConversation
     ]);
 }
 
