@@ -130,16 +130,35 @@ function renderLeadsTable() {
             const elapsedMs = Date.now() - createdAt.getTime();
             firstResponseHtml = '<div class="d-flex align-items-center gap-2">'
                 + '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>' + formatElapsed(elapsedMs) + '</span>'
-                + '<div class="dropdown" onclick="event.stopPropagation()">'
-                + '<button class="btn btn-outline-secondary btn-sm dropdown-toggle" style="font-size:0.7rem;padding:0.15rem 0.4rem;" data-bs-toggle="dropdown">Mark</button>'
-                + '<ul class="dropdown-menu dropdown-menu-dark">'
-                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'SMS\')">SMS</a></li>'
-                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Email\')">Email</a></li>'
-                + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Phone\')">Phone</a></li>'
-                + '<li><hr class="dropdown-divider"></li>'
-                + '<li><a class="dropdown-item text-info" href="#" onclick="event.preventDefault(); engageAI(\'' + escapedLeadEmail + '\')"><i class="bi bi-robot me-1"></i>Auto Text</a></li>'
-                + '</ul></div></div>';
+                + '<select class="form-select form-select-sm bg-dark border-secondary text-white" style="width:auto;font-size:0.75rem;" onclick="event.stopPropagation()" onchange="handleMarkAction(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', this.value); this.value=\'\'">'
+                + '<option value="" selected>Mark</option>'
+                + '<option value="sms">SMS</option>'
+                + '<option value="email">Email</option>'
+                + '<option value="phone">Phone</option>'
+                + '<option value="auto_text">Auto Text</option>'
+                + '</select>'
+                + '</div>';
         }
+
+        // Status column
+        const statusValue = lead.lead_status || 'New';
+        const escapedEmailForStatus = esc(lead.email || '').replace(/'/g, "\\'");
+        const escapedSourceForStatus = esc(lead.source || '').replace(/'/g, "\\'");
+        const statusOptions = ['New','Contacted','Showing Scheduled','Showed','Applied','Leased','Lost'];
+        const statusColor = {
+            'New': 'primary',
+            'Contacted': 'info',
+            'Showing Scheduled': 'warning',
+            'Showed': 'secondary',
+            'Applied': 'success',
+            'Leased': 'success',
+            'Lost': 'danger'
+        }[statusValue] || 'secondary';
+        const statusHtml = '<select class="form-select form-select-sm bg-dark border-' + statusColor + ' text-' + statusColor + '" '
+            + 'style="width:auto;font-size:0.75rem;" onclick="event.stopPropagation()" '
+            + 'onchange="updateLeadStatus(\'' + escapedEmailForStatus + '\', \'' + escapedSourceForStatus + '\', this.value)">'
+            + statusOptions.map(s => '<option value="' + esc(s) + '"' + (s === statusValue ? ' selected' : '') + '>' + esc(s) + '</option>').join('')
+            + '</select>';
 
         // Delete button
         const escapedEmailForDelete = esc(lead.email || '').replace(/'/g, "\\'");
@@ -153,6 +172,7 @@ function renderLeadsTable() {
             + '<td><div class="d-flex align-items-center gap-2">' + avatar + '<div><span class="fw-semibold text-white">' + esc(lead.first_name) + ' ' + esc(lead.last_name) + '</span>' + submissionBadge + '</div></div></td>'
             + '<td>' + contactHtml + '</td>'
             + '<td>' + intentHtml + '</td>'
+            + '<td>' + statusHtml + '</td>'
             + '<td>' + engagementLabel + '</td>'
             + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
             + '<td>' + assignedHtml + '</td>'
@@ -161,6 +181,30 @@ function renderLeadsTable() {
 
         tbody.appendChild(row);
     });
+}
+
+// ── Mark dropdown dispatcher (native <select>) ──
+function handleMarkAction(email, source, action) {
+    if (!action) return;
+    switch (action) {
+        case 'sms':       respondLead(email, source, 'SMS'); break;
+        case 'email':     respondLead(email, source, 'Email'); break;
+        case 'phone':     respondLead(email, source, 'Phone'); break;
+        case 'auto_text': engageAI(email); break;
+    }
+}
+
+// ── Update Lead Status ──
+async function updateLeadStatus(email, source, status) {
+    try {
+        await fetch(API + '?action=update_lead_status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, source, status })
+        });
+    } catch (err) {
+        console.error('Status update failed:', err);
+    }
 }
 
 // ── Delete Lead ──

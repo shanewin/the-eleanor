@@ -18,6 +18,7 @@ include __DIR__ . '/includes/layout-header.php';
                         <th class="sortable" onclick="sortLeads('last_name')">Lead</th>
                         <th>Contact</th>
                         <th>Intent</th>
+                        <th class="sortable" onclick="sortLeads('lead_status')">Status</th>
                         <th class="sortable" onclick="sortLeads('event_count')">Engagement</th>
                         <th class="sortable" onclick="sortLeads('grade_score')">Grade</th>
                         <th>Assigned</th>
@@ -25,7 +26,7 @@ include __DIR__ . '/includes/layout-header.php';
                         <th>Management</th>
                     </tr>
                 </thead>
-                <tbody><tr><td colspan="10" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
+                <tbody><tr><td colspan="11" class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary" role="status"></div><span class="text-body-tertiary ms-2">Loading...</span></td></tr></tbody>
             </table>
         </div>
     </div>
