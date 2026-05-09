@@ -197,6 +197,41 @@ function showConfirm({ title, message, icon, btnText, btnClass, onConfirm }) {
     new bootstrap.Modal(document.getElementById('confirmModal')).show();
 }
 
+// ── Bootstrap dropdowns inside .table-responsive get clipped by overflow.
+// Override Popper after it positions and force position:fixed so the menu
+// escapes any clipping ancestor. ──
+document.addEventListener('shown.bs.dropdown', function(e) {
+    const toggle = e.target;
+    if (!toggle.closest('.table-responsive')) return;
+    const menu = toggle.parentElement && toggle.parentElement.querySelector('.dropdown-menu.show');
+    if (!menu) return;
+
+    // Compute viewport-relative position from the toggle button rect
+    const rect = toggle.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth;
+    menu.style.position = 'fixed';
+    menu.style.inset = 'auto'; // clear any inset from Popper
+    menu.style.top = rect.bottom + 'px';
+    menu.style.left = (rect.right - menuWidth) + 'px';
+    menu.style.transform = 'none';
+    menu.style.margin = '0';
+    menu.dataset.repositioned = '1';
+});
+
+document.addEventListener('hidden.bs.dropdown', function(e) {
+    const toggle = e.target;
+    const menu = toggle.parentElement && toggle.parentElement.querySelector('.dropdown-menu');
+    if (menu && menu.dataset.repositioned) {
+        menu.style.position = '';
+        menu.style.inset = '';
+        menu.style.top = '';
+        menu.style.left = '';
+        menu.style.transform = '';
+        menu.style.margin = '';
+        delete menu.dataset.repositioned;
+    }
+});
+
 // ── Notifications ──
 let notifDropdownOpen = false;
 

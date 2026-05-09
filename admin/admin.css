@@ -367,12 +367,8 @@ th.sortable.active { color: #6366f1; }
 .showing-dot.confirmed { background: #22c55e; }
 .showing-dot.pending { background: #eab308; }
 
-/* Allow Bootstrap dropdowns to escape the table-responsive clipping context.
-   Our admin tables don't actually need horizontal scrolling, and overflow:auto
-   was clipping the Mark/action dropdowns. */
-.table-responsive {
-    overflow: visible !important;
-}
+/* Dropdown menus inside tables — promote to position:fixed via JS hook to
+   escape the .table-responsive overflow clipping. */
 .dropdown-menu.show {
     z-index: 1080;
 }
