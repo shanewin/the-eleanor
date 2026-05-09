@@ -172,6 +172,18 @@ function processForm(array $config): void {
             ? ($config['enrich_args'])($fields)
             : [$fields['email'], $fields['firstName'] ?? '', $fields['lastName'] ?? '', $fields['phone'] ?? ''];
         call_user_func_array('enrichLead', $enrichArgs);
+
+        // Bell notification for new lead
+        $leadName = trim(($fields['firstName'] ?? '') . ' ' . ($fields['lastName'] ?? ''));
+        $sb->insert('notifications', [
+            'type'       => 'new_lead',
+            'title'      => 'New Lead: ' . ($leadName ?: $email),
+            'body'       => ucfirst(str_replace('_', ' ', $table)) . ($fields['unit'] ?? '' ? ' — Unit ' . $fields['unit'] : ''),
+            'lead_email' => $email,
+            'broker_id'  => null,
+            'is_read'    => false,
+            'link'       => '/admin/communications.php?email=' . urlencode($email)
+        ]);
     } catch (Exception $e) {
         error_log("Database insert failed ($table): " . $e->getMessage());
     }
