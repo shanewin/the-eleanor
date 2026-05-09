@@ -42,7 +42,11 @@ async function loadCommPipeline() {
             if (sms) {
                 const aiColor = sms.ai_status === 'active' ? 'success' : sms.ai_status === 'paused_handoff' ? 'warning' : 'secondary';
                 const aiLabel = sms.ai_status === 'active' ? 'AI Active' : sms.ai_status === 'paused_handoff' ? 'Handoff' : 'Paused';
-                smsBadge = '<span class="badge bg-' + aiColor + ' bg-opacity-25 text-' + aiColor + '" style="font-size:0.7rem">' + aiLabel + '</span>';
+                // Unread badge
+                const unreadBadge = sms.unread > 0
+                    ? '<span class="badge bg-danger rounded-pill ms-1" style="font-size:0.65rem">' + sms.unread + '</span>'
+                    : '';
+                smsBadge = '<span class="badge bg-' + aiColor + ' bg-opacity-25 text-' + aiColor + '" style="font-size:0.7rem">' + aiLabel + '</span>' + unreadBadge;
 
                 // Follow-up status badge
                 if (sms.followup_status === 'sent_1') {
@@ -115,6 +119,13 @@ async function showCommTimeline(email) {
         renderTimeline(data.timeline);
         setupReplyBox(data.lead);
         setupAIToggle(data);
+
+        // Mark messages as read
+        fetch(API + '?action=mark_sms_read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
     } catch(err) {
         container.innerHTML = '<div class="text-center text-danger py-5">Error loading timeline.</div>';
     }

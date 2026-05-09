@@ -181,3 +181,29 @@ async function respondLead(email, source, method) {
         alert('Connection error while marking response.');
     }
 }
+
+// ── Unread SMS Badge (sidebar) ──
+async function updateSidebarUnreadBadge() {
+    try {
+        const res = await fetch(API + '?action=sms_conversations');
+        const convos = await res.json();
+        if (!Array.isArray(convos)) return;
+
+        const totalUnread = convos.reduce((sum, c) => sum + (c.unread || 0), 0);
+        const badge = document.getElementById('sidebarUnreadBadge');
+        if (badge) {
+            if (totalUnread > 0) {
+                badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    } catch(e) {}
+}
+
+// Update badge on load and every 30 seconds
+document.addEventListener('DOMContentLoaded', () => {
+    updateSidebarUnreadBadge();
+    setInterval(updateSidebarUnreadBadge, 30000);
+});

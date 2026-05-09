@@ -46,6 +46,7 @@ switch ($action) {
     case 'update_my_profile': updateMyProfile(); break;
     case 'upload_profile_picture': uploadProfilePicture(); break;
     case 'get_unified_timeline': getUnifiedTimeline($_GET['email'] ?? ''); break;
+    case 'mark_sms_read': markSMSRead(); break;
     case 'get_tour_requests': getTourRequests(); break;
     case 'update_tour_request': updateTourRequest(); break;
     case 'google_calendar_connect': googleCalendarConnect(); break;
@@ -956,6 +957,30 @@ function updateTourRequest() {
     echo json_encode(['success' => true]);
 }
 
+/**
+ * Mark all inbound SMS messages as read for a lead (by email or phone).
+ */
+function markSMSRead() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+    $email = $input['email'] ?? '';
+    $phone = $input['phone'] ?? '';
+
+    if ($email) {
+        $sb->update('sms_messages', ['is_read' => true],
+            ['lead_email=eq.' . urlencode($email), 'direction=eq.inbound', 'is_read=eq.false']);
+    } elseif ($phone) {
+        require_once __DIR__ . '/telnyx-sms.php';
+        $normalized = normalizePhone($phone);
+        if ($normalized) {
+            $sb->update('sms_messages', ['is_read' => true],
+                ['lead_phone=eq.' . urlencode($normalized), 'direction=eq.inbound', 'is_read=eq.false']);
+        }
+    }
+
+    echo json_encode(['success' => true]);
+}
+
 /* ── SMS Conversations ── */
 
 /**
@@ -984,8 +1009,8 @@ function getSMSConversations() {
             ];
         }
         $convos[$phone]['message_count']++;
-        // Count inbound messages as "unread" (simplified — no read tracking yet)
-        if ($msg['direction'] === 'inbound') {
+        // Count unread inbound messages
+        if ($msg['direction'] === 'inbound' && empty($msg['is_read'])) {
             $convos[$phone]['unread']++;
         }
     }

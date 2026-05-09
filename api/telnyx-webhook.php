@@ -128,7 +128,8 @@ function handleInboundSMS($payload) {
         'sender_name'      => null,
         'body'             => $text,
         'telnyx_message_id'=> $messageId,
-        'status'           => 'received'
+        'status'           => 'received',
+        'is_read'          => false
     ]);
 
     // Track last lead message time + reset follow-up counter

@@ -8,8 +8,9 @@
         <a href="/admin/leads.php" class="nav-link<?= ($activePage ?? '') === 'leads' ? ' active' : '' ?>">
             <i class="bi bi-people"></i> Leads
         </a>
-        <a href="/admin/communications.php" class="nav-link<?= ($activePage ?? '') === 'communications' ? ' active' : '' ?>">
+        <a href="/admin/communications.php" class="nav-link<?= ($activePage ?? '') === 'communications' ? ' active' : '' ?>" style="position:relative">
             <i class="bi bi-chat-left-text"></i> Communications
+            <span class="badge bg-danger rounded-pill" id="sidebarUnreadBadge" style="display:none;position:absolute;right:10px;font-size:0.6rem"></span>
         </a>
         <?php if (isOwner()): ?>
         <a href="/admin/brokers.php" class="nav-link<?= ($activePage ?? '') === 'brokers' ? ' active' : '' ?>">
