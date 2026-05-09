@@ -261,10 +261,42 @@ function getLeadDetail($email) {
         }
     }
 
+    // Gather all Waitlist + Unit Interest submissions for this lead (by email + phone tail)
+    $primaryPhone = preg_replace('/\D/', '', $submission['phone'] ?? '');
+    $phoneTail = $primaryPhone && strlen($primaryPhone) >= 10 ? substr($primaryPhone, -10) : null;
+    $submissions = [];
+    foreach ([
+        ['table' => 'waitlist_submissions', 'source' => 'Waitlist'],
+        ['table' => 'unit_inquiries', 'source' => 'Unit Interest']
+    ] as $src) {
+        $rows = $sb->select($src['table'], '*', ['email=eq.' . urlencode($email)], 'created_at.asc');
+        foreach ($rows as $r) {
+            $r['source'] = $src['source'];
+            $submissions[] = $r;
+        }
+        if ($phoneTail) {
+            $allRows = $sb->select($src['table'], '*');
+            foreach ($allRows as $r) {
+                $rPhone = preg_replace('/\D/', '', $r['phone'] ?? '');
+                if ($rPhone && substr($rPhone, -10) === $phoneTail
+                    && strtolower($r['email']) !== strtolower($email)) {
+                    $r['source'] = $src['source'];
+                    $submissions[] = $r;
+                }
+            }
+        }
+    }
+    usort($submissions, function($a, $b) {
+        return strtotime($a['created_at']) - strtotime($b['created_at']);
+    });
+
     $merged = array_merge($submission, $enrichment);
     if (!isset($merged['phone_number']) && isset($merged['phone'])) {
         $merged['phone_number'] = $merged['phone'];
     }
+
+    $merged['submissions'] = $submissions;
+    $merged['submission_count'] = count($submissions);
 
     // Resolve broker name
     if (!empty($merged['assigned_to'])) {

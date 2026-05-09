@@ -120,19 +120,44 @@ function renderFullProfile(intel, logs, container) {
     // Right column
     html += '<div class="col-lg-6">';
 
-    // Submission Details
+    // Submission Details — show all submissions for this lead
+    const allSubmissions = (intel.submissions && intel.submissions.length > 0)
+        ? intel.submissions
+        : [intel]; // fallback to single intel object if backend hasn't returned submissions
+
+    const submissionRow = (label, val) =>
+        val ? '<tr><td class="text-white-50" style="width:40%">' + esc(label) + '</td><td>' + esc(String(val)) + '</td></tr>' : '';
+
+    const renderOneSubmission = (s, idx, total) => {
+        const sourceLabel = s.source || s.submission_type || 'General';
+        const sourceColor = sourceLabel === 'Waitlist' ? 'primary' : (sourceLabel === 'Unit Interest' ? 'success' : 'secondary');
+        const dt = s.created_at ? new Date(s.created_at).toLocaleString() : 'N/A';
+        const heading = total > 1
+            ? '<div class="d-flex justify-content-between align-items-center mb-2"><span class="badge bg-' + sourceColor + ' bg-opacity-25 text-' + sourceColor + '" style="font-size:0.7rem">' + esc(sourceLabel) + '</span><span class="text-white-50" style="font-size:0.75rem">' + esc(dt) + '</span></div>'
+            : '';
+        return '<div ' + (idx > 0 ? 'class="border-top border-secondary mt-3 pt-3"' : '') + '>'
+            + heading
+            + '<table class="table table-sm table-dark mb-0" style="font-size:0.85rem"><tbody>'
+            + (total === 1 ? '<tr><td class="text-white-50" style="width:40%">Form</td><td class="text-primary fw-semibold">' + esc(sourceLabel) + '</td></tr>' : '')
+            + (total === 1 ? '<tr><td class="text-white-50">Submitted</td><td>' + esc(dt) + '</td></tr>' : '')
+            + submissionRow('Unit', s.unit)
+            + submissionRow('Unit Type', s.unit_type)
+            + (s.budget ? '<tr><td class="text-white-50">Budget</td><td>$' + esc(String(s.budget)).replace(/^\$/, '') + '</td></tr>' : '')
+            + submissionRow('Move-In', s.move_in_date)
+            + submissionRow('How Found Us', s.hear_about_us)
+            + (s.message ? '<tr><td class="text-white-50">Message</td><td style="white-space:pre-wrap">' + esc(s.message) + '</td></tr>' : '')
+            + '</tbody></table>'
+            + '</div>';
+    };
+
+    const headingTitle = allSubmissions.length > 1
+        ? 'Submission Details <span class="badge bg-info bg-opacity-25 text-info ms-1" style="font-size:0.65rem">' + allSubmissions.length + '</span>'
+        : 'Submission Details';
+
     html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-        + '<h6 class="text-white-50 text-uppercase fw-semibold" style="font-size:0.7rem;letter-spacing:0.1em">Submission Details</h6>'
-        + '<table class="table table-sm table-dark mb-0" style="font-size:0.85rem"><tbody>'
-        + '<tr><td class="text-white-50" style="width:40%">Form</td><td class="text-primary fw-semibold">' + esc(intel.submission_type || 'General') + '</td></tr>'
-        + '<tr><td class="text-white-50">Submitted</td><td>' + esc(intel.created_at ? new Date(intel.created_at).toLocaleString() : 'N/A') + '</td></tr>'
-        + (intel.unit ? '<tr><td class="text-white-50">Unit</td><td>' + esc(intel.unit) + '</td></tr>' : '')
-        + (intel.unit_type ? '<tr><td class="text-white-50">Unit Type</td><td>' + esc(intel.unit_type) + '</td></tr>' : '')
-        + (intel.budget ? '<tr><td class="text-white-50">Budget</td><td>$' + esc(String(intel.budget)).replace(/^\$/, '') + '</td></tr>' : '')
-        + (intel.move_in_date ? '<tr><td class="text-white-50">Move-In</td><td>' + esc(intel.move_in_date) + '</td></tr>' : '')
-        + (intel.hear_about_us ? '<tr><td class="text-white-50">How Found Us</td><td>' + esc(intel.hear_about_us) + '</td></tr>' : '')
-        + (intel.message ? '<tr><td class="text-white-50">Message</td><td style="white-space:pre-wrap">' + esc(intel.message) + '</td></tr>' : '')
-        + '</tbody></table></div></div>';
+        + '<h6 class="text-white-50 text-uppercase fw-semibold mb-3" style="font-size:0.7rem;letter-spacing:0.1em">' + headingTitle + '</h6>'
+        + allSubmissions.map((s, i) => renderOneSubmission(s, i, allSubmissions.length)).join('')
+        + '</div></div>';
 
     // Grade Explanation
     html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
