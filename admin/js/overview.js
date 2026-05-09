@@ -161,6 +161,8 @@ function renderOverviewTable(leads) {
                 + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Phone\')">Phone</a></li>'
                 + '<li><hr class="dropdown-divider"></li>'
                 + '<li><a class="dropdown-item text-info" href="#" onclick="event.preventDefault(); engageAI(\'' + escapedLeadEmail + '\')"><i class="bi bi-robot me-1"></i>Auto Text</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); deleteLeadFromOverview(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\')"><i class="bi bi-trash me-1"></i>Delete</a></li>'
                 + '</ul></div></div>';
         }
 
@@ -406,6 +408,25 @@ async function toggleOverviewSMS() {
     } catch (e) {
         statusEl.innerHTML = '<span class="badge bg-danger bg-opacity-25 text-danger">Error</span>';
         toggle.checked = !toggle.checked;
+    }
+}
+
+// ── Delete Lead ──
+async function deleteLeadFromOverview(email, source) {
+    if (!confirm('Permanently delete this lead?')) return;
+    try {
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('source', source);
+        const res = await fetch(API + '?action=delete_lead', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (result.success) {
+            fetchData();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown'));
+        }
+    } catch(err) {
+        alert('Connection error deleting lead.');
     }
 }
 
