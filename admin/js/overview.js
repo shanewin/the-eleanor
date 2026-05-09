@@ -161,8 +161,7 @@ function renderOverviewTable(leads) {
                 + '<li><a class="dropdown-item" href="#" onclick="event.preventDefault(); respondLead(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\', \'Phone\')">Phone</a></li>'
                 + '<li><hr class="dropdown-divider"></li>'
                 + '<li><a class="dropdown-item text-info" href="#" onclick="event.preventDefault(); engageAI(\'' + escapedLeadEmail + '\')"><i class="bi bi-robot me-1"></i>Auto Text</a></li>'
-                + '<li><hr class="dropdown-divider"></li>'
-                + '<li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); deleteLeadFromOverview(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\')"><i class="bi bi-trash me-1"></i>Delete</a></li>'
+                + (USER_ROLE === 'owner' ? '<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); deleteLeadFromOverview(\'' + escapedLeadEmail + '\', \'' + escapedLeadSource + '\')"><i class="bi bi-trash me-1"></i>Delete</a></li>' : '')
                 + '</ul></div></div>';
         }
 

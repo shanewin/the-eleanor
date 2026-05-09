@@ -406,6 +406,12 @@ function getAnalytics() {
 function deleteLead($email, $source) {
     global $sb;
 
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Owner only']);
+        return;
+    }
+
     if (empty($email) || empty($source)) {
         echo json_encode(['success' => false, 'error' => 'Email and Source required']);
         return;

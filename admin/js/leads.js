@@ -153,7 +153,7 @@ function renderLeadsTable() {
             + '<td class="text-center"><div class="grade-pill ' + gradeClass + '">' + esc(lead.grade.letter) + '</div></td>'
             + '<td>' + assignedHtml + '</td>'
             + '<td>' + firstResponseHtml + '</td>'
-            + '<td class="text-end"><button class="delete-btn" onclick="event.stopPropagation(); deleteLead(\'' + escapedEmailForDelete + '\', \'' + escapedSourceForDelete + '\')">Delete</button></td>';
+            + '<td class="text-end">' + (USER_ROLE === 'owner' ? '<button class="delete-btn" onclick="event.stopPropagation(); deleteLead(\'' + escapedEmailForDelete + '\', \'' + escapedSourceForDelete + '\')">Delete</button>' : '') + '</td>';
 
         tbody.appendChild(row);
     });
