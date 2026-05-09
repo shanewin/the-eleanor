@@ -472,26 +472,110 @@ function deleteLead($email, $source) {
         return;
     }
 
-    if (empty($email) || empty($source)) {
-        echo json_encode(['success' => false, 'error' => 'Email and Source required']);
+    if (empty($email)) {
+        echo json_encode(['success' => false, 'error' => 'Email required']);
         return;
     }
 
-    $table = '';
-    switch ($source) {
-        case 'Waitlist': $table = 'waitlist_submissions'; break;
-        case 'Unit Interest': $table = 'unit_inquiries'; break;
-        case 'Mailing List': $table = 'mailing_list'; break;
+    // ── Step 1: Find all emails + phones that belong to this person ──
+    // Match by primary email first, then expand by phone matches.
+    $emails = [strtolower($email)];
+    $phones = [];
+    $phoneTails = []; // last 10 digits, for fuzzy matching
+
+    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+        $rows = $sb->select($table, 'email,phone', ['email=eq.' . urlencode($email)]);
+        foreach ($rows as $r) {
+            if (!empty($r['phone'])) {
+                $digits = preg_replace('/\D/', '', $r['phone']);
+                if ($digits && strlen($digits) >= 10) {
+                    $phones[] = $r['phone'];
+                    $phoneTails[substr($digits, -10)] = true;
+                }
+            }
+        }
     }
 
-    if ($table) {
-        $sb->delete($table, ['email=eq.' . urlencode($email)]);
+    // Now expand: any submission with a matching phone but different email also gets deleted
+    if (!empty($phoneTails)) {
+        foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+            $allRows = $sb->select($table, 'email,phone');
+            foreach ($allRows as $r) {
+                $rPhone = preg_replace('/\D/', '', $r['phone'] ?? '');
+                if ($rPhone && strlen($rPhone) >= 10 && isset($phoneTails[substr($rPhone, -10)])) {
+                    if (!empty($r['email'])) $emails[] = strtolower($r['email']);
+                    if (!empty($r['phone'])) $phones[] = $r['phone'];
+                }
+            }
+        }
     }
 
-    // Also delete orphaned enrichment data
-    $sb->delete('lead_enrichment', ['email=eq.' . urlencode($email)]);
+    $emails = array_values(array_unique($emails));
+    $phones = array_values(array_unique($phones));
 
-    echo json_encode(['success' => true]);
+    // Helper to build PostgREST in.() filter for emails and phones
+    $emailFilter = 'email=in.(' . implode(',', array_map('urlencode', $emails)) . ')';
+    $leadEmailFilter = 'lead_email=in.(' . implode(',', array_map('urlencode', $emails)) . ')';
+
+    // Build phone filter — try a few common normalisations since stored format varies
+    $phoneVariants = [];
+    foreach ($phones as $p) {
+        $phoneVariants[$p] = true;
+        $digits = preg_replace('/\D/', '', $p);
+        if ($digits) {
+            $phoneVariants[$digits] = true;
+            if (strlen($digits) === 10) {
+                $phoneVariants['+1' . $digits] = true;
+                $phoneVariants['1' . $digits] = true;
+            } elseif (strlen($digits) === 11 && $digits[0] === '1') {
+                $phoneVariants['+' . $digits] = true;
+                $phoneVariants[substr($digits, 1)] = true;
+            }
+        }
+    }
+    $phoneVariants = array_keys($phoneVariants);
+    $phoneFilter = $phoneVariants
+        ? 'lead_phone=in.(' . implode(',', array_map('urlencode', $phoneVariants)) . ')'
+        : null;
+
+    // ── Step 2: Hard delete from all submission tables ──
+    $sb->delete('waitlist_submissions', [$emailFilter]);
+    $sb->delete('unit_inquiries', [$emailFilter]);
+    $sb->delete('mailing_list', [$emailFilter]);
+
+    // ── Step 3: Delete enrichment ──
+    $sb->delete('lead_enrichment', [$emailFilter]);
+
+    // ── Step 4: Delete communications (email-based) ──
+    $sb->delete('communications', [$leadEmailFilter]);
+
+    // ── Step 5: Delete SMS records (phone-based, with email fallback) ──
+    if ($phoneFilter) {
+        $sb->delete('sms_messages', [$phoneFilter]);
+        $sb->delete('sms_automation', [$phoneFilter]);
+        $sb->delete('sms_queue', [$phoneFilter]);
+    }
+    // Catch SMS rows that have lead_email but no phone match
+    $sb->delete('sms_messages', [$leadEmailFilter]);
+    $sb->delete('sms_automation', [$leadEmailFilter]);
+    $sb->delete('sms_queue', [$leadEmailFilter]);
+
+    // ── Step 6: Delete tour requests ──
+    $sb->delete('tour_requests', [$leadEmailFilter]);
+    if ($phoneFilter) {
+        $sb->delete('tour_requests', [$phoneFilter]);
+    }
+
+    // ── Step 7: Delete notifications ──
+    $sb->delete('notifications', [$leadEmailFilter]);
+
+    echo json_encode([
+        'success' => true,
+        'deleted' => [
+            'emails' => $emails,
+            'phones' => $phones
+        ]
+    ]);
 }
 
 function getSettings() {
