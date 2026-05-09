@@ -21,6 +21,7 @@ switch ($action) {
     case 'lead_detail': getLeadDetail($_GET['email'] ?? ''); break;
     case 'session_detail': getSessionDetail($_GET['sessionId'] ?? ''); break;
     case 'delete_lead': deleteLead($_POST['email'] ?? '', $_POST['source'] ?? ''); break;
+    case 'normalize_phones': normalizeAllPhones(); break;
     case 'lead_activity': getLeadActivity($_GET['email'] ?? ''); break;
     case 'analytics': getAnalytics(); break;
     case 'get_settings': getSettings(); break;
@@ -461,6 +462,50 @@ function getAnalytics() {
         http_response_code(500);
         echo json_encode(['error' => $e->getMessage()]);
     }
+}
+
+/**
+ * One-time backfill: normalize all phone numbers to E.164 format across submission tables.
+ * Owner only.
+ */
+function normalizeAllPhones() {
+    global $sb;
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Owner only']);
+        return;
+    }
+
+    require_once __DIR__ . '/telnyx-sms.php';
+
+    $updated = 0;
+    $skipped = 0;
+    $unchanged = 0;
+
+    foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+        $rows = $sb->select($table, 'id,phone');
+        foreach ($rows as $row) {
+            if (empty($row['phone'])) continue;
+            $normalized = normalizePhone($row['phone']);
+            if (!$normalized) {
+                $skipped++;
+                continue;
+            }
+            if ($normalized === $row['phone']) {
+                $unchanged++;
+                continue;
+            }
+            $sb->update($table, ['phone' => $normalized], ['id=eq.' . $row['id']]);
+            $updated++;
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'updated' => $updated,
+        'unchanged' => $unchanged,
+        'skipped' => $skipped
+    ]);
 }
 
 function deleteLead($email, $source) {

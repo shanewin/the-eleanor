@@ -149,6 +149,15 @@ function processForm(array $config): void {
     $ip              = $_SERVER['REMOTE_ADDR'];
     $table           = $config['table'];
 
+    // Normalize phone to E.164 format (+16317596760) for consistent storage
+    if (!empty($fields['phone'])) {
+        require_once __DIR__ . '/telnyx-sms.php';
+        $normalised = normalizePhone($fields['phone']);
+        if ($normalised) {
+            $fields['phone'] = $normalised;
+        }
+    }
+
     // ── Rate limiting (same IP within last 60 s) ────────────────────
     $cutoff  = gmdate('Y-m-d\TH:i:s\Z', time() - 60);
     $recent  = $sb->select($table, 'id', [
