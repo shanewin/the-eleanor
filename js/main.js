@@ -108,6 +108,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Live-format phone inputs as (XXX) XXX-XXXX while typing
+  // Backend still receives the raw value and normalises to E.164 — this is purely visual.
+  document.querySelectorAll('input.phone-input, input[type="tel"]').forEach(input => {
+    input.addEventListener('input', () => {
+      let digits = input.value.replace(/\D/g, '');
+      // If the leading 1 is country code, drop it for display
+      if (digits.length === 11 && digits[0] === '1') digits = digits.slice(1);
+      if (digits.length > 10) digits = digits.slice(0, 10);
+
+      let formatted;
+      if (digits.length >= 7)      formatted = '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
+      else if (digits.length >= 4) formatted = '(' + digits.slice(0, 3) + ') ' + digits.slice(3);
+      else if (digits.length > 0)  formatted = '(' + digits;
+      else                         formatted = '';
+
+      input.value = formatted;
+    });
+  });
+
   const neighborhoodTabs = document.querySelectorAll('.neighborhood-tabs');
   neighborhoodTabs.forEach(section => {
     const buttons = section.querySelectorAll('.tab-btn');
