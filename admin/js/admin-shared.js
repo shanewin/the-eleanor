@@ -102,15 +102,19 @@ function calculateLeadGrade(lead) {
         });
     }
 
-    // 3. Verified Professional (15 pts)
+    // 3. Verified Professional (25 pts) \u2014 merged with LinkedIn since both come
+    // from the same enrichment pipeline. Email + phone are already required on
+    // the form, so LinkedIn isn't a new outreach channel \u2014 it's just another
+    // piece of evidence confirming who they are.
     if (lead.job_title && lead.company) {
+        const linkedinNote = lead.linkedin_url ? ' LinkedIn profile also confirmed.' : '';
         insights.push({
-            label: "Verified Professional", type: "success", icon: "\u{1F4BC}", points: 15,
-            reason: `Identified as ${lead.job_title} at ${lead.company} via enrichment.`
+            label: "Verified Professional", type: "success", icon: "\u{1F4BC}", points: 25,
+            reason: `Identified as ${lead.job_title} at ${lead.company} via enrichment.${linkedinNote}`
         });
     } else {
         missed.push({
-            label: "Not professionally verified (+15 missed)",
+            label: "Not professionally verified (+25 missed)",
             reason: "Enrichment couldn't match a job title and company \u2014 common for personal email addresses or low-data profiles."
         });
     }
@@ -159,19 +163,6 @@ function calculateLeadGrade(lead) {
         missed.push({
             label: "No move-in date (+5 missed)",
             reason: "Lead didn't provide a target move-in date \u2014 timeline unclear."
-        });
-    }
-
-    // 7. LinkedIn Verified (10 pts)
-    if (lead.linkedin_url) {
-        insights.push({
-            label: "LinkedIn Verified", type: "info", icon: "\u{1F517}", points: 10,
-            reason: "Identity confirmed via LinkedIn profile match in enrichment."
-        });
-    } else {
-        missed.push({
-            label: "No LinkedIn match (+10 missed)",
-            reason: "Enrichment didn't surface a LinkedIn profile \u2014 identity not independently verified."
         });
     }
 

@@ -13,10 +13,9 @@ The score is designed to answer one question for the broker: **"How likely is th
 | Signal | Max Points | What It Measures |
 |--------|:----------:|------------------|
 | Affordability Match | +30 | Can they afford the unit? |
+| Verified Professional | +25 | Do we know who they are? (job, company, optional LinkedIn) |
 | High Intent | +20 | How serious are they? |
-| Verified Professional | +15 | Do we know who they are? |
 | Engagement | +15 | How much did they explore the site? |
-| LinkedIn Verified | +10 | Is their identity confirmed via LinkedIn? |
 | Budget Provided | +5 | Did they fill in a budget? |
 | Timeline Set | +5 | Did they provide a move-in date? |
 | **Maximum Possible** | **100** | |
@@ -88,16 +87,24 @@ ELSE (Mailing List):
     (Just signed up for updates)
 ```
 
-### 3. Verified Professional (+15)
+### 3. Verified Professional (+25)
 
 **Source:** Enrichment pipeline (PDL → Apollo → LinkedIn)
 
 ```
 IF lead has both job_title AND company:
-    +15 points — "Verified Professional" 💼
+    +25 points — "Verified Professional" 💼
+    (Reason copy mentions LinkedIn URL if also present, as supporting evidence)
 ```
 
 This confirms we successfully identified who they are professionally. A lead with no enrichment data gets 0 points here.
+
+**Note on LinkedIn:** A separate "LinkedIn Verified" signal previously awarded +10 for the presence of a LinkedIn URL. It was merged into this signal because:
+- Email and phone are already required on the form, so LinkedIn isn't a new outreach channel
+- The LinkedIn URL almost always comes from the same enrichment hit as the job + company match
+- Two signals measuring "we know who this person is via enrichment" was redundant
+
+The LinkedIn URL is still surfaced in the Professional Intel panel as a clickable link.
 
 ### 4. Engagement (+10 or +15)
 
@@ -117,18 +124,7 @@ ELSE:
     (Submitted quickly without exploring)
 ```
 
-### 5. LinkedIn Verified (+10)
-
-**Source:** Enrichment pipeline
-
-```
-IF lead has a linkedin_url:
-    +10 points — "LinkedIn Verified" 🔗
-```
-
-A LinkedIn profile confirms identity and provides career context.
-
-### 6. Budget Provided (+5)
+### 5. Budget Provided (+5)
 
 **Source:** Form submission
 
@@ -137,7 +133,7 @@ IF budget field is filled in and > 0:
     +5 points — "Budget Provided" 💰
 ```
 
-### 7. Timeline Set (+5)
+### 6. Timeline Set (+5)
 
 **Source:** Form submission
 
@@ -152,7 +148,7 @@ A move-in date signals the lead has a concrete timeline, not just browsing.
 
 ## Scoring Examples
 
-### Example 1: Ideal Lead (A+)
+### Example 1: Borderline Afford Lead (A)
 ```
 Shane Winter — Revenue Operations Systems Engineer @ Doorway NYC
 - Budget: $3,500 | Salary: $100,000-150,000
@@ -161,18 +157,16 @@ Shane Winter — Revenue Operations Systems Engineer @ Doorway NYC
 - LinkedIn verified
 
 Scoring:
-  Can Afford:           +30  ($100k >= $140k required? No → Borderline)
-  Wait — $100k < $140k: +10  (Borderline Afford)
+  Borderline Afford:    +15  ($100k below $140k required, but within 60%)
   High Intent:          +20  (Unit Interest form)
-  Verified Professional:+15  (has title + company)
+  Verified Professional:+25  (has title + company, LinkedIn confirms)
   Highly Engaged:       +15  (12 events)
-  LinkedIn Verified:    +10
   Budget Provided:      +5
   Timeline Set:         +5
-  TOTAL:                80 → A
+  TOTAL:                85 → A
 ```
 
-### Example 2: Casual Browser (C)
+### Example 2: Casual Browser (F)
 ```
 Jane Doe — No enrichment data
 - Budget: not provided
@@ -185,7 +179,6 @@ Scoring:
   Waitlist:             +10
   Verified Professional:+0   (no enrichment)
   Engagement:           +0   (2 events < 5)
-  LinkedIn:             +0
   Budget:               +0
   Timeline:             +0
   TOTAL:                10 → F
@@ -202,9 +195,8 @@ John Smith — VP of Finance @ Goldman Sachs
 Scoring:
   Can Afford:           +30  ($300k >= $200k required)
   High Intent:          +20  (Unit Interest)
-  Verified Professional:+15
+  Verified Professional:+25  (has title + company, LinkedIn confirms)
   Engaged:              +10  (8 events)
-  LinkedIn Verified:    +10
   Budget Provided:      +5
   Timeline Set:         +5
   TOTAL:                95 → A+
@@ -222,7 +214,7 @@ Scoring:
 | Tracking events | `activity_logs` table via JS tracking | During browsing |
 | Job title | PDL → Apollo → LinkedIn Scraper | Post-submit enrichment |
 | Company | PDL → Apollo → LinkedIn Scraper | Post-submit enrichment |
-| LinkedIn URL | PDL → Apollo → LinkedIn Scraper | Post-submit enrichment |
+| LinkedIn URL | PDL → Apollo → LinkedIn Scraper | Post-submit enrichment (displayed in profile, not scored separately) |
 | Inferred salary | People Data Labs `inferred_salary` | Post-submit enrichment |
 
 ---
