@@ -57,6 +57,8 @@ switch ($action) {
     case 'google_calendar_disconnect': googleCalendarDisconnect(); break;
     case 'google_calendar_status': googleCalendarStatus(); break;
     case 'google_calendar_availability': googleCalendarAvailability(); break;
+    case 'get_lead_jobs': getLeadJobs(); break;
+    case 'retry_lead_job': retryLeadJob(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -2005,4 +2007,87 @@ function googleCalendarAvailability() {
     }
 
     echo json_encode(['brokers' => $result]);
+}
+
+/**
+ * Owner-only: list lead_processing_jobs that need attention (failed or stuck
+ * running past the stale-lock cutoff). Used by the Jobs tab in Settings.
+ */
+function getLeadJobs() {
+    global $sb;
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Owner only']);
+        return;
+    }
+
+    // Failed jobs first, then jobs that are still 'running' but past the
+    // 5-minute stale-lock cutoff (something is stuck).
+    $staleCutoff = gmdate('Y-m-d\TH:i:s\Z', time() - 300);
+
+    $failed = $sb->select(
+        'lead_processing_jobs',
+        'id,source_table,source_id,lead_email,lead_phone,status,steps_done,attempts,last_error,created_at,updated_at',
+        ['status=eq.failed'],
+        'updated_at.desc',
+        50
+    );
+
+    $stuck = $sb->select(
+        'lead_processing_jobs',
+        'id,source_table,source_id,lead_email,lead_phone,status,steps_done,attempts,last_error,created_at,updated_at',
+        ['status=eq.running', 'locked_at=lt.' . $staleCutoff],
+        'locked_at.asc',
+        50
+    );
+
+    // Recent 'done' jobs for context (last 10) — helps confirm the queue is alive.
+    $recentDone = $sb->select(
+        'lead_processing_jobs',
+        'id,source_table,lead_email,status,attempts,updated_at',
+        ['status=eq.done'],
+        'updated_at.desc',
+        10
+    );
+
+    echo json_encode([
+        'failed'      => $failed ?: [],
+        'stuck'       => $stuck ?: [],
+        'recent_done' => $recentDone ?: [],
+    ]);
+}
+
+/**
+ * Owner-only: re-queue a failed or stuck job. Resets status to pending and
+ * clears the lock; the cron-runner picks it up on the next run. steps_done
+ * is preserved so completed steps aren't re-executed.
+ */
+function retryLeadJob() {
+    global $sb;
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Owner only']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $jobId = (int) ($input['id'] ?? 0);
+    if ($jobId <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Invalid job id']);
+        return;
+    }
+
+    $updated = $sb->update('lead_processing_jobs', [
+        'status'     => 'pending',
+        'locked_at'  => null,
+        'attempts'   => 0,
+        'last_error' => null,
+        'updated_at' => date('c'),
+    ], ['id=eq.' . $jobId]);
+
+    if (empty($updated)) {
+        echo json_encode(['success' => false, 'error' => 'Job not found']);
+        return;
+    }
+    echo json_encode(['success' => true]);
 }

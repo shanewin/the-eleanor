@@ -30,6 +30,12 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
                         <i class="bi bi-plug me-1"></i>Integrations
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white-50" href="#" data-settings-tab="jobs" onclick="showSettingsTab('jobs', event)">
+                        <i class="bi bi-list-check me-1"></i>Jobs
+                        <span id="jobsTabBadge" class="badge bg-danger ms-1" style="display:none;font-size:0.65rem"></span>
+                    </a>
+                </li>
             </ul>
 
             <div class="row">
@@ -210,6 +216,32 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
                                     <div class="col-4"><span class="text-white-50 small">Status</span></div>
                                     <div class="col-8"><span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.7rem">Active</span></div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ═══ Jobs Tab ═══ -->
+                    <div class="settings-tab-pane" id="settingsTab-jobs" style="display:none">
+                        <div class="card bg-body-tertiary border-0 mb-4">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h5 class="fw-semibold mb-1">Lead-processing jobs</h5>
+                                        <p class="text-white-50 small mb-0">Background work after form submissions — notification email, enrichment, welcome SMS. Healthy jobs finish in seconds; this tab surfaces anything that didn't.</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="loadLeadJobs()" title="Refresh">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+
+                                <h6 class="text-danger small text-uppercase mt-3 mb-2">Failed</h6>
+                                <div id="jobsFailedBody" class="text-white-50 small">Loading…</div>
+
+                                <h6 class="text-warning small text-uppercase mt-4 mb-2">Stuck (running &gt; 5 min)</h6>
+                                <div id="jobsStuckBody" class="text-white-50 small">Loading…</div>
+
+                                <h6 class="text-success small text-uppercase mt-4 mb-2">Recent completions</h6>
+                                <div id="jobsDoneBody" class="text-white-50 small">Loading…</div>
                             </div>
                         </div>
                     </div>

@@ -164,6 +164,8 @@ function showSettingsTab(tab, event) {
     document.querySelectorAll('.settings-tab-pane').forEach(pane => {
         pane.style.display = pane.id === 'settingsTab-' + tab ? 'block' : 'none';
     });
+    // Refresh on open for tabs whose data may be stale
+    if (tab === 'jobs') loadLeadJobs();
 }
 
 async function toggleOverviewSMS() {
@@ -194,6 +196,115 @@ async function toggleOverviewSMS() {
     }
 }
 
+// ─── Lead-processing jobs tab ───────────────────────────────────────────────
+
+function escapeJobsHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+function formatJobsTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function renderJobRow(job, withRetry) {
+    const steps = Array.isArray(job.steps_done) ? job.steps_done.join(', ') : (job.steps_done || '—');
+    const err = job.last_error ? `<div class="text-danger small mt-1" style="word-break:break-word">${escapeJobsHtml(job.last_error)}</div>` : '';
+    const retryBtn = withRetry
+        ? `<button class="btn btn-sm btn-outline-primary" onclick="retryLeadJob(${job.id})">Retry</button>`
+        : '';
+    return `
+        <div class="d-flex justify-content-between align-items-start py-2 border-bottom border-secondary border-opacity-25">
+            <div class="flex-grow-1 me-3">
+                <div class="text-white small fw-semibold">${escapeJobsHtml(job.lead_email)}</div>
+                <div class="text-white-50" style="font-size:0.75rem">
+                    ${escapeJobsHtml(job.source_table)} #${job.source_id} · attempts ${job.attempts} · updated ${formatJobsTime(job.updated_at)}
+                </div>
+                <div class="text-white-50" style="font-size:0.75rem">steps: ${escapeJobsHtml(steps) || '—'}</div>
+                ${err}
+            </div>
+            <div>${retryBtn}</div>
+        </div>
+    `;
+}
+
+function renderJobRowDone(job) {
+    return `
+        <div class="d-flex justify-content-between align-items-center py-1" style="font-size:0.8rem">
+            <span class="text-white-50">${escapeJobsHtml(job.lead_email)} · ${escapeJobsHtml(job.source_table)}</span>
+            <span class="text-white-50">${formatJobsTime(job.updated_at)}</span>
+        </div>
+    `;
+}
+
+async function loadLeadJobs() {
+    const failedEl = document.getElementById('jobsFailedBody');
+    const stuckEl  = document.getElementById('jobsStuckBody');
+    const doneEl   = document.getElementById('jobsDoneBody');
+    const badgeEl  = document.getElementById('jobsTabBadge');
+    if (!failedEl || !stuckEl || !doneEl) return;
+
+    try {
+        const res = await fetch('/api/admin-api.php?action=get_lead_jobs');
+        const data = await res.json();
+        if (data.error) {
+            failedEl.innerHTML = `<div class="text-danger small">${escapeJobsHtml(data.error)}</div>`;
+            stuckEl.innerHTML = '';
+            doneEl.innerHTML = '';
+            return;
+        }
+
+        const failed = data.failed || [];
+        const stuck = data.stuck || [];
+        const done  = data.recent_done || [];
+
+        failedEl.innerHTML = failed.length
+            ? failed.map(j => renderJobRow(j, true)).join('')
+            : '<div class="text-white-50 small">No failed jobs. 🎉</div>';
+        stuckEl.innerHTML = stuck.length
+            ? stuck.map(j => renderJobRow(j, true)).join('')
+            : '<div class="text-white-50 small">Nothing stuck.</div>';
+        doneEl.innerHTML = done.length
+            ? done.map(renderJobRowDone).join('')
+            : '<div class="text-white-50 small">No recent completions.</div>';
+
+        // Tab badge: total of attention-needed jobs.
+        const attention = failed.length + stuck.length;
+        if (badgeEl) {
+            if (attention > 0) {
+                badgeEl.textContent = attention;
+                badgeEl.style.display = 'inline-block';
+            } else {
+                badgeEl.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        failedEl.innerHTML = `<div class="text-danger small">Failed to load jobs: ${escapeJobsHtml(e.message)}</div>`;
+    }
+}
+
+async function retryLeadJob(id) {
+    try {
+        const res = await fetch('/api/admin-api.php?action=retry_lead_job', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.error || 'Retry failed');
+            return;
+        }
+        loadLeadJobs();
+    } catch (e) {
+        alert('Retry failed: ' + e.message);
+    }
+}
+
 // Day button toggle styling
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.sms-day-check').forEach(cb => {
@@ -205,4 +316,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     loadSettings();
+    loadLeadJobs();
 });
