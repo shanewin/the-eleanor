@@ -10,40 +10,6 @@ require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/telnyx-sms.php';
 require_once __DIR__ . '/sms-ai.php';
 
-// TEMPORARY: capture fatals + uncaught exceptions to the DB so we can
-// diagnose the inbound webhook failure. Remove after root cause is found.
-register_shutdown_function(function () {
-    $err = error_get_last();
-    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR])) {
-        global $sb;
-        if (isset($sb)) {
-            @$sb->insert('communications', [
-                'lead_email' => 'webhook-debug@local',
-                'direction'  => 'internal',
-                'channel'    => 'note',
-                'subject'    => 'Telnyx webhook FATAL',
-                'body'       => substr($err['message'] . ' @ ' . $err['file'] . ':' . $err['line'], 0, 1000),
-                'sender'     => 'Telnyx Webhook',
-                'status'     => 'system'
-            ]);
-        }
-    }
-});
-set_exception_handler(function ($e) {
-    global $sb;
-    if (isset($sb)) {
-        @$sb->insert('communications', [
-            'lead_email' => 'webhook-debug@local',
-            'direction'  => 'internal',
-            'channel'    => 'note',
-            'subject'    => 'Telnyx webhook EXCEPTION',
-            'body'       => substr(get_class($e) . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine(), 0, 1000),
-            'sender'     => 'Telnyx Webhook',
-            'status'     => 'system'
-        ]);
-    }
-});
-
 // Telnyx sends POST with JSON body
 $rawBody = file_get_contents('php://input');
 
@@ -128,17 +94,6 @@ if ($eventType === 'message.received') {
 function handleInboundSMS($payload) {
     global $sb;
 
-    // TEMP: trace entry to handler
-    @$sb->insert('communications', [
-        'lead_email' => 'webhook-debug@local',
-        'direction'  => 'internal',
-        'channel'    => 'note',
-        'subject'    => 'Webhook trace: handleInboundSMS ENTER',
-        'body'       => 'from=' . ($payload['from']['phone_number'] ?? '?') . ' text=' . substr($payload['text'] ?? '', 0, 100),
-        'sender'     => 'Telnyx Webhook Debug',
-        'status'     => 'system'
-    ]);
-
     $fromPhone = $payload['from']['phone_number'] ?? '';
     $toPhone   = $payload['to'][0]['phone_number'] ?? ($payload['to']['phone_number'] ?? '');
     $text      = $payload['text'] ?? '';
@@ -216,20 +171,7 @@ function handleInboundSMS($payload) {
     }
 
     // Generate and send AI response
-    $aiStart = microtime(true);
     $reply = generateAIResponse($normalizedPhone, $text);
-    $aiElapsed = round(microtime(true) - $aiStart, 2);
-
-    // TEMP: capture AI result state to DB for diagnosis
-    @$sb->insert('communications', [
-        'lead_email' => $leadEmail ?: 'webhook-debug@local',
-        'direction'  => 'internal',
-        'channel'    => 'note',
-        'subject'    => 'AI debug: reply=' . ($reply ? 'text(' . strlen($reply) . ')' : 'NULL') . ' in ' . $aiElapsed . 's',
-        'body'       => $reply ? substr($reply, 0, 500) : 'generateAIResponse returned null/empty',
-        'sender'     => 'Telnyx Webhook Debug',
-        'status'     => 'system'
-    ]);
 
     if ($reply) {
         // Check for handoff/not-interested tags

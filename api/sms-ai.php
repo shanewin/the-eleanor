@@ -80,15 +80,6 @@ function generateAIResponse($leadPhone, $inboundText) {
 
         if (!$response) {
             error_log("Claude AI SMS response failed on loop $i");
-            @$sb->insert('communications', [
-                'lead_email' => 'webhook-debug@local',
-                'direction'  => 'internal',
-                'channel'    => 'note',
-                'subject'    => 'AI loop ' . $i . ': Claude API returned null',
-                'body'       => 'See PHP error_log for HTTP status / body',
-                'sender'     => 'Telnyx Webhook Debug',
-                'status'     => 'system'
-            ]);
             return null;
         }
 
@@ -103,16 +94,6 @@ function generateAIResponse($leadPhone, $inboundText) {
             }
         }
 
-        @$sb->insert('communications', [
-            'lead_email' => 'webhook-debug@local',
-            'direction'  => 'internal',
-            'channel'    => 'note',
-            'subject'    => 'AI loop ' . $i . ': stop=' . ($response['stop_reason'] ?? '?') . ' text_parts=' . count($textParts) . ' tools=' . count($toolCalls),
-            'body'       => substr(json_encode(array_map(function($c) { return ['name' => $c['name'] ?? null, 'input' => $c['input'] ?? null]; }, $toolCalls)), 0, 800),
-            'sender'     => 'Telnyx Webhook Debug',
-            'status'     => 'system'
-        ]);
-
         // If no tool calls, we're done
         if ($response['stop_reason'] !== 'tool_use' || empty($toolCalls)) {
             $reply = implode(' ', $textParts);
@@ -122,29 +103,7 @@ function generateAIResponse($leadPhone, $inboundText) {
         // Execute each tool call
         $toolResults = [];
         foreach ($toolCalls as $call) {
-            try {
-                $result = executeCalendarTool($call['name'], $call['input'], $leadPhone, $leadContext);
-            } catch (Throwable $e) {
-                @$sb->insert('communications', [
-                    'lead_email' => 'webhook-debug@local',
-                    'direction'  => 'internal',
-                    'channel'    => 'note',
-                    'subject'    => 'AI tool ' . $call['name'] . ' THREW',
-                    'body'       => substr($e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine(), 0, 800),
-                    'sender'     => 'Telnyx Webhook Debug',
-                    'status'     => 'system'
-                ]);
-                $result = ['error' => 'tool execution failed: ' . $e->getMessage()];
-            }
-            @$sb->insert('communications', [
-                'lead_email' => 'webhook-debug@local',
-                'direction'  => 'internal',
-                'channel'    => 'note',
-                'subject'    => 'AI tool ' . $call['name'] . ' RESULT',
-                'body'       => substr(json_encode($result), 0, 800),
-                'sender'     => 'Telnyx Webhook Debug',
-                'status'     => 'system'
-            ]);
+            $result = executeCalendarTool($call['name'], $call['input'], $leadPhone, $leadContext);
             $toolResults[] = [
                 'type'        => 'tool_result',
                 'tool_use_id' => $call['id'],
@@ -206,18 +165,6 @@ function callClaudeAPI($payload) {
 
     if ($httpCode < 200 || $httpCode >= 300) {
         error_log("Claude API failed ($httpCode): $response");
-        global $sb;
-        if (isset($sb)) {
-            @$sb->insert('communications', [
-                'lead_email' => 'webhook-debug@local',
-                'direction'  => 'internal',
-                'channel'    => 'note',
-                'subject'    => 'Claude API failed: HTTP ' . $httpCode,
-                'body'       => substr($response ?: '(empty body)', 0, 1500),
-                'sender'     => 'Telnyx Webhook Debug',
-                'status'     => 'system'
-            ]);
-        }
         return null;
     }
 
@@ -862,17 +809,28 @@ function buildSystemPrompt($lead) {
     ];
     $toneDesc = $toneMap[$tone] ?? $toneMap['friendly'];
 
-    $nyNow = new DateTime('now', new DateTimeZone('America/New_York'));
+    $nyTz = new DateTimeZone('America/New_York');
+    $nyNow = new DateTime('now', $nyTz);
     $todayStr = $nyNow->format('l, F j, Y');
     $todayIso = $nyNow->format('Y-m-d');
+
+    // Explicit weekday → ISO date map so the model can't drift when resolving
+    // relative phrases like "Tuesday" or "next Friday".
+    $weekdayMap = [];
+    for ($d = 0; $d <= 13; $d++) {
+        $day = (clone $nyNow)->modify("+{$d} days");
+        $label = $d === 0 ? 'today' : ($d === 1 ? 'tomorrow' : strtolower($day->format('l')));
+        $weekdayMap[] = $day->format('l, F j') . ' = ' . $day->format('Y-m-d') . ($d <= 1 ? " ({$label})" : '');
+    }
 
     $prompt = "You are a leasing agent for The Eleanor, a brand-new luxury rental building in Boerum Hill, Brooklyn. "
         . "You are texting with a prospective renter via SMS. Your goal is to be helpful and conversational — "
         . "and ultimately to book an in-person tour of the building.\n"
         . "PERSONALITY: " . $toneDesc . "\n"
-        . "TODAY: " . $todayStr . " (ISO: " . $todayIso . ", America/New_York). "
-        . "When the lead says \"this Saturday\" or \"Monday\", resolve it relative to TODAY. "
-        . "Never pass a date in the past to scheduling tools.\n\n";
+        . "TODAY: " . $todayStr . " (ISO: " . $todayIso . ", America/New_York).\n"
+        . "UPCOMING DATES (use this map verbatim when resolving \"Tuesday\", \"this Friday\", etc.):\n"
+        . "  " . implode("\n  ", $weekdayMap) . "\n"
+        . "Never offer or book a date not in this map. Never pass a past date to scheduling tools.\n\n";
 
     // ── Conversation Rules ──
     $prompt .= "RULES:\n"
