@@ -22,6 +22,10 @@
 error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT);
 ini_set('display_errors', 0);
 
+// Disable on-the-fly gzip so Content-Length is accurate when we flush early.
+// Must be set before any output. Hostinger's LiteSpeed sometimes enables it.
+@ini_set('zlib.output_compression', '0');
+
 /**
  * Sanitise a single POST value.
  */
@@ -216,30 +220,46 @@ function processForm(array $config): void {
         error_log("Database insert failed ($table) — falling back to inline notification send");
     }
 
-    // ── CSRF token regeneration (must happen before fastcgi_finish_request) ─
+    // ── CSRF token regeneration (must happen before we close the session) ──
     if ($useCsrf) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
 
-    // ── Response ────────────────────────────────────────────────────
-    http_response_code(200);
-    echo json_encode([
+    // ── Build response body so Content-Length can be exact ──────────
+    $responseBody = json_encode([
         'success' => true,
         'message' => $config['success_message'] ?? 'Submission successful',
     ]);
 
-    // ── Flush response so the user stops waiting ────────────────────
-    if (function_exists('fastcgi_finish_request')) {
-        fastcgi_finish_request();
-    } else {
-        // Apache mod_php fallback: close the session, flush buffers, keep going.
-        if ($useCsrf && session_status() === PHP_SESSION_ACTIVE) {
-            session_write_close();
-        }
-        ignore_user_abort(true);
-        @ob_end_flush();
-        @flush();
+    // Release the session lock before flushing — keeps other requests from this
+    // user from blocking on the session file while our tail keeps running.
+    if ($useCsrf && session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
     }
+
+    // Tell the client exactly how many bytes are coming, and to close after.
+    // Without Content-Length, LiteSpeed/keep-alive holds the connection open
+    // until the PHP worker exits, which defeats the early flush.
+    http_response_code(200);
+    header('Content-Length: ' . strlen($responseBody));
+    header('Connection: close');
+    echo $responseBody;
+
+    // Drain every output buffer layer (php.ini output_buffering, any gzip
+    // handler, etc.) so the bytes actually leave PHP.
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+    @flush();
+
+    // Detach from the client. LiteSpeed has its own native function; PHP-FPM
+    // uses fastcgi_finish_request(). Whichever exists, use it.
+    if (function_exists('litespeed_finish_request')) {
+        @litespeed_finish_request();
+    } elseif (function_exists('fastcgi_finish_request')) {
+        @fastcgi_finish_request();
+    }
+    ignore_user_abort(true);
 
     // ── Post-response work ──────────────────────────────────────────
     // Give the slow API cascade headroom; default max_execution_time is too tight.
