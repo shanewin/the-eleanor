@@ -171,95 +171,52 @@ function processForm(array $config): void {
         exit;
     }
 
-    // ── Database insert + enrichment ────────────────────────────────
-    $dbData = ($config['db_map'])($fields, $ip);
-
-    try {
-        $sb->insert($table, $dbData);
-
-        $enrichArgs = isset($config['enrich_args'])
-            ? ($config['enrich_args'])($fields)
-            : [$fields['email'], $fields['firstName'] ?? '', $fields['lastName'] ?? '', $fields['phone'] ?? ''];
-        call_user_func_array('enrichLead', $enrichArgs);
-
-        // Bell notification for new lead (moved to after try/catch to avoid blocking)
-
-    } catch (Exception $e) {
-        error_log("Database insert failed ($table): " . $e->getMessage());
-    }
-
-    // ── SMTP notification ───────────────────────────────────────────
-    $subject   = $config['subject'];
-    // Replace {placeholder} tokens in subject
+    // ── Build the notification email + enrichment args eagerly ──────
+    // We need these now so they can be stored in the job payload and run
+    // asynchronously after the response is flushed.
+    $subject = $config['subject'];
     foreach ($fields as $k => $v) {
         $subject = str_replace('{' . $k . '}', $v, $subject);
     }
-
-    $body = ($config['email_body'])($fields);
-
-    // Get notification emails from settings table (comma-separated)
+    $body         = ($config['email_body'])($fields);
     $notifyEmails = getNotificationEmails();
-    foreach ($notifyEmails as $notifyTo) {
-        $sent = smtpSend(trim($notifyTo), $subject, $body, $email);
-        if (!$sent) {
-            error_log("Failed to send notification email to $notifyTo for $table");
-        }
-        $sb->insert('communications', [
-            'lead_email' => $email,
-            'direction' => 'internal',
-            'channel' => 'email',
-            'subject' => $subject,
-            'body' => $body,
-            'sender' => 'System',
-            'recipient' => trim($notifyTo),
-            'status' => $sent ? 'sent' : 'failed'
+    $enrichArgs   = isset($config['enrich_args'])
+        ? ($config['enrich_args'])($fields)
+        : [$fields['email'], $fields['firstName'] ?? '', $fields['lastName'] ?? '', $fields['phone'] ?? ''];
+
+    // ── Database insert ─────────────────────────────────────────────
+    $dbData   = ($config['db_map'])($fields, $ip);
+    $inserted = $sb->insert($table, $dbData);
+    $sourceId = (is_array($inserted) && isset($inserted['id'])) ? (int) $inserted['id'] : 0;
+
+    // ── Enqueue background job ──────────────────────────────────────
+    // If the lead row insert succeeded, write a job row and run it inline after
+    // the HTTP response is flushed. The cron-runner picks up anything that
+    // doesn't finish here.
+    $jobId = 0;
+    if ($sourceId > 0) {
+        $jobRow = $sb->insert('lead_processing_jobs', [
+            'source_table' => $table,
+            'source_id'    => $sourceId,
+            'lead_email'   => $email,
+            'lead_phone'   => $fields['phone'] ?? null,
+            'payload'      => [
+                'fields'          => $fields,
+                'subject'         => $subject,
+                'body'            => $body,
+                'notify_emails'   => $notifyEmails,
+                'enrich_args'     => $enrichArgs,
+                'is_mailing_list' => $table === 'mailing_list',
+            ],
         ]);
-    }
-
-    // ── SMS Auto Follow-up (Telnyx + Claude) ─────────────────────────
-    $phone = $fields['phone'] ?? '';
-    if (!empty($phone) && $table !== 'mailing_list') {
-        try {
-            require_once __DIR__ . '/telnyx-sms.php';
-            require_once __DIR__ . '/sms-ai.php';
-
-            if (isSMSAutomationAllowed() && defined('TELNYX_FROM_NUMBER') && TELNYX_FROM_NUMBER) {
-                $normalizedPhone = normalizePhone($phone);
-                if ($normalizedPhone) {
-                    // Generate personalized welcome message via Claude
-                    $welcomeMsg = generateInitialMessage($normalizedPhone, $email);
-
-                    if ($welcomeMsg) {
-                        $smsResult = sendSMS($normalizedPhone, $welcomeMsg);
-
-                        // Log the message
-                        $sb->insert('sms_messages', [
-                            'lead_phone'        => $normalizedPhone,
-                            'lead_email'        => $email,
-                            'direction'         => 'outbound',
-                            'sender_type'       => 'ai',
-                            'sender_name'       => 'Eleanor AI',
-                            'body'              => $welcomeMsg,
-                            'telnyx_message_id' => $smsResult['message_id'] ?? null,
-                            'status'            => $smsResult['success'] ? 'sent' : 'failed'
-                        ]);
-
-                        // Create or update automation record (upsert — lead_phone is UNIQUE)
-                        $sb->upsert('sms_automation', [
-                            'lead_phone' => $normalizedPhone,
-                            'lead_email' => $email,
-                            'status'     => 'active',
-                            'updated_at' => date('c')
-                        ], 'lead_phone');
-                    }
-                }
-            }
-        } catch (Exception $e) {
-            error_log("SMS auto follow-up failed: " . $e->getMessage());
+        if (is_array($jobRow) && isset($jobRow['id'])) {
+            $jobId = (int) $jobRow['id'];
         }
+    } else {
+        error_log("Database insert failed ($table) — falling back to inline notification send");
     }
 
-    // ── CSRF token regeneration ─────────────────────────────────────
+    // ── CSRF token regeneration (must happen before fastcgi_finish_request) ─
     if ($useCsrf) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
@@ -268,6 +225,51 @@ function processForm(array $config): void {
     http_response_code(200);
     echo json_encode([
         'success' => true,
-        'message' => $config['success_message'] ?? ($emailSent ? 'Submission successful' : 'Submission saved (email notification failed)'),
+        'message' => $config['success_message'] ?? 'Submission successful',
     ]);
+
+    // ── Flush response so the user stops waiting ────────────────────
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    } else {
+        // Apache mod_php fallback: close the session, flush buffers, keep going.
+        if ($useCsrf && session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        ignore_user_abort(true);
+        @ob_end_flush();
+        @flush();
+    }
+
+    // ── Post-response work ──────────────────────────────────────────
+    // Give the slow API cascade headroom; default max_execution_time is too tight.
+    @set_time_limit(120);
+
+    if ($jobId > 0) {
+        require_once __DIR__ . '/job-runner.php';
+        try {
+            runLeadProcessingJob($jobId);
+        } catch (Throwable $e) {
+            error_log("Inline job run failed for $jobId: " . $e->getMessage());
+            // The job row stays pending/running; cron will rescue it.
+        }
+    } else {
+        // No job row (source insert failed). Best-effort inline notification so
+        // the leasing team still hears about it.
+        foreach ($notifyEmails as $notifyTo) {
+            $notifyTo = trim($notifyTo);
+            if ($notifyTo === '') continue;
+            $sent = smtpSend($notifyTo, $subject, $body, $email);
+            $sb->insert('communications', [
+                'lead_email' => $email,
+                'direction'  => 'internal',
+                'channel'    => 'email',
+                'subject'    => $subject,
+                'body'       => $body,
+                'sender'     => 'System',
+                'recipient'  => $notifyTo,
+                'status'     => $sent ? 'sent' : 'failed',
+            ]);
+        }
+    }
 }
