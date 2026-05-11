@@ -80,6 +80,15 @@ function generateAIResponse($leadPhone, $inboundText) {
 
         if (!$response) {
             error_log("Claude AI SMS response failed on loop $i");
+            @$sb->insert('communications', [
+                'lead_email' => 'webhook-debug@local',
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'AI loop ' . $i . ': Claude API returned null',
+                'body'       => 'See PHP error_log for HTTP status / body',
+                'sender'     => 'Telnyx Webhook Debug',
+                'status'     => 'system'
+            ]);
             return null;
         }
 
@@ -94,6 +103,16 @@ function generateAIResponse($leadPhone, $inboundText) {
             }
         }
 
+        @$sb->insert('communications', [
+            'lead_email' => 'webhook-debug@local',
+            'direction'  => 'internal',
+            'channel'    => 'note',
+            'subject'    => 'AI loop ' . $i . ': stop=' . ($response['stop_reason'] ?? '?') . ' text_parts=' . count($textParts) . ' tools=' . count($toolCalls),
+            'body'       => substr(json_encode(array_map(function($c) { return ['name' => $c['name'] ?? null, 'input' => $c['input'] ?? null]; }, $toolCalls)), 0, 800),
+            'sender'     => 'Telnyx Webhook Debug',
+            'status'     => 'system'
+        ]);
+
         // If no tool calls, we're done
         if ($response['stop_reason'] !== 'tool_use' || empty($toolCalls)) {
             $reply = implode(' ', $textParts);
@@ -103,7 +122,29 @@ function generateAIResponse($leadPhone, $inboundText) {
         // Execute each tool call
         $toolResults = [];
         foreach ($toolCalls as $call) {
-            $result = executeCalendarTool($call['name'], $call['input'], $leadPhone, $leadContext);
+            try {
+                $result = executeCalendarTool($call['name'], $call['input'], $leadPhone, $leadContext);
+            } catch (Throwable $e) {
+                @$sb->insert('communications', [
+                    'lead_email' => 'webhook-debug@local',
+                    'direction'  => 'internal',
+                    'channel'    => 'note',
+                    'subject'    => 'AI tool ' . $call['name'] . ' THREW',
+                    'body'       => substr($e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine(), 0, 800),
+                    'sender'     => 'Telnyx Webhook Debug',
+                    'status'     => 'system'
+                ]);
+                $result = ['error' => 'tool execution failed: ' . $e->getMessage()];
+            }
+            @$sb->insert('communications', [
+                'lead_email' => 'webhook-debug@local',
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'AI tool ' . $call['name'] . ' RESULT',
+                'body'       => substr(json_encode($result), 0, 800),
+                'sender'     => 'Telnyx Webhook Debug',
+                'status'     => 'system'
+            ]);
             $toolResults[] = [
                 'type'        => 'tool_result',
                 'tool_use_id' => $call['id'],
@@ -155,6 +196,18 @@ function callClaudeAPI($payload) {
 
     if ($httpCode < 200 || $httpCode >= 300) {
         error_log("Claude API failed ($httpCode): $response");
+        global $sb;
+        if (isset($sb)) {
+            @$sb->insert('communications', [
+                'lead_email' => 'webhook-debug@local',
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'Claude API failed: HTTP ' . $httpCode,
+                'body'       => substr($response ?: '(empty body)', 0, 1500),
+                'sender'     => 'Telnyx Webhook Debug',
+                'status'     => 'system'
+            ]);
+        }
         return null;
     }
 
