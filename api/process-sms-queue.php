@@ -1,9 +1,6 @@
 <?php
 /**
- * SMS Queue Processor
- * Run via cron every 5 minutes:
- *   */5 * * * * php /path/to/api/process-sms-queue.php
- *
+ * SMS Queue Processor — run via cron every 5 minutes.
  * Processes queued inbound messages that arrived outside the send window.
  */
 require_once __DIR__ . '/config.php';
@@ -91,6 +88,8 @@ foreach ($pending as $queued) {
             'status' => 'sent',
             'processed_at' => date('c')
         ], ['id=eq.' . $queueId]);
+
+        markFirstResponseIfUnset($email, 'sms');
 
         error_log("SMS queue: sent delayed response to $phone");
     } else {

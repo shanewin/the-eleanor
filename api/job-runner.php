@@ -219,4 +219,6 @@ function sendWelcomeSms(string $leadPhone, string $leadEmail): void {
     if (empty($smsResult['success'])) {
         throw new RuntimeException('sendSMS failed: ' . ($smsResult['error'] ?? 'unknown'));
     }
+
+    markFirstResponseIfUnset($leadEmail, 'sms');
 }

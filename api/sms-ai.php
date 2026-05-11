@@ -1250,6 +1250,26 @@ if (!function_exists('normalizePhone')) {
     require_once __DIR__ . '/telnyx-sms.php';
 }
 
+// Stamp first_response_at on a lead the first time we reply by SMS.
+// Idempotent — only writes if first_response_at is currently null.
+if (!function_exists('markFirstResponseIfUnset')) {
+    function markFirstResponseIfUnset($email, $method = 'sms') {
+        global $sb;
+        if (!$email) return;
+
+        foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+            $lead = $sb->selectOne($table, 'id,first_response_at', ['email=eq.' . urlencode($email)]);
+            if (!$lead) continue;
+            if (!empty($lead['first_response_at'])) return;
+            $sb->update($table, [
+                'first_response_at' => date('c'),
+                'response_method'   => $method
+            ], ['email=eq.' . urlencode($email)]);
+            return;
+        }
+    }
+}
+
 // Auto-update lead status (safe to call from any context)
 if (!function_exists('autoUpdateLeadStatusFromWebhook')) {
     function autoUpdateLeadStatusFromWebhook($email, $newStatus) {

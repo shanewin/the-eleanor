@@ -203,9 +203,10 @@ function handleInboundSMS($payload) {
             'status'            => $result['success'] ? 'sent' : 'failed'
         ]);
 
-        // Auto-update lead status to Contacted
+        // Auto-update lead status to Contacted + stamp first response
         if ($result['success'] && $leadEmail) {
             autoUpdateLeadStatusFromWebhook($leadEmail, 'Contacted');
+            markFirstResponseIfUnset($leadEmail, 'sms');
         }
 
         // Handle handoff or not-interested
