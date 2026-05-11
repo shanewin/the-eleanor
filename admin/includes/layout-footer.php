@@ -22,9 +22,18 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
 <?php endif; ?>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/admin/js/admin-shared.js"></script>
+<?php
+// Cache-bust local /admin/js/*.js by appending ?v={filemtime}. Skips CDN URLs.
+function assetUrl($path) {
+    if (strpos($path, '://') !== false) return $path;
+    $abs = $_SERVER['DOCUMENT_ROOT'] . $path;
+    $v = @filemtime($abs);
+    return htmlspecialchars($path) . ($v ? '?v=' . $v : '');
+}
+?>
+<script src="<?= assetUrl('/admin/js/admin-shared.js') ?>"></script>
 <?php if (!empty($extraJs)): foreach ($extraJs as $js): ?>
-<script src="<?= htmlspecialchars($js) ?>"></script>
+<script src="<?= assetUrl($js) ?>"></script>
 <?php endforeach; endif; ?>
 </body>
 </html>
