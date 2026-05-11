@@ -1,0 +1,9 @@
+# The Eleanor — root rewrite rules
+
+RewriteEngine On
+
+# Pretty URL for the public tour booking page
+RewriteRule ^tours/?$ tours.php [L]
+
+# Prevent listing directories
+Options -Indexes
