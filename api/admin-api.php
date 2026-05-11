@@ -557,9 +557,10 @@ function deleteLead($email, $source) {
     $emails = [strtolower($email)];
     $phones = [];
     $phoneTails = []; // last 10 digits, for fuzzy matching
+    $trackingIds = [];
 
     foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
-        $rows = $sb->select($table, 'email,phone', ['email=eq.' . urlencode($email)]);
+        $rows = $sb->select($table, 'email,phone,tracking_id', ['email=eq.' . urlencode($email)]);
         foreach ($rows as $r) {
             if (!empty($r['phone'])) {
                 $digits = preg_replace('/\D/', '', $r['phone']);
@@ -568,18 +569,20 @@ function deleteLead($email, $source) {
                     $phoneTails[substr($digits, -10)] = true;
                 }
             }
+            if (!empty($r['tracking_id'])) $trackingIds[] = $r['tracking_id'];
         }
     }
 
     // Now expand: any submission with a matching phone but different email also gets deleted
     if (!empty($phoneTails)) {
         foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
-            $allRows = $sb->select($table, 'email,phone');
+            $allRows = $sb->select($table, 'email,phone,tracking_id');
             foreach ($allRows as $r) {
                 $rPhone = preg_replace('/\D/', '', $r['phone'] ?? '');
                 if ($rPhone && strlen($rPhone) >= 10 && isset($phoneTails[substr($rPhone, -10)])) {
                     if (!empty($r['email'])) $emails[] = strtolower($r['email']);
                     if (!empty($r['phone'])) $phones[] = $r['phone'];
+                    if (!empty($r['tracking_id'])) $trackingIds[] = $r['tracking_id'];
                 }
             }
         }
@@ -587,6 +590,7 @@ function deleteLead($email, $source) {
 
     $emails = array_values(array_unique($emails));
     $phones = array_values(array_unique($phones));
+    $trackingIds = array_values(array_unique($trackingIds));
 
     // Helper to build PostgREST in.() filter for emails and phones
     $emailFilter = 'email=in.(' . implode(',', array_map('urlencode', $emails)) . ')';
@@ -644,11 +648,21 @@ function deleteLead($email, $source) {
     // ── Step 7: Delete notifications ──
     $sb->delete('notifications', [$leadEmailFilter]);
 
+    // ── Step 8: Delete tracking activity ──
+    // activity_logs.session_id references tracking_sessions.id, so delete logs first.
+    if (!empty($trackingIds)) {
+        $trackingFilter = 'session_id=in.(' . implode(',', array_map('urlencode', $trackingIds)) . ')';
+        $sb->delete('activity_logs', [$trackingFilter]);
+        $sessionFilter = 'id=in.(' . implode(',', array_map('urlencode', $trackingIds)) . ')';
+        $sb->delete('tracking_sessions', [$sessionFilter]);
+    }
+
     echo json_encode([
         'success' => true,
         'deleted' => [
             'emails' => $emails,
-            'phones' => $phones
+            'phones' => $phones,
+            'tracking_ids' => $trackingIds
         ]
     ]);
 }
