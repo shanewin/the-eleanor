@@ -1,14 +1,14 @@
-/* ======= PORTFOLIO SLIDER SECTION ======= */
+/* ============================================================
+   LIVE, REST, GATHER  —  three-row composition + gallery lightbox
+   ============================================================ */
+
 .portfolio-section {
     padding-top: 60px;
-    /* Inherit background from page */
 }
-
-
 
 .section-header {
     text-align: center;
-    margin-bottom: 40px;
+    margin-bottom: 56px;
 }
 
 .section-header .section-subtitle {
@@ -39,155 +39,218 @@
     margin: 0 auto;
 }
 
-.slider-container {
-    width: 100%;
-    margin: 0 auto;
+/* ====== Three-row stack ====== */
+.lrg-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
 }
 
-.mobile-slide-caption {
-    display: none;
+.lrg-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 0.85fr) minmax(0, 1.1fr);
+    gap: 40px;
+    align-items: stretch;
 }
 
-/* Swiper Container - Glass Card Style */
-.swiper {
-    width: 100%;
-    height: 600px;
-    border-radius: 20px;
-    overflow: hidden;
-
-    /* cleaner glass */
-    background: rgba(255, 255, 255, 0.20);
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
-
-    /* luxury shadow */
-    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.12);
+.lrg-row--reverse {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.85fr) minmax(0, 1.7fr);
 }
 
-
-.swiper-slide {
+/* ====== Hero image ====== */
+.lrg-hero {
+    display: block;
     position: relative;
-}
-
-/* Portfolio Slide */
-.portfolio-slide {
-    position: relative;
-    width: 100%;
-    height: 100%;
     overflow: hidden;
+    border-radius: 18px;
+    background: rgba(0, 0, 0, 0.04);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.10);
+    transition: transform 0.5s ease, box-shadow 0.5s ease;
+    cursor: pointer;
+    min-height: 420px;
 }
 
-.slide-image {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-}
-
-.slide-image img {
+.lrg-hero img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    aspect-ratio: 16/9; /* Prevent layout shifts */
+    display: block;
+    transition: transform 0.8s ease;
 }
 
-.slide-image::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 30%;
-    height: 100%;
-    background: linear-gradient(to right, rgba(0,0,0,0.12), transparent);
-    pointer-events: none;
+.lrg-hero:hover {
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.16);
 }
 
-/* Lazy loading for better performance */
-.swiper-lazy {
-    opacity: 0;
-    transition: opacity 0.3s ease;
+.lrg-hero:hover img {
+    transform: scale(1.04);
 }
 
-.swiper-lazy-loaded {
-    opacity: 1;
-}
-
-.slide-overlay {
-    display: none !important;
-}
-
-.slide-title {
-    color: rgba(255,255,255,0.85);
-    font-family: var(--font-display);
-    font-size: 1.15rem;
-    font-weight: 300;
-    opacity: 0.85;
-    letter-spacing: 0.15em;
-}
-
-
-
-#explore .slide-content {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 40%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(10px) saturate(120%);
-    -webkit-backdrop-filter: blur(10px);
-    border-left: 1px solid rgba(255, 255, 255, 0.35);
-    padding: 60px 40px;
-    z-index: 3;
-    transform: translateX(100%);
-    opacity: 0;
-    transition: transform 1.65s ease, opacity 3.6s ease;
-    transition-delay: 0s;
+/* ====== Content (eyebrow / title / description / CTA) ====== */
+.lrg-content {
+    padding: 16px 8px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.08);
-    justify-content: center; 
-
 }
 
-#explore.slider-ready .swiper-slide-active .slide-content {
-    transform: translateX(0);
-    opacity: 1;
-    transition-delay: 0.35s;
-}
-
-.slide-content h3 {
+.lrg-eyebrow {
     font-family: var(--font-display);
-    font-size: 0.9rem;
-    letter-spacing: 0.1em;
+    font-size: 0.68rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(0, 0, 0, 0.45);
+    margin-bottom: 12px;
+}
+
+.lrg-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 3.2vw, 2.75rem);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--eleanor-charcoal);
-    margin-bottom: 1rem;
+    margin: 0 0 14px;
+    font-weight: 300;
+    line-height: 1;
 }
 
-.slide-divider {
-    width: 60px;
+.lrg-divider {
+    width: 56px;
     height: 1px;
-    background: rgba(0, 0, 0, 0.1);
-    opacity: 0.3;
-    margin: 20px 0;
+    background: rgba(0, 0, 0, 0.18);
+    margin: 0 0 18px;
 }
 
-.slide-content p {
+.lrg-description {
     font-family: var(--font-body);
     font-weight: 300;
-    font-size: var(--font-body-size);
-    line-height: 1.6;
-    color: rgba(0, 0, 0, 0.75);
-    margin-bottom: 30px;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: rgba(0, 0, 0, 0.7);
+    margin-bottom: 26px;
+    max-width: 36ch;
 }
 
+/* ====== Thumbnails ====== */
+.lrg-thumbs {
+    display: grid;
+    gap: 16px;
+}
+
+.lrg-thumbs--stack {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+    height: 100%;
+    max-height: 100%;
+}
+
+.lrg-thumbs--single {
+    grid-template-columns: 1fr;
+}
+
+.lrg-thumbs--grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.lrg-thumb {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    aspect-ratio: 4 / 3;
+    background: rgba(0, 0, 0, 0.04);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    cursor: pointer;
+}
+
+.lrg-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.7s ease;
+}
+
+.lrg-thumb:hover {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14);
+}
+
+.lrg-thumb:hover img {
+    transform: scale(1.06);
+}
+
+/* ====== Hover overlay (dim + label card with expand icon) ====== */
+.lrg-hero,
+.lrg-thumb {
+    /* Anchor for hover pseudo-elements; existing rules already set position:relative */
+}
+
+.lrg-hero::before,
+.lrg-thumb::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.lrg-hero::after,
+.lrg-thumb::after {
+    content: attr(data-label);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.94);
+    background-color: rgba(245, 240, 230, 0.94);
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a1a1a' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M3 8V3H8M21 8V3H16M3 16V21H8M21 16V21H16'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center 18px;
+    background-size: 22px;
+    padding: 56px 32px 18px;
+    border-radius: 4px;
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--eleanor-charcoal);
+    opacity: 0;
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    z-index: 3;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.lrg-hero:hover::before,
+.lrg-thumb:hover::before {
+    opacity: 1;
+}
+
+.lrg-hero:hover::after,
+.lrg-thumb:hover::after {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Slightly smaller label card on the thumbs (they're smaller images) */
+.lrg-thumb::after {
+    padding: 48px 22px 14px;
+    font-size: 0.62rem;
+    background-position: center 14px;
+    background-size: 18px;
+}
+
+/* CTA button — kept as .slide-button for backwards-compat with existing styles elsewhere */
 .slide-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 12px 26px;
+    padding: 13px 28px;
     background: var(--eleanor-charcoal);
     color: #fff;
     text-decoration: none;
@@ -199,7 +262,7 @@
     text-transform: uppercase;
     transition: all 0.3s ease;
     align-self: flex-start;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .slide-button:hover {
@@ -208,328 +271,483 @@
     transform: translateY(-1px);
 }
 
-/* Navigation Arrows - Matching Filter Button Style */
-.swiper-button-prev,
-.swiper-button-next {
-    width: 44px;
-    height: 44px;
-    background: rgba(255, 255, 255, 0.60);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    border-radius: 999px;
-    backdrop-filter: blur(8px);
-    transition: all 0.2s ease;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.swiper-button-prev:hover,
-.swiper-button-next:hover {
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
-}
-
-.swiper-button-prev:after,
-.swiper-button-next:after {
-    font-size: 1rem;
-    color: rgba(0,0,0,0.55);
-    font-weight: 600;
-}
-
-/* Pagination (Numbers) */
-.swiper-pagination {
-    position: relative;
-    bottom: auto !important;
-    margin-top: 30px;
-    display: flex;
+/* ============================================================
+   LIGHTBOX  —  image on top, white card overlapping bottom
+   ============================================================ */
+.lrg-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
     justify-content: center;
-    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.35s ease;
 }
 
-.swiper-pagination-bullet {
+.lrg-lightbox.is-open {
+    display: flex;
+    opacity: 1;
+}
+
+.lrg-lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 20, 20, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+}
+
+.lrg-lightbox__stage {
+    position: relative;
+    width: min(94vw, 1100px);
+    height: min(90vh, 800px);
+    z-index: 2;
+}
+
+.lrg-lightbox__swiper {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: visible;
+}
+
+/* Close ✕ — sits at top-right of image area */
+.lrg-lightbox__close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
     width: 40px;
     height: 40px;
-    background: rgba(255, 255, 255, 0.55);
-
-    border: 1px solid rgba(0, 0, 0, 0.10);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.06);
     color: var(--eleanor-charcoal);
-    opacity: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    font-weight: 400;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    backdrop-filter: blur(8px);
+    cursor: pointer;
+    z-index: 20;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.swiper-pagination-bullet:hover {
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-    transform: translateY(-1px);
-}
-
-.swiper-pagination-bullet-active {
-    background: var(--eleanor-charcoal);
-    color: white;
-    border-color: var(--eleanor-charcoal);
+.lrg-lightbox__close:hover {
+    background: #fff;
     transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
-/* ======= MOBILE RESPONSIVE DESIGN ======= */
+/* Counter — small, bottom-right of image area (above the card) */
+.lrg-lightbox__counter {
+    position: absolute;
+    top: 16px;
+    left: 24px;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    z-index: 15;
+    pointer-events: none;
+}
+
+/* Slides */
+.lrg-lightbox .swiper-slide {
+    position: relative;
+}
+
+.lrg-lightbox .portfolio-slide {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Image: top portion, rounded top corners */
+.lrg-lightbox .slide-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 65%;
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.lrg-lightbox .slide-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* No left-side gradient in the new layout */
+.lrg-lightbox .slide-image::after {
+    display: none;
+}
+
+/* Hide divider in lightbox — cleaner look matches reference */
+.lrg-lightbox .slide-divider {
+    display: none;
+}
+
+/* Card: white, centered horizontally, overlaps image bottom */
+.lrg-lightbox .slide-content {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(880px, 88%);
+    background: #fff;
+    border-radius: 12px;
+    padding: 44px 56px 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    z-index: 5;
+}
+
+.lrg-lightbox .slide-content h3 {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 2.6vw, 2.5rem);
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--eleanor-charcoal);
+    margin: 0 0 22px;
+    text-align: center;
+    line-height: 1.15;
+}
+
+.lrg-lightbox .slide-content p {
+    font-family: var(--font-body);
+    font-weight: 300;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: rgba(0, 0, 0, 0.72);
+    margin: 0 auto 28px;
+    text-align: center;
+    max-width: 56ch;
+}
+
+/* CTA: wide rectangular charcoal bar inside the card */
+.lrg-lightbox .slide-content .slide-button {
+    align-self: stretch;
+    width: 100%;
+    border-radius: 8px;
+    padding: 16px 28px;
+    text-align: center;
+    justify-content: center;
+}
+
+/* Lightbox nav arrows — plain white chevrons on image (no glass circle) */
+.lrg-lightbox .swiper-button-prev,
+.lrg-lightbox .swiper-button-next {
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    top: 32%;
+    transform: translateY(-50%);
+    transition: opacity 0.2s ease;
+    opacity: 0.85;
+}
+
+.lrg-lightbox .swiper-button-prev {
+    left: 24px;
+}
+
+.lrg-lightbox .swiper-button-next {
+    right: 24px;
+}
+
+.lrg-lightbox .swiper-button-prev:hover,
+.lrg-lightbox .swiper-button-next:hover {
+    background: transparent;
+    opacity: 1;
+}
+
+.lrg-lightbox .swiper-button-prev:after,
+.lrg-lightbox .swiper-button-next:after {
+    font-size: 2rem;
+    font-weight: 300;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Lock body scroll when lightbox is open */
+body.lrg-lightbox-open {
+    overflow: hidden;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+/* Tablet */
 @media (max-width: 1024px) {
-    .swiper {
-        height: 550px;
+    .lrg-row,
+    .lrg-row--reverse {
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.9fr);
+        gap: 28px;
     }
-    
-    #explore .slide-content {
-        width: 36%;
-        padding: 40px 30px;
+
+    .lrg-lightbox__stage {
+        width: min(94vw, 900px);
     }
-    
-    #explore .slide-content h3 {
-        font-size: 1.8rem;
+
+    .lrg-lightbox .slide-content {
+        padding: 36px 44px 32px;
     }
 }
 
-/* Tablet + mobile */
+/* Mobile — stacks vertically per category, like shot 3 */
 @media (max-width: 768px) {
     .portfolio-section {
         padding: 60px 0;
     }
 
-    /* ⬇️ Make the Live / Rest / Gather card match the hero card width */
     .portfolio-section .content-container {
-        width: calc(100% - 32px);   /* 16px gutter on each side */
+        width: calc(100% - 32px);
         max-width: none;
         margin: 0 16px;
-        padding: 24px 18px 28px;
+        padding: 28px 18px 32px;
         border-radius: 20px;
         box-sizing: border-box;
     }
 
-    /* Let the slider fill that card */
-    .slider-container {
-        width: 100%;
-        padding: 0;
-    }
-    
     .section-header {
-        margin-bottom: 40px;
+        margin-bottom: 36px;
     }
-    
+
     .section-header h2 {
         font-size: 2rem;
     }
-    
-    .swiper {
-        height: 500px;
-        border-radius: 20px;
-    }
-    
-    #explore .slide-content {
-        display: none;
-    }
-    
-    .slide-overlay {
-        padding: 25px;
-    }
-    
-    .slide-title {
-        font-size: 1.3rem;
-    }
-    
-    .mobile-slide-caption {
-        display: block;
-        margin-top: 12px;
-        background: rgba(255, 255, 255, 0.88);
-        border-radius: 24px;
-        padding: 28px 24px 32px;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        text-align: left;
-        opacity: 0;
-        transform: translateY(16px);
-        transition: opacity 0.6s ease, transform 0.6s ease;
+
+    .lrg-stack {
+        gap: 56px;
     }
 
-    .mobile-slide-caption.mobile-caption-visible {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    
-    .mobile-slide-caption h3 {
-        font-family: var(--font-display);
-        font-size: 1.4rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--eleanor-charcoal);
-        margin-bottom: 0.75rem;
+    /* Each row becomes a vertical card */
+    .lrg-row,
+    .lrg-row--reverse {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: stretch;
     }
 
-    .mobile-slide-caption p {
-        font-family: var(--font-body);
-        font-size: var(--font-body-size);
-        line-height: 1.65;
-        color: rgba(0, 0, 0, 0.75);
-        margin-bottom: 1.25rem;
-    }
-    
-    .mobile-slide-caption .slide-button {
-        width: 100%;
+    .lrg-content {
+        order: 3;
+        padding: 8px 4px 0;
         text-align: center;
-        padding: 14px 25px;
-        margin-top: 10px;
     }
-    
-    /* Mobile-optimized navigation */
-    .swiper-button-prev,
-    .swiper-button-next {
-        width: 50px;
-        height: 50px;
+
+    .lrg-divider {
+        margin-left: auto;
+        margin-right: auto;
     }
-    
-    .swiper-pagination-bullet {
-        width: 44px;
-        height: 44px;
+
+    .lrg-description {
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 46ch;
+    }
+
+    .slide-button {
+        align-self: center;
+        width: 100%;
+        max-width: 360px;
+        text-align: center;
+        padding: 14px 28px;
+    }
+
+    .lrg-hero {
+        order: 1;
+        aspect-ratio: 16 / 11;
+    }
+
+    .lrg-thumbs {
+        order: 2;
+    }
+
+    .lrg-thumbs--stack,
+    .lrg-thumbs--single {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+    }
+
+    .lrg-thumbs--single {
+        grid-template-columns: 1fr;
+    }
+
+    .lrg-thumbs--grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .lrg-thumb {
+        aspect-ratio: 4 / 3;
+    }
+
+    /* Lightbox: stack image then card, no overlap */
+    .lrg-lightbox__stage {
+        width: 96vw;
+        height: 92vh;
+    }
+
+    .lrg-lightbox__close {
+        top: 12px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .lrg-lightbox__counter {
+        top: 14px;
+        left: 16px;
+        font-size: 0.65rem;
+    }
+
+    .lrg-lightbox .slide-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60%;
+        border-radius: 12px;
+    }
+
+    .lrg-lightbox .slide-content {
+        position: absolute;
+        top: auto;
+        bottom: 16px;
+        left: 12px;
+        right: 12px;
+        transform: none;
+        width: auto;
+        height: auto;
+        max-height: 45%;
+        padding: 24px 22px 26px;
+        border-radius: 12px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+        overflow-y: auto;
+        text-align: center;
+        align-items: center;
+    }
+
+    .lrg-lightbox .slide-content h3 {
+        font-size: 1.4rem;
+        margin-bottom: 14px;
+        text-align: center;
+    }
+
+    .lrg-lightbox .slide-content p {
+        font-size: 0.92rem;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .lrg-lightbox .slide-content .slide-button {
+        align-self: center;
+        width: auto;
+        min-width: 220px;
+        max-width: 320px;
+    }
+
+    .lrg-lightbox .swiper-button-prev {
+        top: 30%;
+        left: 8px;
+    }
+
+    .lrg-lightbox .swiper-button-next {
+        top: 30%;
+        right: 8px;
+    }
+
+    .lrg-lightbox .swiper-button-prev:after,
+    .lrg-lightbox .swiper-button-next:after {
+        font-size: 1.6rem;
     }
 }
 
-/* Small phones (like your 390px iPhone) */
+/* Small phones */
 @media (max-width: 480px) {
     .portfolio-section {
         padding: 40px 0;
     }
 
-    /* ⬇️ Tighter gutters, like the hero at 390px */
     .portfolio-section .content-container {
-        width: calc(100% - 8px);  /* 4px gutter each side */
+        width: calc(100% - 8px);
         max-width: none;
         margin: 0 4px;
-        padding: 20px 14px 24px;
+        padding: 22px 14px 26px;
         border-radius: 16px;
     }
-    
-    .slider-container {
-        padding: 0;  /* no inner padding – full-width images */
-    }
-    
-    .swiper {
-        height: 430px;
-        border-radius: 16px;
-    }
-    
-    .slide-overlay {
-        padding: 20px;
-    }
-    
+
     .section-header h2 {
         font-size: 1.8rem;
     }
-    
-    .mobile-slide-caption {
-        padding: 22px 18px 26px;
-    }
-    
-    .mobile-slide-caption h3 {
-        font-size: 1.2rem;
-    }
-    
-    .mobile-slide-caption p {
-        font-size: var(--font-body-size);
-        line-height: 1.55;
-    }
-    
-    .slide-divider {
-        opacity: 0.3;
-        margin: 28px 0;
-    }
-    
-    .swiper-pagination {
-        bottom: 20px !important;
-        gap: 10px;
+
+    .lrg-stack {
+        gap: 44px;
     }
 
-    /* Mobile-optimized navigation */
-     .swiper-button-prev, .swiper-button-next { 
-        width: 50px; 
-        height: 50px;
+    .lrg-title {
+        font-size: 2.25rem;
     }
-    
-    .swiper-pagination-bullet {
-        width: 40px;
-        height: 40px;
-        font-size: 0.8rem;
+
+    .lrg-hero,
+    .lrg-thumb {
+        border-radius: 12px;
+    }
+
+    .lrg-lightbox .slide-content h3 {
+        font-size: 1.4rem;
+    }
+
+    .lrg-lightbox .slide-content p {
+        font-size: 0.9rem;
+        margin-bottom: 20px;
     }
 }
 
-/* iPhone SE and small devices */
-@media (max-width: 375px) {
-    .swiper {
-        height: 400px;
-    }
-    
-    .mobile-slide-caption {
-        padding: 18px 16px 24px;
-    }
-    
-    .mobile-slide-caption h3 {
-        font-size: 1.2rem;
-    }
-    
-    .mobile-slide-caption p {
-        font-size: var(--font-body-size);
-    }
-    
-    .mobile-slide-caption .slide-button {
-        padding: 12px 20px;
-        font-size: 0.85rem;
-    }
-}
-
-/* Landscape orientation on mobile */
-@media (max-width: 768px) and (orientation: landscape) {
-    .swiper {
-        height: 350px;
-    }
-    
-}
-
-/* Reduced motion support for accessibility */
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-    #explore .slide-content {
+    .lrg-hero,
+    .lrg-hero img,
+    .lrg-thumb,
+    .lrg-thumb img,
+    .slide-button,
+    .lrg-lightbox,
+    .lrg-lightbox__close {
         transition: none;
     }
-    
-    .slide-button:hover {
+
+    .lrg-hero:hover img,
+    .lrg-thumb:hover img,
+    .slide-button:hover,
+    .lrg-lightbox__close:hover {
         transform: none;
-    }
-    
-    .swiper-button-prev:hover,
-    .swiper-button-next:hover {
-        transform: none;
-    }
-    
-    .swiper-pagination-bullet {
-        transition: none;
     }
 }
 
-/* High contrast mode support */
+/* High contrast */
 @media (prefers-contrast: high) {
-    #explore .slide-content {
-        background: white;
+    .lrg-hero,
+    .lrg-thumb {
         border: 2px solid var(--eleanor-charcoal);
     }
-    
-    .swiper-button-prev,
-    .swiper-button-next {
-        background: white;
+
+    .lrg-lightbox .slide-content {
+        background: #fff;
         border: 2px solid var(--eleanor-charcoal);
     }
 }

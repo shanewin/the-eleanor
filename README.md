@@ -12,7 +12,7 @@ The Eleanor is a luxury residential building at 52 4th Avenue, Brooklyn. This re
 - **Admin Dashboard**: Lead management with A+ to F grading, enrichment data, behavioral journey timeline, and AI-generated prospect summaries.
 - **Email Notifications**: SMTP delivery via Hostinger for form submissions and enrichment profiles.
 
----
+
 
 ## Tech Stack
 

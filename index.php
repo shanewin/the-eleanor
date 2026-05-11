@@ -119,7 +119,7 @@ endif;
   <meta property="og:type" content="website">
   <meta property="og:title" content="The Eleanor | Luxury Residences in Boerum Hill, Brooklyn">
   <meta property="og:description" content="Modern luxury residences featuring light-filled interiors and a landscaped rooftop terrace.">
-  <meta property="og:image" content="img/background-hero-cropped.jpg">
+  <meta property="og:image" content="img/building_facade.jpg">
   <meta property="og:url" content="https://eleanor.nyc">
 </head>
 <body>
@@ -211,7 +211,7 @@ endif;
 
       <div class="hero-media">
         <div class="hero-media-main">
-          <img src="img/background-hero-cropped.jpg" alt="The Eleanor exterior" />
+          <img src="img/building_facade.jpg" alt="The Eleanor exterior" />
         </div>
         <div class="hero-media-secondary">
           <img src="img/7С.jpeg" alt="The Eleanor residence interior" />
@@ -268,7 +268,7 @@ endif;
         <!-- Right column: imagery -->
         <div class="hero-media">
           <div class="hero-media-main">
-            <img src="img/background-hero-cropped.jpg" alt="The Eleanor exterior" />
+            <img src="img/building_facade.jpg" alt="The Eleanor exterior" />
           </div>
           <div class="hero-media-secondary">
             <img src="img/7С.jpeg" alt="The Eleanor residence interior" />
@@ -286,203 +286,205 @@ endif;
             <div class="section-header">
                 <div class="section-subtitle">The Eleanor</div>
                 <h2 class="section-title">Live, Rest, Gather</h2>
-                <p>Spaces shaped with intention—from open living areas to restful rooms and thoughtfully crafted places to gather. A calm, contemporary building experience grounded in warmth and design.</p>
+                <p>Three ways to live well at The Eleanor. From the moments you spend alone to the ones you share, every part of the building is designed for how you actually live.</p>
             </div>
             
-            <div class="slider-container">
-            <div class="swiper">
+            <div class="lrg-stack">
+
+                <!-- LIVE -->
+                <article class="lrg-row" data-category="live">
+                    <a class="lrg-hero" href="#" data-lightbox-index="0" data-label="Skyline Living" aria-label="Open Skyline Living in gallery">
+                        <img src="img/slider-pics/skyline_living.jpg" alt="The Eleanor Skyline Living">
+                    </a>
+                    <div class="lrg-content">
+                        <div class="lrg-eyebrow">01 — Residences</div>
+                        <h3 class="lrg-title">Live</h3>
+                        <div class="lrg-divider"></div>
+                        <p class="lrg-description">Homes built for the way you actually live. Whether you're cooking, working, hosting, or just stretching out at the end of a long day, every residence is designed to feel like yours from the moment you move in.</p>
+                        <a href="#waitlist" class="slide-button">Join the Waitlist</a>
+                    </div>
+                    <div class="lrg-thumbs lrg-thumbs--stack">
+                        <a class="lrg-thumb" href="#" data-lightbox-index="1" data-label="Open Plan Living" aria-label="Open Open Plan Living in gallery">
+                            <img src="img/slider-pics/open_plan_living.jpg" alt="The Eleanor Open Plan Living">
+                        </a>
+                        <a class="lrg-thumb" href="#" data-lightbox-index="2" data-label="Terrace Living" aria-label="Open Terrace Living in gallery">
+                            <img src="img/slider-pics/terrace_living.jpg" alt="The Eleanor Terrace Living">
+                        </a>
+                    </div>
+                </article>
+
+                <!-- REST (inverted layout: thumbs left, hero right) -->
+                <article class="lrg-row lrg-row--reverse" data-category="rest">
+                    <div class="lrg-thumbs lrg-thumbs--stack">
+                        <a class="lrg-thumb" href="#" data-lightbox-index="4" data-label="Tucked Away" aria-label="Open Tucked Away in gallery">
+                            <img src="img/slider-pics/private_suite.jpg" alt="The Eleanor Tucked Away">
+                        </a>
+                        <a class="lrg-thumb" href="#" data-lightbox-index="5" data-label="Effortless Living" aria-label="Open Effortless Living in gallery">
+                            <img src="img/slider-pics/studio_living.jpg" alt="The Eleanor Effortless Living">
+                        </a>
+                    </div>
+                    <div class="lrg-content">
+                        <div class="lrg-eyebrow">02 — Sanctuary</div>
+                        <h3 class="lrg-title">Rest</h3>
+                        <div class="lrg-divider"></div>
+                        <p class="lrg-description">Bedrooms made for slow mornings, quiet evenings, and the kind of sleep you don't want to leave. Step out of the city and into a room that knows how to hold its calm.</p>
+                        <a href="#availability" class="slide-button">View Floor Plans</a>
+                    </div>
+                    <a class="lrg-hero" href="#" data-lightbox-index="3" data-label="Skyline Bedroom" aria-label="Open Skyline Bedroom in gallery">
+                        <img src="img/slider-pics/skyline_bedroom.jpg" alt="The Eleanor Skyline Bedroom">
+                    </a>
+                </article>
+
+                <!-- GATHER -->
+                <article class="lrg-row lrg-row--gather" data-category="gather">
+                    <a class="lrg-hero" href="#" data-lightbox-index="6" data-label="The Library" aria-label="Open The Library in gallery">
+                        <img src="img/slider-pics/residents_library.jpg" alt="The Eleanor The Library">
+                    </a>
+                    <div class="lrg-content">
+                        <div class="lrg-eyebrow">03 — Amenities</div>
+                        <h3 class="lrg-title">Gather</h3>
+                        <div class="lrg-divider"></div>
+                        <p class="lrg-description">Spaces beyond your front door that don't feel like extras. Work somewhere quieter than your kitchen table, host friends without rearranging the living room, and find your routine — or break it — without ever leaving the building.</p>
+                        <a href="#availability" class="slide-button">Check Availability</a>
+                    </div>
+                    <div class="lrg-thumbs lrg-thumbs--stack">
+                        <a class="lrg-thumb" href="#" data-lightbox-index="7" data-label="Strength, On Your Terms" aria-label="Open Strength, On Your Terms in gallery">
+                            <img src="img/slider-pics/fitness_center.jpg" alt="The Eleanor Strength, On Your Terms">
+                        </a>
+                        <a class="lrg-thumb" href="#" data-lightbox-index="8" data-label="The Courtyard" aria-label="Open The Courtyard in gallery">
+                            <img src="img/slider-pics/garden_courtyard.jpg" alt="The Eleanor The Courtyard">
+                        </a>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+      </div>
+
+      <!-- ======= LIGHTBOX (10-slide gallery) ======= -->
+      <div id="lrg-lightbox" class="lrg-lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Live, Rest, Gather gallery">
+        <div class="lrg-lightbox__backdrop" data-lightbox-close></div>
+        <div class="lrg-lightbox__stage">
+            <button class="lrg-lightbox__close" type="button" data-lightbox-close aria-label="Close gallery">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <div class="swiper lrg-lightbox__swiper">
                 <div class="swiper-wrapper">
-                    <!-- Slide 1 -->
+                    <!-- 0: Skyline Living (LIVE hero) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/elevated_living.jpg" alt="The Eleanor Elevated Living">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Elevated Living</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/skyline_living.jpg" alt="The Eleanor Skyline Living"></div>
                             <div class="slide-content">
-                                <h3>Elevated Living</h3>
+                                <h3>Skyline Living</h3>
                                 <div class="slide-divider"></div>
-                                <p>Homes shaped by The Eleanor’s refined materials—warm oak flooring, sculpted stone surfaces, and expansive windows that bring natural light deep into the space. Designed with a modern, effortless layout, it reflects the calm, contemporary character found throughout the building.</p>
-                                <a href="#waitlist" class="slide-button">Join the Wait List</a>
+                                <p>Wake up to the skyline. Watch the city soften at dusk. Host friends with a view they'll remember long after they leave. A corner residence makes the everyday feel cinematic.</p>
+                                <a href="#waitlist" class="slide-button" data-lightbox-close>Join the Waitlist</a>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Slide 2: Work, Refined -->
+                    <!-- 1: Open Plan Living (LIVE thumb 1) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/work_refined.jpg" alt="The Eleanor Work, Refined">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Work, Refined</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/open_plan_living.jpg" alt="The Eleanor Open Plan Living"></div>
                             <div class="slide-content">
-                                <h3>Work, Refined</h3>
+                                <h3>Open Plan Living</h3>
                                 <div class="slide-divider"></div>
-                                <p>Warm lighting, curated shelving, and living greenery create a workspace that feels more private library than conventional office. The Eleanor's co-working lounge pairs rich materials—oak flooring, leather seating, and soft acoustic partitions—with thoughtful design, offering residents a polished setting to focus, collaborate, and create.</p>
-                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                                <p>Cook, host, gather, or just stretch out. An open layout means you're never confined to one corner of your home — light moves freely through the residence, and so do you.</p>
+                                <a href="#waitlist" class="slide-button" data-lightbox-close>Join the Waitlist</a>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Slide 3 -->
+                    <!-- 2: Terrace Living (LIVE thumb 2) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/light_filled_living.jpg" alt="The Eleanor Light-Filled Living">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Light-Filled Living</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/terrace_living.jpg" alt="The Eleanor Terrace Living"></div>
                             <div class="slide-content">
-                                <h3>Light-Filled Living</h3>
+                                <h3>Terrace Living</h3>
                                 <div class="slide-divider"></div>
-                                <p>Expansive glass brings The Eleanor’s design ethos to life—natural light, warm oak flooring, and refined stone surfaces shaping a calm, modern environment. Every residence reflects the building’s commitment to crafted materials, soft textures, and elevated city living..</p>
-                                <a href="#availability" class="slide-button">Check Availability</a>
+                                <p>Step outside without leaving home. A private terrace gives you fresh air, open sky, and a quiet place to unwind at the end of the day — all of it just past the door.</p>
+                                <a href="#waitlist" class="slide-button" data-lightbox-close>Join the Waitlist</a>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Slide 4: Your Move -->
+                    <!-- 3: Skyline Bedroom (REST hero) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/your_move.jpg" alt="The Eleanor Your Move">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Your Move</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/skyline_bedroom.jpg" alt="The Eleanor Skyline Bedroom"></div>
                             <div class="slide-content">
-                                <h3>Your Move</h3>
+                                <h3>Skyline Bedroom</h3>
                                 <div class="slide-divider"></div>
-                                <p>A landscaped terrace with oversized chess, lounge seating, and lush greenery offers residents a private outdoor retreat without leaving home. The Eleanor's courtyard blends playful detail with considered design—mature plantings, natural stone, and shaded gathering spots that invite you to slow down and stay awhile.</p>
-                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                                <p>Fall asleep to the city's quiet hours and wake to morning light pouring across the room. A bedroom that feels less like a place to crash and more like a place you want to linger.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>View Floor Plans</a>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Slide 5: Room to Unwind -->
+                    <!-- 4: Tucked Away (REST thumb 1) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/room_to_unwind.jpg" alt="The Eleanor Room to Unwind">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Room to Unwind</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/private_suite.jpg" alt="The Eleanor Tucked Away"></div>
                             <div class="slide-content">
-                                <h3>Room to Unwind</h3>
+                                <h3>Tucked Away</h3>
                                 <div class="slide-divider"></div>
-                                <p>Floor-to-ceiling glass, a modern fireplace, and rich leather seating shape a residents' library designed for slow mornings and easy evenings. With curated shelving, warm oak millwork, and views onto the courtyard, The Eleanor's lounge is a shared living room that feels unmistakably personal.</p>
-                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                                <p>Your private corner of the residence — tucked away from the main living space, with everything you need close at hand. Work, rest, and recharge without ever switching gears.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>View Floor Plans</a>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Slide 5 -->
+                    <!-- 5: Effortless Living (REST thumb 2) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/rest_well.jpg" alt="The Eleanor Rest Well">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Rest Well</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/studio_living.jpg" alt="The Eleanor Effortless Living"></div>
                             <div class="slide-content">
-                                <h3>Rest Well</h3>
+                                <h3>Effortless Living</h3>
                                 <div class="slide-divider"></div>
-                                <p>Soft textures, warm neutrals, and natural light reflect The Eleanor’s commitment to quiet luxury—spaces crafted for balance, comfort, and a sense of calm at the end of each day.</p>
-                                <a href="#waitlist" class="slide-button">Join the Wait List</a>
+                                <p>Everything you need, exactly where you need it. The day flows naturally from a quiet morning at home to an easy evening with friends — and the skyline stays with you, just outside the window.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>View Floor Plans</a>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Slide 4 -->
+                    <!-- 6: The Library (GATHER hero) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/crafted_intention.jpg" alt="The Eleanor Crafted with Intention">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Crafted with Intention</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/residents_library.jpg" alt="The Eleanor The Library"></div>
                             <div class="slide-content">
-                                <h3>Crafted with Intention</h3>
+                                <h3>The Library</h3>
                                 <div class="slide-divider"></div>
-                                <p>Refined materials and modern craftsmanship define The Eleanor’s kitchens—marble-look surfaces, warm oak flooring, and considered cabinetry creating spaces designed for connection, creativity, and everyday ease.</p>
-                                <a href="#waitlist" class="slide-button">Join the Wait List</a>
+                                <p>A second living room for movie nights, lazy Sunday reading, and late games of pool. Big enough to bring people together, comfortable enough to stay all night.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Slide 5 -->
+                    <!-- 7: Strength, On Your Terms (GATHER thumb 1) -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/design_to_flow.jpg" alt="The Eleanor Garden">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Designed to Flow</div>
-                            </div>
-                            <div class="slide-content">
-                                <h3>Designed to Flow</h3>
-                                <div class="slide-divider"></div>
-                                <p>Generous glazing, warm oak flooring, and refined stone elements embody The Eleanor’s modern architectural identity. A calm palette and thoughtful detailing shape spaces that feel open, airy, and quietly elevated—designed with light, materiality, and intention at the forefront.</p>
-                                <a href="#availability" class="slide-button">Check Availability</a>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Slide 6 -->
-                    <div class="swiper-slide">
-                        <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/a_considered_welcome.jpg" alt="The Eleanor A Considered Welcome">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">A Considered Welcome</div>
-                            </div>
-                            <div class="slide-content">
-                                <h3>A Considered Welcome</h3>
-                                <div class="slide-divider"></div>
-                                <p>Textured metallic screens, warm panel detailing, and terrazzo flooring set the tone from the moment you arrive. The Eleanor's lobby reflects the building's design philosophy—refined materials, intentional craft, and a quiet sense of arrival that feels both modern and timeless.</p>
-                                <a href="#availability" class="slide-button">Schedule a Tour</a>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Slide 7 -->
-                    <div class="swiper-slide">
-                        <div class="portfolio-slide">
-                            <div class="slide-image">
-                                <img src="img/slider-pics/strength_on_your_terms.jpg" alt="The Eleanor Strength, On Your Terms">
-                            </div>
-                            <div class="slide-overlay">
-                                <div class="slide-title">Strength, On Your Terms</div>
-                            </div>
+                            <div class="slide-image"><img src="img/slider-pics/fitness_center.jpg" alt="The Eleanor Strength, On Your Terms"></div>
                             <div class="slide-content">
                                 <h3>Strength, On Your Terms</h3>
                                 <div class="slide-divider"></div>
-                                <p>A fully equipped fitness center with free weights, cable machines, and cardio—designed with the same intentional aesthetic found throughout The Eleanor. Clean lines, concrete textures, and open sightlines create a focused, no-frills environment built for residents who take their routine seriously.</p>
-                                <a href="#availability" class="slide-button">Schedule a Tour</a>
+                                <p>Train on your own schedule, without leaving the building. A serious setup with free weights, cardio, and the cable system you'd actually use — available whenever you need it.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
                             </div>
                         </div>
                     </div>
-
+                    <!-- 8: The Courtyard (GATHER thumb 2) -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image"><img src="img/slider-pics/garden_courtyard.jpg" alt="The Eleanor The Courtyard"></div>
+                            <div class="slide-content">
+                                <h3>The Courtyard</h3>
+                                <div class="slide-divider"></div>
+                                <p>A private outdoor escape just downstairs. Settle into the swing with a coffee, host friends for a long lunch, or take on the oversized chess board — fresh air and open sky, without ever leaving home.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
-                <!-- Navigation -->
                 <div class="swiper-button-prev"></div>
                 <div class="swiper-button-next"></div>
             </div>
-            
-            <!-- Pagination (Numbers) - Outside swiper for better positioning -->
-            <div class="swiper-pagination"></div>
-            </div>
-            <div class="mobile-slide-caption" aria-live="polite"></div>
+            <div class="lrg-lightbox__counter" aria-live="polite">1 of 10</div>
         </div>
       </div>
     </section>
