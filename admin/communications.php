@@ -61,44 +61,88 @@ include __DIR__ . '/includes/layout-header.php';
         </div>
     </div>
 
-    <!-- Form Submissions -->
-    <div id="formSubmissionsCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
+    <!-- Lead-to-Showing Status Pipeline -->
+    <div id="statusPipelineCard" class="card bg-body-tertiary border-0 mb-3">
         <div class="card-body p-3">
-            <div class="d-flex justify-content-between align-items-center mb-2" style="cursor:pointer" onclick="toggleSubmissionsList()">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-file-earmark-text text-info"></i>
-                    <span class="small fw-semibold text-white">Form Submissions</span>
-                    <span class="badge bg-info bg-opacity-25 text-info" id="formSubmissionsCount" style="font-size:0.65rem"></span>
-                </div>
-                <i class="bi bi-chevron-down text-white-50" id="formSubmissionsChevron"></i>
-            </div>
-            <div id="formSubmissionsList" style="display:none"></div>
+            <div id="statusPipeline"></div>
         </div>
     </div>
 
-    <!-- Timeline Container -->
-    <div class="card bg-body-tertiary border-0" style="min-height:400px;max-height:calc(100vh - 300px);display:flex;flex-direction:column;">
-        <div class="card-body p-4 flex-grow-1" style="overflow-y:auto" id="timelineContainer">
-            <div class="text-center py-5 text-body-tertiary">Loading...</div>
-        </div>
+    <!-- Tour Banner (active or recent tour) -->
+    <div id="tourBanner" style="display:none" class="mb-3"></div>
 
-        <!-- SMS Reply Box -->
-        <div id="smsReplyBox" class="border-top border-secondary p-3" style="display:none">
-            <div class="d-flex gap-2">
-                <input type="text" class="form-control bg-dark border-secondary text-white" id="smsReplyInput" placeholder="Type an SMS reply..." maxlength="480" onkeydown="if(event.key==='Enter')sendSMSReply()">
-                <button class="btn btn-primary px-3" onclick="sendSMSReply()" id="smsReplyBtn">
-                    <i class="bi bi-send"></i>
-                </button>
-            </div>
-            <div class="d-flex justify-content-between mt-1">
-                <small class="text-white-50" id="smsReplyStatus"></small>
-                <small class="text-white-50"><span id="smsCharCount">0</span> / 480</small>
+    <!-- Form Submissions -->
+    <div id="formSubmissionsCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
+        <div class="card-body p-3">
+            <div id="formSubmissionsList"></div>
+        </div>
+    </div>
+
+    <!-- Two-column conversation: SMS + Email -->
+    <div class="row g-3 mb-3" id="conversationRow">
+        <!-- SMS column -->
+        <div class="col-12 col-lg-6">
+            <div class="card bg-body-tertiary border-0 h-100" style="min-height:400px;display:flex;flex-direction:column">
+                <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center px-3 py-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-chat-dots-fill text-info"></i>
+                        <span class="fw-semibold text-white" style="font-size:0.9rem">SMS</span>
+                    </div>
+                    <small class="text-white-50" id="smsThreadCount"></small>
+                </div>
+                <div class="card-body p-3 flex-grow-1" id="smsThreadContainer" style="overflow-y:auto;max-height:calc(100vh - 480px);min-height:300px">
+                    <div class="text-center text-body-tertiary py-4 small">Loading...</div>
+                </div>
+                <!-- SMS Reply Box -->
+                <div id="smsReplyBox" class="border-top border-secondary p-3" style="display:none">
+                    <div class="d-flex gap-2">
+                        <input type="text" class="form-control bg-dark border-secondary text-white" id="smsReplyInput" placeholder="Type an SMS reply..." maxlength="480" onkeydown="if(event.key==='Enter')sendSMSReply()">
+                        <button class="btn btn-primary px-3" onclick="sendSMSReply()" id="smsReplyBtn">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-white-50" id="smsReplyStatus"></small>
+                        <small class="text-white-50"><span id="smsCharCount">0</span> / 480</small>
+                    </div>
+                </div>
+                <div id="noPhoneMessage" class="border-top border-secondary p-3 text-center" style="display:none">
+                    <small class="text-white-50"><i class="bi bi-exclamation-circle me-1"></i>No phone number on file</small>
+                </div>
             </div>
         </div>
+        <!-- Email column -->
+        <div class="col-12 col-lg-6">
+            <div class="card bg-body-tertiary border-0 h-100" style="min-height:400px;display:flex;flex-direction:column">
+                <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center px-3 py-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-envelope-fill text-info"></i>
+                        <span class="fw-semibold text-white" style="font-size:0.9rem">Email</span>
+                    </div>
+                    <small class="text-white-50" id="emailThreadCount"></small>
+                </div>
+                <div class="card-body p-3 flex-grow-1" id="emailThreadContainer" style="overflow-y:auto;max-height:calc(100vh - 480px);min-height:300px">
+                    <div class="text-center text-body-tertiary py-4 small">Loading...</div>
+                </div>
+                <div class="border-top border-secondary p-3 text-center">
+                    <small class="text-white-50"><i class="bi bi-info-circle me-1"></i>Outbound email composer coming soon</small>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <!-- No Phone Message -->
-        <div id="noPhoneMessage" class="border-top border-secondary p-3 text-center" style="display:none">
-            <small class="text-white-50"><i class="bi bi-exclamation-circle me-1"></i>No phone number on file — SMS replies unavailable</small>
+    <!-- Internal Log (collapsed by default) -->
+    <div id="internalLogCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center" style="cursor:pointer" onclick="toggleInternalLog()">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-bell-fill text-secondary"></i>
+                    <span class="fw-semibold text-white" style="font-size:0.9rem">Internal Log</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-white-50" id="internalLogCount" style="font-size:0.65rem"></span>
+                </div>
+                <i class="bi bi-chevron-down text-white-50" id="internalLogChevron"></i>
+            </div>
+            <div id="internalLogList" style="display:none" class="mt-3"></div>
         </div>
     </div>
 </div>

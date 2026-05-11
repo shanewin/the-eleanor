@@ -102,22 +102,28 @@ async function showCommTimeline(email) {
     document.getElementById('commTimelineView').style.display = 'block';
     document.getElementById('currentLeadEmail').value = email;
 
-    const container = document.getElementById('timelineContainer');
-    container.innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+    const smsContainer = document.getElementById('smsThreadContainer');
+    const emailContainer = document.getElementById('emailThreadContainer');
+    smsContainer.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+    emailContainer.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
 
     try {
         const res = await fetch(API + '?action=get_unified_timeline&email=' + encodeURIComponent(email));
         const data = await res.json();
 
         if (data.error) {
-            container.innerHTML = '<div class="text-center text-danger py-5">' + esc(data.error) + '</div>';
+            smsContainer.innerHTML = '<div class="text-center text-danger py-5">' + esc(data.error) + '</div>';
+            emailContainer.innerHTML = '';
             return;
         }
 
         currentTimelineData = data;
         renderTimelineHeader(data);
+        renderStatusPipeline(data.lead);
+        renderTourBanner(data.tour);
         renderFormSubmissions(data.submissions || []);
-        renderTimeline(data.timeline);
+        renderConversations(data.timeline || []);
+        renderInternalLog(data.timeline || []);
         setupReplyBox(data.lead);
         setupAIToggle(data);
 
@@ -128,7 +134,8 @@ async function showCommTimeline(email) {
             body: JSON.stringify({ email: email })
         });
     } catch(err) {
-        container.innerHTML = '<div class="text-center text-danger py-5">Error loading timeline.</div>';
+        smsContainer.innerHTML = '<div class="text-center text-danger py-5">Error loading timeline.</div>';
+        emailContainer.innerHTML = '';
     }
 }
 
@@ -139,25 +146,95 @@ function renderTimelineHeader(data) {
     document.getElementById('timelineLeadPhone').textContent = lead.phone ? ' · ' + lead.phone : '';
 }
 
+// ── Status Pipeline ──
+const PIPELINE_STEPS = [
+    { key: 'New',               label: 'New' },
+    { key: 'Contacted',         label: 'Contacted' },
+    { key: 'Showing Scheduled', label: 'Booked' },
+    { key: 'Showed',            label: 'Showed' },
+    { key: 'Lost',              label: 'Closed' }
+];
+
+function renderStatusPipeline(lead) {
+    const el = document.getElementById('statusPipeline');
+    if (!el) return;
+    const current = lead.lead_status || 'New';
+    const currentIdx = PIPELINE_STEPS.findIndex(s => s.key === current);
+    // Lost is a terminal sideline, not a forward step — render it as the final node only when reached
+    const isLost = current === 'Lost';
+
+    const html = '<div class="d-flex align-items-center justify-content-between" style="position:relative">'
+        + PIPELINE_STEPS.map((step, i) => {
+            const reached = isLost ? (step.key === 'Lost') : (i <= currentIdx);
+            const isCurrent = step.key === current;
+            const dotColor = isLost && isCurrent ? '#ef4444' : (reached ? '#10b981' : '#374151');
+            const labelColor = isCurrent ? (isLost ? '#ef4444' : '#10b981') : (reached ? '#9ca3af' : '#6b7280');
+            const lineColor = (i < PIPELINE_STEPS.length - 1 && i < currentIdx && !isLost) ? '#10b981' : '#374151';
+            const showLine = i < PIPELINE_STEPS.length - 1;
+            return '<div class="d-flex flex-column align-items-center" style="flex:0 0 auto;position:relative;z-index:2">'
+                + '<div style="width:14px;height:14px;border-radius:50%;background:' + dotColor + ';border:2px solid #1f2937"></div>'
+                + '<div class="mt-2" style="font-size:0.7rem;color:' + labelColor + ';font-weight:' + (isCurrent ? 600 : 400) + '">' + esc(step.label) + '</div>'
+                + '</div>'
+                + (showLine ? '<div style="flex:1;height:2px;background:' + lineColor + ';margin:0 -2px;align-self:flex-start;margin-top:6px;z-index:1"></div>' : '');
+        }).join('')
+        + '</div>';
+
+    el.innerHTML = html;
+}
+
+// ── Tour Banner ──
+function renderTourBanner(tour) {
+    const el = document.getElementById('tourBanner');
+    if (!el) return;
+    if (!tour) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+    const dt = tour.scheduled_at ? new Date(tour.scheduled_at) : null;
+    const whenStr = dt ? dt.toLocaleString([], { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Time TBD';
+
+    const palette = {
+        confirmed:   { border: '#10b981', bg: 'rgba(16,185,129,0.08)',  icon: 'bi-calendar-check-fill', label: 'TOUR BOOKED',     color: '#10b981' },
+        pending:     { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)', icon: 'bi-hourglass-split',       label: 'TOUR PENDING',    color: '#f59e0b' },
+        rescheduled: { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)', icon: 'bi-arrow-repeat',          label: 'TOUR RESCHEDULED',color: '#f59e0b' },
+        cancelled:   { border: '#ef4444', bg: 'rgba(239,68,68,0.08)',  icon: 'bi-x-circle-fill',         label: 'TOUR CANCELLED',  color: '#ef4444' },
+        no_show:     { border: '#ef4444', bg: 'rgba(239,68,68,0.08)',  icon: 'bi-person-x-fill',         label: 'NO SHOW',         color: '#ef4444' },
+        completed:   { border: '#6b7280', bg: 'rgba(107,114,128,0.08)',icon: 'bi-check-circle-fill',     label: 'TOUR COMPLETED',  color: '#9ca3af' },
+    };
+    const p = palette[tour.status] || palette.pending;
+
+    const meta = [];
+    if (tour.unit) meta.push('Unit ' + tour.unit);
+    if (tour.broker_name) meta.push('with ' + tour.broker_name);
+    const metaLine = meta.length ? '<div class="text-white-50" style="font-size:0.85rem">' + esc(meta.join(' · ')) + '</div>' : '';
+
+    el.style.display = '';
+    el.innerHTML = '<div class="d-flex align-items-center gap-3 p-3 rounded-3" style="border-left:4px solid ' + p.border + ';background:' + p.bg + '">'
+        + '<i class="bi ' + p.icon + '" style="font-size:1.6rem;color:' + p.color + '"></i>'
+        + '<div class="flex-grow-1">'
+        + '<div style="font-size:0.7rem;color:' + p.color + ';font-weight:700;letter-spacing:0.1em">' + p.label + '</div>'
+        + '<div class="fw-semibold text-white" style="font-size:1.05rem">' + esc(whenStr) + '</div>'
+        + metaLine
+        + '</div>'
+        + '<a href="/admin/calendar.php" class="btn btn-sm btn-outline-light">Open Calendar</a>'
+        + '</div>';
+}
+
 // ── Form Submissions Section ──
 const SUBMISSION_FIELDS = [
-    { key: 'first_name', label: 'First Name' },
-    { key: 'last_name',  label: 'Last Name' },
-    { key: 'email',      label: 'Email' },
-    { key: 'phone',      label: 'Phone' },
-    { key: 'unit',       label: 'Unit' },
-    { key: 'unit_type',  label: 'Unit Type' },
-    { key: 'budget',     label: 'Budget' },
-    { key: 'move_in_date', label: 'Move-in Date' },
-    { key: 'hear_about_us', label: 'Heard About Us' },
-    { key: 'message',    label: 'Message' }
+    { key: 'first_name',    label: 'First name' },
+    { key: 'last_name',     label: 'Last name' },
+    { key: 'email',         label: 'Email' },
+    { key: 'phone',         label: 'Phone' },
+    { key: 'unit',          label: 'Unit' },
+    { key: 'unit_type',     label: 'Unit type' },
+    { key: 'budget',        label: 'Budget' },
+    { key: 'move_in_date',  label: 'Move-in date' },
+    { key: 'hear_about_us', label: 'Heard about us' },
+    { key: 'message',       label: 'Message' }
 ];
 
 function renderFormSubmissions(submissions) {
     const card = document.getElementById('formSubmissionsCard');
-    const countEl = document.getElementById('formSubmissionsCount');
     const list = document.getElementById('formSubmissionsList');
-    const chevron = document.getElementById('formSubmissionsChevron');
     if (!card) return;
 
     if (!submissions || submissions.length === 0) {
@@ -166,51 +243,66 @@ function renderFormSubmissions(submissions) {
     }
 
     card.style.display = '';
-    countEl.textContent = submissions.length + (submissions.length === 1 ? ' submission' : ' submissions');
 
-    // Auto-expand if there are multiple submissions, collapse if single
-    const expanded = submissions.length > 1;
-    list.style.display = expanded ? '' : 'none';
-    if (chevron) chevron.className = 'bi text-white-50 ' + (expanded ? 'bi-chevron-up' : 'bi-chevron-down');
-
-    list.innerHTML = submissions.map((s, i) => {
+    list.innerHTML = submissions.map(s => {
         const dt = s.created_at ? new Date(s.created_at) : null;
-        const timeStr = dt ? dt.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+        const timeStr = dt ? dt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Unknown time';
         const sourceColor = s.source === 'Waitlist' ? 'primary' : 'success';
 
-        const fieldRows = SUBMISSION_FIELDS
-            .filter(f => s[f.key] && String(s[f.key]).trim() !== '')
-            .map(f => '<div class="row g-2 mb-1"><div class="col-4 small text-white-50">' + esc(f.label) + '</div><div class="col-8 small text-white">' + esc(String(s[f.key])) + '</div></div>')
-            .join('');
+        // Show ALL fields — blanks render as a dim em-dash so the broker can see what wasn't filled in.
+        const fieldRows = SUBMISSION_FIELDS.map(f => {
+            const raw = s[f.key];
+            const filled = raw !== null && raw !== undefined && String(raw).trim() !== '';
+            const valueHtml = filled
+                ? '<span class="text-white">' + esc(String(raw)) + '</span>'
+                : '<span class="text-white-50" style="opacity:0.5">—</span>';
+            return '<div class="row g-2 mb-1"><div class="col-4 small text-white-50">' + esc(f.label) + '</div><div class="col-8 small">' + valueHtml + '</div></div>';
+        }).join('');
 
         return '<div class="border border-secondary rounded-3 p-3 mb-2" style="background:rgba(255,255,255,0.02)">'
-            + '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<div class="d-flex justify-content-between align-items-start mb-3">'
+            + '<div>'
+            + '<div class="fw-semibold text-white" style="font-size:0.95rem"><i class="bi bi-file-earmark-text me-2"></i>Form submission</div>'
+            + '<div class="text-white-50 mt-1" style="font-size:0.8rem">' + esc(timeStr) + '</div>'
+            + '</div>'
             + '<span class="badge bg-' + sourceColor + ' bg-opacity-25 text-' + sourceColor + '" style="font-size:0.7rem">' + esc(s.source || '') + '</span>'
-            + '<span class="text-white-50" style="font-size:0.75rem">' + esc(timeStr) + '</span>'
             + '</div>'
             + fieldRows
             + '</div>';
     }).join('');
 }
 
-function toggleSubmissionsList() {
-    const list = document.getElementById('formSubmissionsList');
-    const chevron = document.getElementById('formSubmissionsChevron');
-    if (!list) return;
-    const isOpen = list.style.display !== 'none';
-    list.style.display = isOpen ? 'none' : '';
-    if (chevron) chevron.className = 'bi text-white-50 ' + (isOpen ? 'bi-chevron-down' : 'bi-chevron-up');
+// ── Conversation columns (SMS + Email) and Internal Log ──
+function classifyTimelineItem(item) {
+    // SMS bubbles always go in the SMS column.
+    if (item.type === 'sms') return 'sms';
+    // Outbound/inbound email messages go in the Email column.
+    if (item.type === 'email' && item.direction !== 'internal') return 'email';
+    // Everything else — internal notes, system alerts, enrichment emails to owners — go to the internal log.
+    return 'internal';
 }
 
-function renderTimeline(items) {
-    const container = document.getElementById('timelineContainer');
+function renderConversations(items) {
+    const smsItems = items.filter(it => classifyTimelineItem(it) === 'sms');
+    const emailItems = items.filter(it => classifyTimelineItem(it) === 'email');
 
-    if (!items || items.length === 0) {
-        container.innerHTML = '<div class="text-center text-body-tertiary py-5">No communications yet.</div>';
+    renderConversationColumn('smsThreadContainer', 'smsThreadCount', smsItems, 'sms');
+    renderConversationColumn('emailThreadContainer', 'emailThreadCount', emailItems, 'email');
+}
+
+function renderConversationColumn(containerId, countId, items, kind) {
+    const container = document.getElementById(containerId);
+    const countEl = document.getElementById(countId);
+    if (!container) return;
+
+    if (countEl) countEl.textContent = items.length ? items.length + (items.length === 1 ? ' msg' : ' msgs') : '';
+
+    if (!items.length) {
+        const label = kind === 'sms' ? 'No SMS yet.' : 'No email conversation yet.';
+        container.innerHTML = '<div class="text-center text-body-tertiary py-4 small">' + label + '</div>';
         return;
     }
 
-    // Group by date
     const grouped = {};
     items.forEach(item => {
         const day = new Date(item.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -220,21 +312,74 @@ function renderTimeline(items) {
 
     let html = '';
     Object.entries(grouped).forEach(([day, dayItems]) => {
-        html += '<div class="text-center my-3"><span class="badge bg-body-secondary text-white-50 px-3 py-1" style="font-size:0.7rem;letter-spacing:0.05em">' + esc(day) + '</span></div>';
-
+        html += '<div class="text-center my-2"><span class="badge bg-body-secondary text-white-50 px-3 py-1" style="font-size:0.65rem;letter-spacing:0.05em">' + esc(day) + '</span></div>';
         dayItems.forEach(item => {
-            if (item.type === 'sms') {
-                html += renderSMSBubble(item);
-            } else {
-                html += renderCommCard(item);
-            }
+            html += kind === 'sms' ? renderSMSBubble(item) : renderEmailCard(item);
         });
     });
 
     container.innerHTML = html;
-
-    // Scroll to bottom
     container.scrollTop = container.scrollHeight;
+}
+
+function renderEmailCard(item) {
+    const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isInbound = item.direction === 'inbound';
+    const borderColor = isInbound ? 'rgba(16,185,129,0.5)' : 'rgba(59,130,246,0.5)';
+    const labelColor = isInbound ? '#10b981' : '#3b82f6';
+    const dirLabel = isInbound ? 'Inbound' : 'Outbound';
+
+    return '<div class="rounded-3 mb-2 p-2" style="border-left:3px solid ' + borderColor + ';background:rgba(255,255,255,0.02)">'
+        + '<div class="d-flex justify-content-between align-items-center mb-1">'
+        + '<span style="font-size:0.65rem;color:' + labelColor + ';font-weight:600">' + dirLabel + '</span>'
+        + '<span class="text-white-50" style="font-size:0.7rem">' + time + '</span>'
+        + '</div>'
+        + (item.subject ? '<div class="fw-semibold text-white" style="font-size:0.85rem">' + esc(item.subject) + '</div>' : '')
+        + (item.sender ? '<div class="text-white-50" style="font-size:0.7rem">From: ' + esc(item.sender) + '</div>' : '')
+        + (item.body ? '<div class="text-white-50 mt-1" style="font-size:0.8rem;line-height:1.4">' + esc(item.body) + '</div>' : '')
+        + '</div>';
+}
+
+function renderInternalLog(items) {
+    const card = document.getElementById('internalLogCard');
+    const list = document.getElementById('internalLogList');
+    const countEl = document.getElementById('internalLogCount');
+    if (!card || !list) return;
+
+    const internalItems = items
+        .filter(it => classifyTimelineItem(it) === 'internal')
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    if (!internalItems.length) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = '';
+    countEl.textContent = internalItems.length;
+
+    list.innerHTML = internalItems.map(item => {
+        const dt = new Date(item.created_at);
+        const time = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const subject = item.subject || (item.type === 'email' ? 'Email notification' : 'Note');
+        const body = item.body ? '<div class="text-white-50 mt-1" style="font-size:0.78rem;line-height:1.4">' + esc(item.body) + '</div>' : '';
+        return '<div class="border-bottom border-secondary py-2 d-flex justify-content-between align-items-start gap-3">'
+            + '<div style="min-width:0;flex:1">'
+            + '<div class="text-white" style="font-size:0.85rem">' + esc(subject) + '</div>'
+            + body
+            + '</div>'
+            + '<small class="text-white-50" style="font-size:0.7rem;white-space:nowrap">' + esc(time) + '</small>'
+            + '</div>';
+    }).join('');
+}
+
+function toggleInternalLog() {
+    const list = document.getElementById('internalLogList');
+    const chevron = document.getElementById('internalLogChevron');
+    if (!list) return;
+    const isOpen = list.style.display !== 'none';
+    list.style.display = isOpen ? 'none' : '';
+    if (chevron) chevron.className = 'bi text-white-50 ' + (isOpen ? 'bi-chevron-down' : 'bi-chevron-up');
 }
 
 function renderSMSBubble(item) {
@@ -266,42 +411,6 @@ function renderSMSBubble(item) {
         + '<div style="font-size:0.65rem;color:' + labelColor + ';font-weight:600;margin-bottom:0.2rem">' + esc(item.sender) + '</div>'
         + '<div class="text-white" style="font-size:0.85rem;line-height:1.5">' + esc(item.body) + '</div>'
         + '<div class="mt-1" style="font-size:0.65rem;color:rgba(255,255,255,0.3)">' + time + statusIcon + '</div>'
-        + '</div></div>';
-}
-
-function renderCommCard(item) {
-    const dt = new Date(item.created_at);
-    const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const channelConfig = {
-        email: { icon: 'bi-envelope-fill', color: '#3b82f6', label: 'Email' },
-        phone: { icon: 'bi-telephone-fill', color: '#f59e0b', label: 'Phone Call' },
-        note:  { icon: 'bi-sticky-fill', color: '#8b5cf6', label: 'Note' }
-    };
-    const ch = channelConfig[item.type] || channelConfig.note;
-
-    const dirColors = {
-        inbound: { border: 'rgba(16,185,129,0.5)', bg: 'rgba(16,185,129,0.04)', label: '<span style="color:#10b981;font-size:0.65rem;font-weight:600"><i class="bi bi-arrow-down-left"></i> Inbound</span>' },
-        outbound: { border: 'rgba(59,130,246,0.5)', bg: 'rgba(59,130,246,0.04)', label: '<span style="color:#3b82f6;font-size:0.65rem;font-weight:600"><i class="bi bi-arrow-up-right"></i> Outbound</span>' },
-        internal: { border: 'rgba(107,114,128,0.4)', bg: 'rgba(107,114,128,0.04)', label: '<span style="color:#9ca3af;font-size:0.65rem;font-weight:600"><i class="bi bi-bell"></i> Internal</span>' }
-    };
-    const dir = dirColors[item.direction] || dirColors.outbound;
-
-    return '<div class="rounded-3 mb-3 overflow-hidden" style="border-left:3px solid ' + dir.border + ';' + dir.bg + '">'
-        + '<div class="d-flex justify-content-between align-items-center px-3 py-2" style="background:rgba(255,255,255,0.02)">'
-        + '<div class="d-flex align-items-center gap-2">'
-        + '<i class="bi ' + ch.icon + '" style="color:' + ch.color + ';font-size:0.8rem"></i>'
-        + '<span class="fw-semibold text-white" style="font-size:0.78rem">' + esc(ch.label) + '</span>'
-        + dir.label
-        + '</div>'
-        + '<span class="text-white-50" style="font-size:0.7rem">' + time + '</span>'
-        + '</div>'
-        + '<div class="px-3 py-2">'
-        + (item.subject ? '<div class="fw-semibold text-white mb-1" style="font-size:0.82rem">' + esc(item.subject) + '</div>' : '')
-        + '<div class="d-flex gap-3 mb-1" style="font-size:0.7rem;color:rgba(255,255,255,0.3)">'
-        + (item.sender ? '<span>From: ' + esc(item.sender) + '</span>' : '')
-        + '</div>'
-        + (item.body ? '<div class="text-white-50" style="font-size:0.8rem;line-height:1.5">' + esc(item.body) + '</div>' : '')
         + '</div></div>';
 }
 

@@ -1319,6 +1319,29 @@ function getUnifiedTimeline($email) {
         }
     }
 
+    // Pull the most relevant tour for this lead — active first (confirmed /
+    // pending / rescheduled), else the most recent cancelled or completed so
+    // the banner can show a historical reference.
+    $tour = null;
+    $tourRows = $sb->select('tour_requests',
+        'id,scheduled_at,duration_minutes,status,unit,broker_id,notes,source,created_at,updated_at',
+        ['lead_email=eq.' . urlencode($email)],
+        'updated_at.desc', 10);
+    if (!empty($tourRows)) {
+        $priority = ['confirmed' => 0, 'pending' => 1, 'rescheduled' => 2, 'cancelled' => 3, 'no_show' => 4, 'completed' => 5];
+        usort($tourRows, function($a, $b) use ($priority) {
+            $pa = $priority[$a['status']] ?? 99;
+            $pb = $priority[$b['status']] ?? 99;
+            if ($pa !== $pb) return $pa - $pb;
+            return strtotime($b['updated_at']) - strtotime($a['updated_at']);
+        });
+        $tour = $tourRows[0];
+        if (!empty($tour['broker_id'])) {
+            $tb = $sb->selectOne('brokers', 'name', ['id=eq.' . intval($tour['broker_id'])]);
+            $tour['broker_name'] = $tb['name'] ?? null;
+        }
+    }
+
     echo json_encode([
         'lead' => [
             'name'        => $leadName,
@@ -1331,7 +1354,8 @@ function getUnifiedTimeline($email) {
         ],
         'ai_status'   => $aiStatus,
         'submissions' => $submissions,
-        'timeline'    => $timeline
+        'timeline'    => $timeline,
+        'tour'        => $tour
     ]);
 }
 
