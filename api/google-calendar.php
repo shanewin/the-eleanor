@@ -390,11 +390,12 @@ function computeAvailableSlots($busyBlocks, $startDate, $endDate, $tourHoursStar
 function getAvailableTourSlots($brokerId, $startDate, $endDate) {
     global $sb;
 
-    // Check cache
-    $cacheFile = sys_get_temp_dir() . '/eleanor_tour_slots_' . $brokerId . '.json';
+    // Check cache (key includes date range — different windows must not share results)
+    $cacheKey = $brokerId . '_' . md5($startDate . '|' . $endDate);
+    $cacheFile = sys_get_temp_dir() . '/eleanor_tour_slots_' . $cacheKey . '.json';
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 300) {
         $cached = json_decode(file_get_contents($cacheFile), true);
-        if ($cached) return $cached;
+        if (is_array($cached)) return $cached;
     }
 
     $broker = $sb->selectOne('brokers', 'id,google_calendar_connected,default_availability_start,default_availability_end,default_availability_days',

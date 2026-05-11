@@ -862,10 +862,17 @@ function buildSystemPrompt($lead) {
     ];
     $toneDesc = $toneMap[$tone] ?? $toneMap['friendly'];
 
+    $nyNow = new DateTime('now', new DateTimeZone('America/New_York'));
+    $todayStr = $nyNow->format('l, F j, Y');
+    $todayIso = $nyNow->format('Y-m-d');
+
     $prompt = "You are a leasing agent for The Eleanor, a brand-new luxury rental building in Boerum Hill, Brooklyn. "
         . "You are texting with a prospective renter via SMS. Your goal is to be helpful and conversational — "
         . "and ultimately to book an in-person tour of the building.\n"
-        . "PERSONALITY: " . $toneDesc . "\n\n";
+        . "PERSONALITY: " . $toneDesc . "\n"
+        . "TODAY: " . $todayStr . " (ISO: " . $todayIso . ", America/New_York). "
+        . "When the lead says \"this Saturday\" or \"Monday\", resolve it relative to TODAY. "
+        . "Never pass a date in the past to scheduling tools.\n\n";
 
     // ── Conversation Rules ──
     $prompt .= "RULES:\n"
