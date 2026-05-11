@@ -29,12 +29,52 @@ function getBrokerStatusBadge(broker) {
     return '<span class="badge bg-success">Active</span>';
 }
 
+// ── Availability summary ──
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function formatHourLabel(hhmm) {
+    if (!hhmm) return '';
+    const [h, m] = hhmm.split(':').map(Number);
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return m ? `${h12}:${String(m).padStart(2, '0')}${ampm}` : `${h12}${ampm}`;
+}
+
+function getBrokerDays(broker) {
+    let days = broker.default_availability_days;
+    if (typeof days === 'string') {
+        try { days = JSON.parse(days); } catch (_) { days = []; }
+    }
+    return Array.isArray(days) ? days.map(Number).sort((a, b) => a - b) : [];
+}
+
+function summarizeAvailability(broker) {
+    const days = getBrokerDays(broker);
+    if (days.length === 0) return '<span class="text-white-50">No days set</span>';
+
+    // Detect a contiguous run for a compact label like "Mon–Fri"
+    let label;
+    const isRun = days.every((d, i) => i === 0 || d === days[i - 1] + 1);
+    if (isRun && days.length >= 2) {
+        label = `${DAY_NAMES[days[0]]}–${DAY_NAMES[days[days.length - 1]]}`;
+    } else {
+        label = days.map(d => DAY_NAMES[d]).join(', ');
+    }
+
+    const start = formatHourLabel(broker.default_availability_start);
+    const end = formatHourLabel(broker.default_availability_end);
+    const hours = (start && end) ? `${start}–${end}` : '';
+    return `<div class="small">${esc(label)}</div>` +
+           (hours ? `<div class="small text-white-50" style="font-size:0.7rem">${esc(hours)}</div>` : '');
+}
+
 // ── Render Table ──
 function renderBrokersTable(brokers) {
     const tbody = document.querySelector('#brokersTable tbody');
     if (!tbody) return;
+
     if (brokers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-body-tertiary py-5">No brokers added yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-body-tertiary py-5">No brokers added yet.</td></tr>';
         return;
     }
     tbody.innerHTML = '';
@@ -52,6 +92,7 @@ function renderBrokersTable(brokers) {
             + '<td><span class="text-capitalize">' + esc(broker.role || 'broker') + '</span></td>'
             + '<td>' + statusBadge + '</td>'
             + '<td>' + gcalCell + '</td>'
+            + '<td>' + summarizeAvailability(broker) + '</td>'
             + '<td class="text-end">'
             + '<button class="btn btn-sm btn-outline-primary me-1" onclick="showBrokerModal(' + esc(String(broker.id)) + ')"><i class="bi bi-pencil"></i></button>'
             + '<button class="btn btn-sm btn-outline-danger" onclick="deleteBroker(' + esc(String(broker.id)) + ')"><i class="bi bi-trash"></i></button>'
@@ -84,6 +125,7 @@ function showBrokerModal(brokerId) {
     const alertEl = document.getElementById('brokerSaveAlert');
     if (alertEl) alertEl.style.display = 'none';
     const emailInput = document.getElementById('brokerEmail');
+    const availSection = document.getElementById('brokerAvailSection');
 
     if (brokerId) {
         const broker = brokersCache.find(b => b.id == brokerId);
@@ -97,13 +139,43 @@ function showBrokerModal(brokerId) {
             document.getElementById('brokerRole').value = broker.role || 'broker';
             document.getElementById('brokerModalTitle').textContent = 'Edit Broker';
             emailInput.readOnly = true;
+
+            // Populate availability
+            const startVal = (broker.default_availability_start || '09:00:00').slice(0, 5);
+            const endVal = (broker.default_availability_end || '18:00:00').slice(0, 5);
+            document.getElementById('brokerAvailStart').value = startVal;
+            document.getElementById('brokerAvailEnd').value = endVal;
+            const days = getBrokerDays(broker);
+            document.querySelectorAll('.broker-avail-day-check').forEach(cb => {
+                cb.checked = days.includes(parseInt(cb.value));
+                cb.closest('.broker-avail-day-btn').classList.toggle('active', cb.checked);
+            });
+            if (availSection) availSection.style.display = '';
         }
         if (inviteNote) inviteNote.style.display = 'none';
     } else {
         emailInput.readOnly = false;
         if (inviteNote) inviteNote.style.display = 'block';
+        if (availSection) availSection.style.display = 'none';
     }
     modal.show();
+}
+
+// Day toggle wiring (idempotent — guards repeat clicks)
+function wireBrokerDayToggles() {
+    document.querySelectorAll('.broker-avail-day-btn').forEach(btn => {
+        if (btn._wired) return;
+        const cb = btn.querySelector('.broker-avail-day-check');
+        btn.addEventListener('click', (e) => {
+            // Bootstrap label-with-hidden-checkbox quirk: clicking the label fires
+            // both the label click and the implicit checkbox toggle. Cancel the
+            // implicit one so we control state explicitly.
+            e.preventDefault();
+            cb.checked = !cb.checked;
+            btn.classList.toggle('active', cb.checked);
+        });
+        btn._wired = true;
+    });
 }
 
 // ── Save Broker ──
@@ -134,6 +206,15 @@ async function saveBroker() {
         phone: phone || null,
         role: role
     };
+
+    // Include availability when editing (the section only renders for edits)
+    if (id) {
+        const activeDays = [];
+        document.querySelectorAll('.broker-avail-day-check:checked').forEach(cb => activeDays.push(parseInt(cb.value)));
+        payload.default_availability_start = document.getElementById('brokerAvailStart').value;
+        payload.default_availability_end = document.getElementById('brokerAvailEnd').value;
+        payload.default_availability_days = activeDays;
+    }
 
     const saveBtn = document.querySelector('#brokerModal .btn-primary');
     saveBtn.disabled = true;
@@ -217,4 +298,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up phone formatting
     const phoneInput = document.getElementById('brokerPhone');
     if (phoneInput) formatPhoneInput(phoneInput);
+    wireBrokerDayToggles();
 });

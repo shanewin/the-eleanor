@@ -817,6 +817,14 @@ function addBroker() {
 
 function updateBroker() {
     global $sb;
+
+    // Owner-only — cross-broker edits (including availability) are sensitive.
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Owner only']);
+        return;
+    }
+
     $input = json_decode(file_get_contents('php://input'), true);
 
     if (empty($input['id'])) {
@@ -827,10 +835,19 @@ function updateBroker() {
 
     $id = $input['id'];
     $data = [];
-    foreach (['name', 'email', 'phone', 'role', 'is_active'] as $field) {
+    $allowed = [
+        'name', 'email', 'phone', 'role', 'is_active',
+        'default_availability_start', 'default_availability_end', 'default_availability_days'
+    ];
+    foreach ($allowed as $field) {
         if (array_key_exists($field, $input)) {
             $data[$field] = $input[$field];
         }
+    }
+
+    // Days come in as a JS array of ints — store as JSON to match updateMyProfile().
+    if (isset($data['default_availability_days']) && is_array($data['default_availability_days'])) {
+        $data['default_availability_days'] = json_encode($data['default_availability_days']);
     }
 
     $sb->update('brokers', $data, ['id=eq.' . $id]);

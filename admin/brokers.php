@@ -22,11 +22,12 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
                                     <th>Role</th>
                                     <th>Status</th>
                                     <th>Google Calendar</th>
+                                    <th data-col="avail">Availability</th>
                                     <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td colspan="7" class="text-center py-5 text-body-tertiary">Loading brokers...</td></tr>
+                                <tr><td colspan="8" class="text-center py-5 text-body-tertiary">Loading brokers...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -69,6 +70,33 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
               </select>
             </div>
             <p class="small text-white-50 mb-0" id="brokerInviteNote"><i class="bi bi-info-circle me-1"></i>An invite email will be sent to this address to set up their login.</p>
+
+            <!-- Default Availability (edit mode only) -->
+            <div id="brokerAvailSection" class="mt-4 pt-3 border-top border-secondary" style="display:none">
+              <h6 class="fw-semibold mb-1 small text-white">Default Availability</h6>
+              <p class="small text-white-50 mb-3">Used for tour bookings when Google Calendar isn't connected.</p>
+              <div class="row g-3 mb-3">
+                <div class="col-6">
+                  <label class="form-label small text-white-50">Start Time</label>
+                  <input type="time" class="form-control bg-dark border-secondary text-white" id="brokerAvailStart" value="09:00">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-white-50">End Time</label>
+                  <input type="time" class="form-control bg-dark border-secondary text-white" id="brokerAvailEnd" value="18:00">
+                </div>
+              </div>
+              <label class="form-label small text-white-50">Available Days</label>
+              <div class="d-flex gap-2 flex-wrap">
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="0"> Sun</label>
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="1"> Mon</label>
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="2"> Tue</label>
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="3"> Wed</label>
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="4"> Thu</label>
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="5"> Fri</label>
+                <label class="btn btn-sm btn-outline-secondary broker-avail-day-btn"><input type="checkbox" class="d-none broker-avail-day-check" value="6"> Sat</label>
+              </div>
+            </div>
+
             <div id="brokerSaveAlert" class="alert small mt-3" style="display:none"></div>
           </div>
           <div class="modal-footer border-secondary">
