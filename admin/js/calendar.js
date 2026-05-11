@@ -550,4 +550,9 @@ async function saveNewShowing() {
     btn.innerHTML = 'Schedule Tour';
 }
 
-document.addEventListener('DOMContentLoaded', initShowingsCalendar);
+document.addEventListener('DOMContentLoaded', () => {
+    // Mark calendar as viewed so the sidebar badge clears.
+    try { localStorage.setItem('calendar_last_viewed', new Date().toISOString()); } catch(e) {}
+    initShowingsCalendar();
+    if (typeof updateSidebarCalendarBadge === 'function') updateSidebarCalendarBadge();
+});

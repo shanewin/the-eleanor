@@ -36,8 +36,9 @@
             <i class="bi bi-person-badge"></i> Brokers
         </a>
         <?php endif; ?>
-        <a href="/admin/calendar.php" class="nav-link<?= ($activePage ?? '') === 'calendar' ? ' active' : '' ?>">
+        <a href="/admin/calendar.php" class="nav-link<?= ($activePage ?? '') === 'calendar' ? ' active' : '' ?>" style="position:relative">
             <i class="bi bi-calendar3"></i> Calendar
+            <span class="badge bg-danger rounded-pill" id="sidebarCalendarBadge" style="display:none;position:absolute;right:10px;font-size:0.6rem"></span>
         </a>
         <?php if (isOwner()): ?>
         <a href="/admin/settings.php" class="nav-link<?= ($activePage ?? '') === 'settings' ? ' active' : '' ?>">

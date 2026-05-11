@@ -53,6 +53,7 @@ switch ($action) {
     case 'mark_notifications_read': markNotificationsRead(); break;
     case 'mark_sms_read': markSMSRead(); break;
     case 'get_tour_requests': getTourRequests(); break;
+    case 'tour_requests_new_count': tourRequestsNewCount(); break;
     case 'add_tour_request': addTourRequest(); break;
     case 'update_tour_request': updateTourRequest(); break;
     case 'delete_tour_request': deleteTourRequest(); break;
@@ -1362,6 +1363,21 @@ function getTourRequests() {
     unset($tour);
 
     echo json_encode($tours);
+}
+
+/**
+ * Count tour_requests created or updated since the given ISO timestamp.
+ * Powers the sidebar Calendar badge — "changes since you last opened Calendar".
+ */
+function tourRequestsNewCount() {
+    global $sb;
+    $since = $_GET['since'] ?? '';
+    $ts = $since ? strtotime($since) : false;
+    if (!$ts) $ts = time() - 7 * 86400; // default: last 7 days
+    $sinceIso = date('c', $ts);
+
+    $rows = $sb->select('tour_requests', 'id', ['updated_at=gte.' . urlencode($sinceIso)]);
+    echo json_encode(['count' => count($rows)]);
 }
 
 function addTourRequest() {

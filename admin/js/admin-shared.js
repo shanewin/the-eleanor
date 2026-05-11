@@ -393,12 +393,36 @@ async function updateSidebarUnreadBadge() {
     } catch(e) {}
 }
 
+// ── Calendar Changes Badge (sidebar) ──
+// Counts tour_requests created or updated since the user last opened the
+// Calendar page (timestamp stored in localStorage by calendar.js).
+async function updateSidebarCalendarBadge() {
+    try {
+        const since = localStorage.getItem('calendar_last_viewed')
+            || new Date(Date.now() - 7 * 86400000).toISOString();
+        const res = await fetch(API + '?action=tour_requests_new_count&since=' + encodeURIComponent(since));
+        const data = await res.json();
+        const count = data && data.count ? data.count : 0;
+        const badge = document.getElementById('sidebarCalendarBadge');
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    } catch(e) {}
+}
+
 // Update badges on load and every 30 seconds
 document.addEventListener('DOMContentLoaded', () => {
     updateSidebarUnreadBadge();
+    updateSidebarCalendarBadge();
     fetchNotifications();
     setInterval(() => {
         updateSidebarUnreadBadge();
+        updateSidebarCalendarBadge();
         fetchNotifications();
     }, 30000);
 });
