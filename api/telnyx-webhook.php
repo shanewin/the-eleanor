@@ -10,6 +10,40 @@ require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/telnyx-sms.php';
 require_once __DIR__ . '/sms-ai.php';
 
+// TEMPORARY: capture fatals + uncaught exceptions to the DB so we can
+// diagnose the inbound webhook failure. Remove after root cause is found.
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR])) {
+        global $sb;
+        if (isset($sb)) {
+            @$sb->insert('communications', [
+                'lead_email' => 'webhook-debug@local',
+                'direction'  => 'internal',
+                'channel'    => 'note',
+                'subject'    => 'Telnyx webhook FATAL',
+                'body'       => substr($err['message'] . ' @ ' . $err['file'] . ':' . $err['line'], 0, 1000),
+                'sender'     => 'Telnyx Webhook',
+                'status'     => 'system'
+            ]);
+        }
+    }
+});
+set_exception_handler(function ($e) {
+    global $sb;
+    if (isset($sb)) {
+        @$sb->insert('communications', [
+            'lead_email' => 'webhook-debug@local',
+            'direction'  => 'internal',
+            'channel'    => 'note',
+            'subject'    => 'Telnyx webhook EXCEPTION',
+            'body'       => substr(get_class($e) . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine(), 0, 1000),
+            'sender'     => 'Telnyx Webhook',
+            'status'     => 'system'
+        ]);
+    }
+});
+
 // Telnyx sends POST with JSON body
 $rawBody = file_get_contents('php://input');
 
