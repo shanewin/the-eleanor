@@ -357,4 +357,12 @@ document.addEventListener('DOMContentLoaded', function() {
     loadOwnerRecipients();
     loadLeadJobs();
     loadCronJobs();
+
+    // Deep-link support: /admin/settings.php#jobs opens the Jobs tab.
+    // Used by cron-failure notifications in the bell dropdown.
+    const hash = (window.location.hash || '').replace('#', '');
+    const validTabs = ['general', 'sms', 'ai', 'integrations', 'jobs'];
+    if (hash && validTabs.includes(hash)) {
+        showSettingsTab(hash, null);
+    }
 });

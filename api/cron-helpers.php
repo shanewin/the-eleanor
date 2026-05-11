@@ -69,12 +69,47 @@ function cronRunFinalize(string $status, ?string $errorMsg = null): void {
         'items_processed' => $__cronItemsProcessed
     ], ['id=eq.' . $__cronRunId]);
 
+    if ($status === 'failed' && $__cronJobName) {
+        cronRunNotifyFailure($__cronJobName, $errorMsg ?? 'Unknown error');
+    }
     if ($__cronJobName) cronRunPrune($__cronJobName);
 
     $__cronRunId = null;
     $__cronJobName = null;
     $__cronItemsProcessed = 0;
     $__cronExtraError = null;
+}
+
+/**
+ * Surface a cron failure in the bell-icon notification dropdown.
+ *
+ * Deduped: if there's already an unread cron_failure notification for this
+ * job, we skip — otherwise a broken cron firing every 5 min would create a
+ * notification each time and bury everything else. As soon as the operator
+ * marks it read (or the cron recovers and they clear it), the next failure
+ * generates a fresh notification.
+ */
+function cronRunNotifyFailure(string $jobName, string $errorMsg): void {
+    global $sb;
+
+    $title = "Cron failed: $jobName";
+    $existing = @$sb->selectOne('notifications', 'id', [
+        'type=eq.cron_failure',
+        'is_read=eq.false',
+        'title=eq.' . urlencode($title)
+    ]);
+    if ($existing) return;
+
+    $body = trim(explode("\n", $errorMsg)[0]);
+    @$sb->insert('notifications', [
+        'type'       => 'cron_failure',
+        'title'      => $title,
+        'body'       => substr($body, 0, 250),
+        'lead_email' => null,
+        'broker_id'  => null,
+        'is_read'    => false,
+        'link'       => '/admin/settings.php#jobs'
+    ]);
 }
 
 function cronRunIncItems(int $n = 1): void {
