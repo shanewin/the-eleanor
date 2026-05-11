@@ -1094,9 +1094,22 @@ function isSMSMasterEnabled() {
 /**
  * Check if current time is within the send window (day + hours).
  * If this returns false but master is enabled, messages should be queued.
+ *
+ * Honors the owner override `sms_override` setting:
+ *   - 'force_on'  → always returns true (window is treated as open)
+ *   - 'force_off' → always returns false (window is treated as closed)
+ *   - 'none'      → normal schedule check
+ *
+ * Pass $ignoreOverride=true to get the raw schedule state (for status UI).
  */
-function isWithinSendWindow() {
+function isWithinSendWindow($ignoreOverride = false) {
     $config = getSMSSettings();
+
+    if (!$ignoreOverride) {
+        $override = $config['sms_override'] ?? 'none';
+        if ($override === 'force_on')  return true;
+        if ($override === 'force_off') return false;
+    }
 
     // Check active days (0=Sun, 1=Mon, ..., 6=Sat)
     $activeDays = $config['sms_active_days'] ?? '1,2,3,4,5';

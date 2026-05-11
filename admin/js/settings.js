@@ -168,34 +168,6 @@ function showSettingsTab(tab, event) {
     if (tab === 'jobs') loadLeadJobs();
 }
 
-async function toggleOverviewSMS() {
-    const toggle = document.getElementById('overviewSmsToggle');
-    const statusEl = document.getElementById('overviewSmsStatus');
-    const newState = toggle.checked ? 'on' : 'off';
-
-    statusEl.innerHTML = '<span class="text-white-50" style="font-size:0.7rem">Saving...</span>';
-
-    try {
-        const res = await fetch('/api/admin-api.php?action=save_settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sms_enabled: newState })
-        });
-        const data = await res.json();
-        if (data.success) {
-            statusEl.innerHTML = toggle.checked
-                ? '<span class="badge bg-success bg-opacity-25 text-success">On</span>'
-                : '<span class="badge bg-secondary bg-opacity-25 text-secondary">Off</span>';
-            // Sync the Settings page toggle if it exists
-            const settingsToggle = document.getElementById('smsEnabled');
-            if (settingsToggle) settingsToggle.checked = toggle.checked;
-        }
-    } catch (e) {
-        statusEl.innerHTML = '<span class="badge bg-danger bg-opacity-25 text-danger">Error</span>';
-        toggle.checked = !toggle.checked;
-    }
-}
-
 // ─── Lead-processing jobs tab ───────────────────────────────────────────────
 
 function escapeJobsHtml(str) {

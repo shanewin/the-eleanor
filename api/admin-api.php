@@ -26,6 +26,8 @@ switch ($action) {
     case 'analytics': getAnalytics(); break;
     case 'get_settings': getSettings(); break;
     case 'save_settings': saveSettings(); break;
+    case 'get_sms_status': getSmsStatus(); break;
+    case 'set_sms_override': setSmsOverride(); break;
     case 'get_brokers': getBrokers(); break;
     case 'add_broker': addBroker(); break;
     case 'update_broker': updateBroker(); break;
@@ -662,6 +664,13 @@ function getSettings() {
 
 function saveSettings() {
     global $sb;
+
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Owner access required']);
+        return;
+    }
+
     $input = json_decode(file_get_contents('php://input'), true);
 
     if (empty($input) || !is_array($input)) {
@@ -679,6 +688,56 @@ function saveSettings() {
     }
 
     echo json_encode(['success' => true]);
+}
+
+function getSmsStatus() {
+    require_once __DIR__ . '/sms-ai.php';
+
+    $config         = getSMSSettings();
+    $masterEnabled  = isSMSMasterEnabled();
+    $inWindow       = isWithinSendWindow(true); // raw — ignore override
+    $override       = $config['sms_override'] ?? 'none';
+
+    if ($override === 'force_on')  $effective = $masterEnabled;
+    elseif ($override === 'force_off') $effective = false;
+    else $effective = $masterEnabled && $inWindow;
+
+    echo json_encode([
+        'master_enabled'   => $masterEnabled,
+        'in_window'        => $inWindow,
+        'override'         => $override,
+        'effective'        => $effective,
+        'next_window_open' => $masterEnabled && !$inWindow ? getNextWindowOpen() : null,
+        'window_start'     => $config['sms_window_start'] ?? '09:00',
+        'window_end'       => $config['sms_window_end']   ?? '19:00',
+        'active_days'      => $config['sms_active_days']  ?? '1,2,3,4,5'
+    ]);
+}
+
+function setSmsOverride() {
+    global $sb;
+
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Owner access required']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $value = $input['override'] ?? '';
+    if (!in_array($value, ['force_on', 'force_off', 'none'], true)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid override value']);
+        return;
+    }
+
+    $sb->upsert('settings', [
+        'key'        => 'sms_override',
+        'value'      => $value,
+        'updated_at' => date('c')
+    ], 'key');
+
+    echo json_encode(['success' => true, 'override' => $value]);
 }
 
 /* ── Broker Management ── */

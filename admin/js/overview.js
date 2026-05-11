@@ -22,16 +22,7 @@ async function fetchData() {
             document.getElementById('statTodayDate').innerText = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
         }
 
-        // Sync overview SMS toggle with settings
-        try {
-            const settingsRes = await fetch(API + '?action=get_settings');
-            const settingsData = await settingsRes.json();
-            const smsOn = settingsData.sms_enabled === 'on';
-            document.getElementById('overviewSmsToggle').checked = smsOn;
-            document.getElementById('overviewSmsStatus').innerHTML = smsOn
-                ? '<span class="badge bg-success bg-opacity-25 text-success">On</span>'
-                : '<span class="badge bg-secondary bg-opacity-25 text-secondary">Off</span>';
-        } catch (e) { /* non-critical */ }
+        loadSmsStatus();
 
         // Fetch brokers for assignment dropdowns
         await fetchBrokers();
@@ -387,29 +378,107 @@ function closeJourney() {
     document.getElementById('journeyPanel').classList.remove('active');
 }
 
-// ── Overview SMS Toggle ──
-async function toggleOverviewSMS() {
-    const toggle = document.getElementById('overviewSmsToggle');
-    const statusEl = document.getElementById('overviewSmsStatus');
-    const newState = toggle.checked ? 'on' : 'off';
-
-    statusEl.innerHTML = '<span class="text-white-50" style="font-size:0.7rem">Saving...</span>';
+// ── Auto SMS Status Card ──
+async function loadSmsStatus() {
+    const chipsEl = document.getElementById('smsStatusChips');
+    const actionsEl = document.getElementById('smsStatusActions');
+    if (!chipsEl) return;
 
     try {
-        const res = await fetch(API + '?action=save_settings', {
+        const res = await fetch(API + '?action=get_sms_status');
+        const s = await res.json();
+        renderSmsStatus(s);
+    } catch (e) {
+        chipsEl.innerHTML = '<span class="badge bg-danger bg-opacity-25 text-danger">Status unavailable</span>';
+        actionsEl.innerHTML = '';
+    }
+}
+
+function renderSmsStatus(s) {
+    const chipsEl = document.getElementById('smsStatusChips');
+    const actionsEl = document.getElementById('smsStatusActions');
+    const isOwner = actionsEl.dataset.isOwner === '1';
+
+    const masterChip = s.master_enabled
+        ? '<span class="badge bg-success bg-opacity-25 text-success">Enabled</span>'
+        : '<span class="badge bg-secondary bg-opacity-25 text-secondary">Disabled</span>';
+
+    const windowChip = s.in_window
+        ? '<span class="badge bg-info bg-opacity-25 text-info">Window open</span>'
+        : '<span class="badge bg-secondary bg-opacity-25 text-body-tertiary">Window closed</span>';
+
+    let effectiveChip;
+    if (s.effective) {
+        effectiveChip = '<span class="badge bg-success text-white"><i class="bi bi-broadcast"></i> Sending now</span>';
+    } else {
+        const reason = !s.master_enabled ? 'master off'
+                     : s.override === 'force_off' ? 'overridden off'
+                     : 'outside window';
+        effectiveChip = '<span class="badge bg-secondary text-white-50"><i class="bi bi-pause-circle"></i> Paused</span>'
+                      + ' <span class="text-body-tertiary small">(' + reason + ')</span>';
+    }
+
+    let overrideChip = '';
+    if (s.override === 'force_on') {
+        overrideChip = '<span class="badge bg-warning bg-opacity-25 text-warning"><i class="bi bi-lightning-charge"></i> Override: force on</span>';
+    } else if (s.override === 'force_off') {
+        overrideChip = '<span class="badge bg-warning bg-opacity-25 text-warning"><i class="bi bi-mute"></i> Override: force off</span>';
+    }
+
+    let nextWindowText = '';
+    if (!s.in_window && s.next_window_open) {
+        const d = new Date(s.next_window_open);
+        nextWindowText = '<span class="text-body-tertiary small">Opens '
+                       + d.toLocaleDateString([], { weekday: 'short' }) + ' '
+                       + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                       + '</span>';
+    }
+
+    chipsEl.innerHTML = [masterChip, windowChip, effectiveChip, overrideChip, nextWindowText]
+        .filter(Boolean).join(' ');
+
+    if (!isOwner || !s.master_enabled) {
+        actionsEl.innerHTML = '';
+        return;
+    }
+
+    const sendingNow = s.effective;
+    const overrideActive = s.override && s.override !== 'none';
+    const targetOverride = sendingNow ? 'force_off' : 'force_on';
+    const btnLabel = sendingNow
+        ? '<i class="bi bi-pause-fill"></i> Pause sending'
+        : '<i class="bi bi-play-fill"></i> Force send now';
+    const btnClass = sendingNow ? 'btn-outline-warning' : 'btn-outline-success';
+
+    let html = '<button type="button" class="btn btn-sm ' + btnClass + '" onclick="setSmsOverride(\'' + targetOverride + '\')">'
+             + btnLabel + '</button>';
+    if (overrideActive) {
+        html += ' <button type="button" class="btn btn-sm btn-link text-body-tertiary p-1" onclick="setSmsOverride(\'none\')" title="Return to schedule">Clear override</button>';
+    }
+    actionsEl.innerHTML = html;
+}
+
+async function setSmsOverride(value) {
+    const actionsEl = document.getElementById('smsStatusActions');
+    const prev = actionsEl.innerHTML;
+    actionsEl.innerHTML = '<span class="text-body-tertiary small">Saving…</span>';
+
+    try {
+        const res = await fetch(API + '?action=set_sms_override', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sms_enabled: newState })
+            body: JSON.stringify({ override: value })
         });
         const data = await res.json();
         if (data.success) {
-            statusEl.innerHTML = toggle.checked
-                ? '<span class="badge bg-success bg-opacity-25 text-success">On</span>'
-                : '<span class="badge bg-secondary bg-opacity-25 text-secondary">Off</span>';
+            await loadSmsStatus();
+        } else {
+            actionsEl.innerHTML = prev;
+            alert(data.error || 'Could not update override');
         }
     } catch (e) {
-        statusEl.innerHTML = '<span class="badge bg-danger bg-opacity-25 text-danger">Error</span>';
-        toggle.checked = !toggle.checked;
+        actionsEl.innerHTML = prev;
+        alert('Network error');
     }
 }
 

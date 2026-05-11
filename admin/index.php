@@ -49,14 +49,18 @@ include __DIR__ . '/includes/layout-header.php';
     </div>
 </div>
 
-<!-- Auto SMS Quick Toggle -->
-<div class="d-flex align-items-center gap-3 mb-4 px-1">
-    <div class="form-check form-switch mb-0">
-        <input class="form-check-input" type="checkbox" id="overviewSmsToggle" style="width:2.5rem;height:1.25rem;cursor:pointer" onchange="toggleOverviewSMS()">
-    </div>
-    <div>
-        <span class="text-white fw-medium" style="font-size:0.85rem">Auto SMS</span>
-        <span class="ms-2" id="overviewSmsStatus" style="font-size:0.75rem"></span>
+<!-- Auto SMS Status -->
+<?php $smsIsOwner = isOwner(); ?>
+<div class="card bg-body-tertiary border-0 mb-4" id="smsStatusCard">
+    <div class="card-body py-3 px-4 d-flex flex-wrap align-items-center gap-3">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-chat-dots text-body-tertiary"></i>
+            <span class="text-white fw-semibold" style="font-size:0.9rem">Auto Responder</span>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2" id="smsStatusChips">
+            <span class="text-body-tertiary small">Loading…</span>
+        </div>
+        <div class="ms-auto d-flex align-items-center gap-2" id="smsStatusActions" data-is-owner="<?= $smsIsOwner ? '1' : '0' ?>"></div>
     </div>
 </div>
 
