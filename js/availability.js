@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Bedrooms
       if (bedroomFilter && bedroomFilter.value !== 'all') {
         const value = bedroomFilter.value;
-        const pattern = new RegExp(`${value}\s*(bed|br|bedroom)`, 'i');
+        const pattern = new RegExp(`${value}\\s*(bed|br|bedroom)`, 'i');
         const inType = pattern.test((unit.type || '').toLowerCase());
         const inBedBath = pattern.test((unit.bedBath || '').toLowerCase());
         if (!inType && !inBedBath) return false;

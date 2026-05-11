@@ -109,7 +109,7 @@ endif;
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/availability.css" />
   <link rel="stylesheet" href="css/neighborhood.css" />
-  <link rel="stylesheet" href="css/waitlist.css" />
+  <link rel="stylesheet" href="css/waitlist.css?v=<?php echo @filemtime(__DIR__ . '/css/waitlist.css'); ?>" />
   <link rel="stylesheet" href="css/slider.css" />
   <link rel="icon" type="image/png" href="img/favicon.png">
 

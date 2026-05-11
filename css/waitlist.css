@@ -85,9 +85,12 @@
   transition: all 0.2s ease;
 }
 
+#waitlist .form1 textarea.form-control,
 #waitlist .form1 textarea {
   border-radius: 16px;
   min-height: 120px;
+  padding: 14px 18px;
+  line-height: 1.5;
   resize: vertical;
 }
 
