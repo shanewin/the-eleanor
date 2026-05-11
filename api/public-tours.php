@@ -97,8 +97,8 @@ function publicAvailability() {
     // Remove slots that already have non-cancelled tour_requests.
     // Using a single range query for efficiency.
     global $sb;
-    $rangeStart = $fromDt->format('c');
-    $rangeEnd   = (clone $toDt)->modify('+1 day')->format('c');
+    $rangeStart = urlencode($fromDt->format('c'));
+    $rangeEnd   = urlencode((clone $toDt)->modify('+1 day')->format('c'));
     $existing = $sb->select(
         'tour_requests',
         'scheduled_at,duration_minutes,status',
@@ -329,8 +329,8 @@ function isSlotStillAvailable(DateTime $when) {
 
     // Conflict check against existing tour_requests (any status that counts as
     // "taken"). Pull a small window and check overlap server-side.
-    $rangeStart = (clone $when)->modify('-1 hour')->format('c');
-    $rangeEnd   = (clone $when)->modify('+1 hour')->format('c');
+    $rangeStart = urlencode((clone $when)->modify('-1 hour')->format('c'));
+    $rangeEnd   = urlencode((clone $when)->modify('+1 hour')->format('c'));
     $existing = $sb->select(
         'tour_requests',
         'scheduled_at,duration_minutes,status',

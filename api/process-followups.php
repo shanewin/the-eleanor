@@ -21,8 +21,8 @@ if (!isSMSMasterEnabled() || !isWithinSendWindow()) {
 }
 
 $now = time();
-$threeDaysAgo = date('c', $now - (3 * 86400));
-$sixDaysAgo = date('c', $now - (6 * 86400));
+$threeDaysAgo = urlencode(date('c', $now - (3 * 86400)));
+$sixDaysAgo   = urlencode(date('c', $now - (6 * 86400)));
 
 // Find leads due for first follow-up (3+ days silent, no follow-ups sent yet)
 $dueFirst = $sb->select('sms_automation', '*', [

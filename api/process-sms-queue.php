@@ -19,8 +19,10 @@ if (!isWithinSendWindow()) {
     return;
 }
 
-// Fetch pending messages whose scheduled_for has passed (limit 10 per run)
-$now = date('c');
+// Fetch pending messages whose scheduled_for has passed (limit 10 per run).
+// urlencode() guards against the `+` in ISO 8601 timestamps being decoded as
+// a space by PostgREST, which makes the timestamp unparseable.
+$now = urlencode(date('c'));
 $pending = $sb->select(
     'sms_queue',
     '*',

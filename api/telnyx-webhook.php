@@ -163,7 +163,7 @@ function handleInboundSMS($payload) {
         'lead_phone=eq.' . urlencode($normalizedPhone),
         'direction=eq.outbound',
         'sender_type=eq.ai',
-        'created_at=gte.' . date('c', time() - 60)
+        'created_at=gte.' . urlencode(date('c', time() - 60))
     ]);
     if ($recentReply) {
         error_log("Rate limit — AI replied to $normalizedPhone within last 60s, skipping");
