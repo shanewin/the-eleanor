@@ -1632,7 +1632,54 @@ function deleteTourRequest() {
     }
 
     $id = $input['id'];
+
+    // Read before deleting so we can log details and decide whether to walk
+    // the lead's pipeline status back.
+    $tour = $sb->selectOne('tour_requests',
+        'lead_email,lead_phone,scheduled_at,unit',
+        ['id=eq.' . $id]);
+
     $sb->delete('tour_requests', ['id=eq.' . $id]);
+
+    if ($tour && !empty($tour['lead_email'])) {
+        $leadEmail = $tour['lead_email'];
+
+        $whenStr = '';
+        if (!empty($tour['scheduled_at'])) {
+            try {
+                $dt = new DateTime($tour['scheduled_at'], new DateTimeZone('America/New_York'));
+                $whenStr = $dt->format('l, F j \\a\\t g:ia');
+            } catch (Throwable $e) {}
+        }
+        $body = 'Tour' . ($whenStr ? ' for ' . $whenStr : '') . ' was deleted from the calendar.';
+        if (!empty($tour['unit'])) $body .= ' Unit: ' . $tour['unit'] . '.';
+
+        $sb->insert('communications', [
+            'lead_email' => $leadEmail,
+            'direction'  => 'internal',
+            'channel'    => 'note',
+            'subject'    => 'Tour deleted from calendar',
+            'body'       => $body,
+            'sender'     => 'System',
+            'status'     => 'system'
+        ]);
+
+        // If this was their only active tour, walk the funnel back to Contacted
+        // so the pipeline doesn't keep claiming they're Booked.
+        $otherActive = $sb->selectOne('tour_requests', 'id', [
+            'lead_email=eq.' . urlencode($leadEmail),
+            'status=in.(pending,confirmed,rescheduled)'
+        ]);
+        if (!$otherActive) {
+            foreach (['waitlist_submissions', 'unit_inquiries'] as $table) {
+                $row = $sb->selectOne($table, 'lead_status', ['email=eq.' . urlencode($leadEmail)]);
+                if ($row && ($row['lead_status'] ?? '') === 'Showing Scheduled') {
+                    forceUpdateLeadStatus($leadEmail, 'Contacted');
+                    break;
+                }
+            }
+        }
+    }
 
     echo json_encode(['success' => true]);
 }
