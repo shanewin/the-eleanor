@@ -48,45 +48,37 @@ set_exception_handler(function ($e) {
 $rawBody = file_get_contents('php://input');
 
 // ── Webhook Signature Verification (Ed25519) ──
-// Telnyx signs webhooks with Ed25519. The public key is in your Telnyx portal
-// (Mission Control > API Keys > Public Key). Set it in config.php as TELNYX_PUBLIC_KEY.
-//
-// TEMPORARY: signature failures log diagnostics but do NOT reject. Re-enable
-// strict rejection (uncomment the `exit;` lines below) once headers are
-// confirmed to arrive intact at the PHP layer.
-if (defined('TELNYX_PUBLIC_KEY') && TELNYX_PUBLIC_KEY) {
+// Telnyx signs webhooks with Ed25519. Skip verification on hosts where the
+// PHP sodium extension isn't available (the function call would fatal).
+if (defined('TELNYX_PUBLIC_KEY') && TELNYX_PUBLIC_KEY && function_exists('sodium_crypto_sign_verify_detached')) {
     $signature = $_SERVER['HTTP_TELNYX_SIGNATURE_ED25519'] ?? '';
     $timestamp = $_SERVER['HTTP_TELNYX_TIMESTAMP'] ?? '';
 
-    $diagHeaders = [];
-    foreach ($_SERVER as $k => $v) {
-        if (strpos($k, 'HTTP_TELNYX') === 0) $diagHeaders[$k] = substr($v, 0, 40);
-    }
-    $sigState = 'unverified';
-
     if (empty($signature) || empty($timestamp)) {
-        $sigState = 'missing_headers';
-        error_log("Telnyx webhook sig: missing_headers — saw: " . json_encode($diagHeaders));
-        // http_response_code(403); echo json_encode(['error' => 'Missing signature']); exit;
-    } elseif (abs(time() - intval($timestamp)) > 300) {
-        $sigState = 'stale_timestamp';
-        error_log("Telnyx webhook sig: stale timestamp ($timestamp)");
-        // http_response_code(403); echo json_encode(['error' => 'Stale timestamp']); exit;
-    } else {
-        $signedPayload = $timestamp . '|' . $rawBody;
-        $decodedSig = base64_decode($signature);
-        $publicKey = base64_decode(TELNYX_PUBLIC_KEY);
-        $valid = sodium_crypto_sign_verify_detached($decodedSig, $signedPayload, $publicKey);
-        if ($valid) {
-            $sigState = 'valid';
-        } else {
-            $sigState = 'invalid';
-            error_log("Telnyx webhook sig: invalid — sig_len=" . strlen($signature) .
-                      " ts=$timestamp body_len=" . strlen($rawBody));
-            // http_response_code(403); echo json_encode(['error' => 'Invalid signature']); exit;
-        }
+        error_log("Telnyx webhook: missing signature headers");
+        http_response_code(403);
+        echo json_encode(['error' => 'Missing signature']);
+        exit;
     }
-    error_log("Telnyx webhook sig state: $sigState");
+
+    if (abs(time() - intval($timestamp)) > 300) {
+        error_log("Telnyx webhook: timestamp too old ($timestamp)");
+        http_response_code(403);
+        echo json_encode(['error' => 'Stale timestamp']);
+        exit;
+    }
+
+    $signedPayload = $timestamp . '|' . $rawBody;
+    $decodedSig = base64_decode($signature);
+    $publicKey = base64_decode(TELNYX_PUBLIC_KEY);
+    $valid = sodium_crypto_sign_verify_detached($decodedSig, $signedPayload, $publicKey);
+
+    if (!$valid) {
+        error_log("Telnyx webhook: invalid signature");
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid signature']);
+        exit;
+    }
 }
 
 $event = json_decode($rawBody, true);
