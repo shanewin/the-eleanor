@@ -402,9 +402,11 @@ function getAvailableTourSlots($brokerId, $startDate, $endDate) {
 
     if (!$broker) return [];
 
-    // Get tour hours from settings
-    $aiSettings = getSMSSettings();
-    $tourHours = $aiSettings['ai_tour_hours'] ?? 'weekdays 10am-6pm, Saturdays 11am-4pm';
+    // Get tour hours from settings (guarded — public endpoints don't load admin-api.php)
+    if (function_exists('getSMSSettings')) {
+        $aiSettings = getSMSSettings();
+        $tourHours = $aiSettings['ai_tour_hours'] ?? 'weekdays 10am-6pm, Saturdays 11am-4pm';
+    }
 
     // Default tour schedule
     $tourStart = '10:00';

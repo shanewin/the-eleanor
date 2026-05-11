@@ -55,6 +55,7 @@ switch ($action) {
     case 'get_tour_requests': getTourRequests(); break;
     case 'add_tour_request': addTourRequest(); break;
     case 'update_tour_request': updateTourRequest(); break;
+    case 'delete_tour_request': deleteTourRequest(); break;
     case 'google_calendar_connect': googleCalendarConnect(); break;
     case 'google_calendar_disconnect': googleCalendarDisconnect(); break;
     case 'google_calendar_status': googleCalendarStatus(); break;
@@ -1414,8 +1415,12 @@ function updateTourRequest() {
     }
 
     $id = $input['id'];
+
+    // Read the pre-update row so we can detect transitions (e.g. pending→confirmed).
+    $prev = $sb->selectOne('tour_requests', 'status,broker_id,lead_email,lead_phone,scheduled_at,duration_minutes,unit,google_event_id', ['id=eq.' . $id]);
+
     $data = [];
-    foreach (['status', 'notes', 'scheduled_at'] as $field) {
+    foreach (['status', 'notes', 'scheduled_at', 'broker_id'] as $field) {
         if (array_key_exists($field, $input)) {
             $data[$field] = $input[$field];
         }
@@ -1424,22 +1429,114 @@ function updateTourRequest() {
 
     $sb->update('tour_requests', $data, ['id=eq.' . $id]);
 
+    // Effective state after update
+    $newStatus   = array_key_exists('status', $input)    ? $input['status']    : ($prev['status'] ?? null);
+    $newBrokerId = array_key_exists('broker_id', $input) ? $input['broker_id'] : ($prev['broker_id'] ?? null);
+    $scheduledAt = $prev['scheduled_at'] ?? '';
+    $leadEmail   = $prev['lead_email'] ?? '';
+    $leadPhone   = $prev['lead_phone'] ?? '';
+    $unit        = $prev['unit'] ?? '';
+
+    // ── pending → confirmed transition ──
+    $becameConfirmed = $prev
+        && ($prev['status'] ?? null) === 'pending'
+        && $newStatus === 'confirmed';
+
+    if ($becameConfirmed) {
+        $tz = new DateTimeZone('America/New_York');
+        $when = $scheduledAt ? new DateTime($scheduledAt, $tz) : null;
+
+        // 1. Confirmation SMS to applicant
+        if ($leadPhone && $when) {
+            require_once __DIR__ . '/telnyx-sms.php';
+            $leadName = '';
+            if ($leadEmail) {
+                $l = findLeadByPhoneOrEmail(null, $leadEmail);
+                if ($l) $leadName = trim(($l['first_name'] ?? '') . ' ' . ($l['last_name'] ?? ''));
+            }
+            $greeting = $leadName ? ('Hi ' . explode(' ', $leadName)[0] . '!') : 'Hi!';
+            $confirmMsg = "{$greeting} Your tour at The Eleanor is confirmed for "
+                        . $when->format('l, F j \\a\\t g:ia')
+                        . ($unit ? " (Unit {$unit})" : '')
+                        . ". 52 4th Avenue, Brooklyn. See you soon! — The Eleanor";
+            sendSMS($leadPhone, $confirmMsg);
+
+            // Log confirmation SMS as outbound comm
+            $sb->insert('communications', [
+                'lead_email' => $leadEmail ?: null,
+                'direction'  => 'outbound',
+                'channel'    => 'sms',
+                'subject'    => 'Tour Confirmation',
+                'body'       => $confirmMsg,
+                'sender'     => 'System',
+                'recipient'  => $leadPhone,
+                'status'     => 'sent',
+            ]);
+        }
+
+        // 2. Create Google Calendar event when an assigned broker has a connected calendar
+        if ($newBrokerId && $when && empty($prev['google_event_id'])) {
+            $accessToken = googleGetValidToken(intval($newBrokerId));
+            if ($accessToken) {
+                $startISO = $when->format('c');
+                $endTime  = clone $when;
+                $endTime->modify('+' . (int)($prev['duration_minutes'] ?: 30) . ' minutes');
+                $summary = 'Tour — The Eleanor' . ($unit ? " (Unit {$unit})" : '');
+                $description = ($leadEmail ? "Lead: {$leadEmail}\n" : '')
+                             . ($leadPhone ? "Phone: {$leadPhone}\n" : '')
+                             . ($unit ? "Unit: {$unit}\n" : '');
+                $eventId = googleCreateEvent($accessToken, $summary, $startISO, $endTime->format('c'), $description, $leadEmail ?: null);
+                if ($eventId) {
+                    $sb->update('tour_requests', ['google_event_id' => $eventId], ['id=eq.' . $id]);
+                }
+            }
+        }
+
+        // 3. Bump lead status to Showing Scheduled
+        if ($leadEmail) {
+            autoUpdateLeadStatus($leadEmail, 'Showing Scheduled');
+        }
+    }
+
     // Sync lead_status when tour status changes
     if (isset($input['status'])) {
-        $tour = $sb->selectOne('tour_requests', 'lead_email', ['id=eq.' . $id]);
-        if ($tour && !empty($tour['lead_email'])) {
-            $email = $tour['lead_email'];
-            $newTourStatus = $input['status'];
-
-            if ($newTourStatus === 'completed') {
+        if ($leadEmail) {
+            if ($newStatus === 'completed') {
                 // Tour happened — advance to Showed
-                forceUpdateLeadStatus($email, 'Showed');
-            } elseif ($newTourStatus === 'no_show' || $newTourStatus === 'cancelled') {
+                forceUpdateLeadStatus($leadEmail, 'Showed');
+            } elseif ($newStatus === 'no_show' || $newStatus === 'cancelled') {
                 // Tour did not happen — return lead to Contacted
-                forceUpdateLeadStatus($email, 'Contacted');
+                forceUpdateLeadStatus($leadEmail, 'Contacted');
             }
         }
     }
+
+    echo json_encode(['success' => true]);
+}
+
+/**
+ * Owner-only. Permanently deletes a tour_requests row. Used to clear out test
+ * bookings — destroys the follow-up trail, so the admin UI gates this behind
+ * a confirmation dialog.
+ */
+function deleteTourRequest() {
+    global $sb;
+
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Owner only']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (empty($input['id'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tour request id is required']);
+        return;
+    }
+
+    $id = $input['id'];
+    $sb->delete('tour_requests', ['id=eq.' . $id]);
 
     echo json_encode(['success' => true]);
 }

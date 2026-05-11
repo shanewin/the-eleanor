@@ -22,18 +22,21 @@ async function loadTourRequests() {
 function tourRequestsToEvents(requests) {
     return requests.map(t => {
         const endTime = new Date(new Date(t.scheduled_at).getTime() + (t.duration_minutes || 30) * 60000);
-        const title = (t.unit ? 'Unit ' + t.unit + ' — ' : '') + (t.lead_name || 'Tour');
+        const status = t.status || 'confirmed';
+        const prefix = status === 'pending' ? '⏳ ' : '';
+        const title = prefix + (t.unit ? 'Unit ' + t.unit + ' — ' : '') + (t.lead_name || 'Tour');
         return {
             id: t.id,
             title: title,
             start: t.scheduled_at,
             end: endTime.toISOString(),
-            classNames: ['fc-event-' + (t.status || 'confirmed')],
+            classNames: ['fc-event-' + status],
             extendedProps: {
-                status: t.status || 'confirmed',
+                status: status,
                 unit: t.unit || '',
                 lead: t.lead_name || 'Unknown',
                 broker: t.broker_name || 'Unassigned',
+                brokerId: t.broker_id || null,
                 source: t.source || '',
                 notes: t.notes || '',
                 tourId: t.id
@@ -68,7 +71,9 @@ async function initShowingsCalendar() {
 
             const p = info.event.extendedProps;
             const time = info.event.start.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-            const statusBadge = p.status === 'confirmed'
+            const statusBadge = p.status === 'pending'
+                ? '<span class="badge bg-warning bg-opacity-25 text-warning">Pending</span>'
+                : p.status === 'confirmed'
                 ? '<span class="badge bg-success bg-opacity-25 text-success">Confirmed</span>'
                 : p.status === 'completed'
                 ? '<span class="badge bg-info bg-opacity-25 text-info">Completed</span>'
@@ -78,7 +83,53 @@ async function initShowingsCalendar() {
                 ? '<span class="badge bg-warning bg-opacity-25 text-warning">No Show</span>'
                 : '<span class="badge bg-secondary">' + esc(p.status) + '</span>';
 
-            const sourceLabel = p.source === 'sms_ai' ? '<span class="badge bg-purple bg-opacity-25 text-purple-300" style="font-size:0.65rem">Booked by AI</span>' : '';
+            const sourceLabel = p.source === 'sms_ai'
+                ? '<span class="badge bg-purple bg-opacity-25 text-purple-300" style="font-size:0.65rem">Booked by AI</span>'
+                : p.source === 'public_form'
+                ? '<span class="badge bg-info bg-opacity-25 text-info" style="font-size:0.65rem">Booked online</span>'
+                : '';
+
+            // Build broker options for the assign dropdown (pending flow)
+            const allBrokers = (typeof brokersCache !== 'undefined' && Array.isArray(brokersCache) && brokersCache.length)
+                ? brokersCache
+                : (Array.isArray(connectedBrokers) ? connectedBrokers : []);
+            const brokerOptions = allBrokers
+                .map(b => '<option value="' + b.id + '"' + (String(p.brokerId) === String(b.id) ? ' selected' : '') + '>' + esc(b.name) + '</option>')
+                .join('');
+
+            const pendingControls = p.status === 'pending' && p.tourId ? `
+                <div class="mt-3 p-3" style="background:rgba(255,255,255,0.04); border-radius:6px">
+                    <div class="small text-white-50 mb-2">Approve this request</div>
+                    <select class="form-select form-select-sm bg-dark border-secondary text-white mb-2" id="approveBrokerSel-${esc(p.tourId)}">
+                        <option value="">Assign a broker…</option>
+                        ${brokerOptions}
+                    </select>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success btn-sm flex-grow-1" onclick="approveTour('${esc(p.tourId)}')">
+                            <i class="bi bi-check-lg me-1"></i>Approve &amp; Send Confirmation
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="updateTourStatus('${esc(p.tourId)}', 'cancelled')">Decline</button>
+                    </div>
+                </div>
+            ` : '';
+
+            const statusControls = p.status !== 'pending' && p.tourId ? `
+                <div class="mt-3"><select class="form-select form-select-sm bg-dark border-secondary text-white" onchange="updateTourStatus('${esc(p.tourId)}', this.value)">
+                    <option value="confirmed"${p.status === 'confirmed' ? ' selected' : ''}>Confirmed</option>
+                    <option value="completed"${p.status === 'completed' ? ' selected' : ''}>Completed</option>
+                    <option value="cancelled"${p.status === 'cancelled' ? ' selected' : ''}>Cancelled</option>
+                    <option value="no_show"${p.status === 'no_show' ? ' selected' : ''}>No Show</option>
+                </select></div>
+            ` : '';
+
+            const isOwner = (typeof USER_ROLE !== 'undefined') && USER_ROLE === 'owner';
+            const deleteControl = isOwner && p.tourId ? `
+                <div class="mt-3 pt-3 border-top border-secondary">
+                    <button class="btn btn-outline-danger btn-sm w-100" onclick="deleteTour('${esc(p.tourId)}', '${esc(p.lead || 'this lead')}')">
+                        <i class="bi bi-trash me-1"></i>Delete Tour
+                    </button>
+                </div>
+            ` : '';
 
             document.getElementById('showingDetailBody').innerHTML = `
                 <div class="mb-3">${statusBadge} ${sourceLabel}</div>
@@ -101,7 +152,9 @@ async function initShowingsCalendar() {
                     </div>
                 </div>
                 ${p.notes ? '<div class="mt-3"><div class="small text-white-50">Notes</div><div class="text-white-50 small">' + esc(p.notes) + '</div></div>' : ''}
-                ${p.tourId ? '<div class="mt-3"><select class="form-select form-select-sm bg-dark border-secondary text-white" onchange="updateTourStatus(\'' + esc(p.tourId) + '\', this.value)"><option value="confirmed"' + (p.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option><option value="completed"' + (p.status === 'completed' ? ' selected' : '') + '>Completed</option><option value="cancelled"' + (p.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option><option value="no_show"' + (p.status === 'no_show' ? ' selected' : '') + '>No Show</option></select></div>' : ''}
+                ${pendingControls}
+                ${statusControls}
+                ${deleteControl}
             `;
             new bootstrap.Modal(document.getElementById('showingDetailModal')).show();
         },
@@ -122,12 +175,14 @@ async function initShowingsCalendar() {
 }
 
 // ── Update Tour Status ──
-async function updateTourStatus(tourId, status) {
+async function updateTourStatus(tourId, status, brokerId) {
     try {
+        const payload = { id: tourId, status: status };
+        if (brokerId !== undefined) payload.broker_id = brokerId || null;
         await fetch(API + '?action=update_tour_request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: tourId, status: status })
+            body: JSON.stringify(payload)
         });
         // Refresh
         await loadTourRequests();
@@ -135,9 +190,105 @@ async function updateTourStatus(tourId, status) {
         showingsCalendar.addEventSource(tourRequestsToEvents(tourRequests));
         updateCalendarStats();
         renderUpcomingShowings();
+
+        const modalEl = document.getElementById('showingDetailModal');
+        const inst = bootstrap.Modal.getInstance(modalEl);
+        if (inst) inst.hide();
     } catch (err) {
         console.error('Error updating tour:', err);
     }
+}
+
+// Owner-only: permanently delete a tour. Confirmation is mandatory because
+// this destroys the lead's follow-up trail (no reschedule, no SMS history
+// linkage on that tour row).
+function deleteTour(tourId, leadLabel) {
+    const html = `
+        <div class="modal fade" id="deleteTourConfirm" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Delete this tour?</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">You're about to permanently delete the tour for <strong>${esc(leadLabel)}</strong>.</p>
+                        <div class="alert alert-warning small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>This cannot be undone.</strong> Deleting the tour removes the ability to reschedule or follow up with this lead through the calendar. Their lead record stays, but the tour-specific history (broker assignment, notes, calendar event link) is lost.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Keep tour</button>
+                        <button type="button" class="btn btn-danger btn-sm" id="deleteTourConfirmBtn">
+                            <i class="bi bi-trash me-1"></i>Delete permanently
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    // Remove any prior instance, then inject and show
+    const prior = document.getElementById('deleteTourConfirm');
+    if (prior) prior.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    const modalEl = document.getElementById('deleteTourConfirm');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+
+    document.getElementById('deleteTourConfirmBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('deleteTourConfirmBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Deleting…';
+        try {
+            const res = await fetch(API + '?action=delete_tour_request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: tourId })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                alert('Could not delete: ' + (data.error || 'Unknown error'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete permanently';
+                return;
+            }
+            // Close both modals + refresh
+            modal.hide();
+            const detail = bootstrap.Modal.getInstance(document.getElementById('showingDetailModal'));
+            if (detail) detail.hide();
+            await loadTourRequests();
+            showingsCalendar.removeAllEvents();
+            showingsCalendar.addEventSource(tourRequestsToEvents(tourRequests));
+            updateCalendarStats();
+            renderUpcomingShowings();
+        } catch (err) {
+            console.error('Delete tour failed:', err);
+            alert('Network error while deleting.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete permanently';
+        }
+    });
+
+    modal.show();
+}
+
+// Approve a pending tour: requires a broker selection, then flips status to
+// 'confirmed'. Backend (updateTourRequest) sends the confirmation SMS and
+// creates the Google Calendar event if the broker is connected.
+async function approveTour(tourId) {
+    const sel = document.getElementById('approveBrokerSel-' + tourId);
+    const brokerId = sel ? sel.value : '';
+    if (!brokerId) {
+        if (sel) {
+            sel.classList.add('is-invalid');
+            sel.focus();
+        }
+        alert('Please assign a broker before approving.');
+        return;
+    }
+    await updateTourStatus(tourId, 'confirmed', brokerId);
 }
 
 // ── Broker Availability Toggles ──
@@ -255,16 +406,16 @@ function updateCalendarStats() {
     const weekEndStr = weekEnd.toISOString().split('T')[0];
 
     const active = tourRequests.filter(t => t.status !== 'cancelled' && t.status !== 'no_show');
+    const pending = active.filter(t => t.status === 'pending').length;
     const confirmed = active.filter(t => t.status === 'confirmed').length;
-    const completed = active.filter(t => t.status === 'completed').length;
     const todayCount = active.filter(t => t.scheduled_at && t.scheduled_at.startsWith(today)).length;
     const weekCount = active.filter(t => {
         const d = t.scheduled_at ? t.scheduled_at.split('T')[0] : '';
         return d >= today && d <= weekEndStr;
     }).length;
 
-    document.getElementById('calStatPending').textContent = confirmed;
-    document.getElementById('calStatConfirmed').textContent = completed;
+    document.getElementById('calStatPending').textContent = pending;
+    document.getElementById('calStatConfirmed').textContent = confirmed;
     document.getElementById('calStatToday').textContent = todayCount;
     document.getElementById('calStatThisWeek').textContent = weekCount;
 }
