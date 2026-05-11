@@ -1403,7 +1403,7 @@ function addTourRequest() {
         $phone = normalizePhone($phone) ?: $phone;
     }
 
-    $result = $sb->insert('tour_requests', [
+    $tourRow = [
         'lead_email'       => $email ?: null,
         'lead_phone'       => $phone ?: null,
         'unit'             => $unit ?: null,
@@ -1413,7 +1413,12 @@ function addTourRequest() {
         'status'           => 'confirmed',
         'source'           => 'manual',
         'notes'            => $notes ?: null
-    ]);
+    ];
+    $result = $sb->insert('tour_requests', $tourRow);
+
+    // Email owners + assigned broker
+    require_once __DIR__ . '/smtp-mail.php';
+    sendTourScheduledEmail($tourRow, 'scheduled');
 
     // Auto-update lead status
     if ($email) {
@@ -1556,6 +1561,25 @@ function updateTourRequest() {
                 forceUpdateLeadStatus($leadEmail, 'Contacted');
             }
         }
+    }
+
+    // Email owners + broker on reschedule (scheduled_at changed) or cancellation
+    $rescheduled = array_key_exists('scheduled_at', $input)
+        && $prev
+        && ($input['scheduled_at'] ?? null) !== ($prev['scheduled_at'] ?? null);
+    $cancelled = isset($input['status']) && $input['status'] === 'cancelled'
+        && ($prev['status'] ?? null) !== 'cancelled';
+
+    if ($rescheduled || $cancelled) {
+        require_once __DIR__ . '/smtp-mail.php';
+        sendTourScheduledEmail([
+            'lead_email'   => $leadEmail,
+            'lead_phone'   => $leadPhone,
+            'unit'         => $unit,
+            'broker_id'    => $newBrokerId,
+            'scheduled_at' => $rescheduled ? $input['scheduled_at'] : $scheduledAt,
+            'source'       => 'manual',
+        ], $cancelled ? 'cancelled' : 'rescheduled');
     }
 
     echo json_encode(['success' => true]);

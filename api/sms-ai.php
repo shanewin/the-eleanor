@@ -335,7 +335,7 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
             }
 
             // Create tour_requests record
-            $sb->insert('tour_requests', [
+            $tourRow = [
                 'lead_email'       => $leadContext['email'] ?? null,
                 'lead_phone'       => $leadPhone,
                 'unit'             => $unitInterest,
@@ -346,7 +346,12 @@ function executeCalendarTool($toolName, $input, $leadPhone, $leadContext) {
                 'google_event_id'  => $eventId,
                 'source'           => 'sms_ai',
                 'notes'            => "Booked via SMS AI conversation"
-            ]);
+            ];
+            $sb->insert('tour_requests', $tourRow);
+
+            // Email owners + assigned broker
+            require_once __DIR__ . '/smtp-mail.php';
+            sendTourScheduledEmail($tourRow, 'scheduled');
 
             // Log in communications
             $sb->insert('communications', [

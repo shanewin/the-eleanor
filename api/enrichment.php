@@ -835,9 +835,11 @@ function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
         }
     }
 
-    // Get notification emails from settings table
-    $notifyRow = $sb->selectOne('settings', 'value', ['key=eq.notification_emails']);
-    $notifyEmails = array_filter(array_map('trim', explode(',', $notifyRow['value'] ?? (defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : ''))));
+    // Recipients: active owners (falls back to NOTIFICATION_EMAIL if no owners exist).
+    $notifyEmails = getOwnerEmails();
+    if (empty($notifyEmails) && defined('NOTIFICATION_EMAIL') && NOTIFICATION_EMAIL) {
+        $notifyEmails = array_filter(array_map('trim', explode(',', NOTIFICATION_EMAIL)));
+    }
 
     $subject = "New Lead: $name" . ($company !== '—' ? " @ $company" : '');
 

@@ -102,3 +102,110 @@ function smtpRead($socket) {
     }
     return $response;
 }
+
+/**
+ * Active owner email addresses — the recipients for all system notifications
+ * (new leads, enrichment reports, tour scheduling). Replaces the legacy
+ * settings.notification_emails field which predated owner/broker accounts.
+ */
+function getOwnerEmails(): array {
+    global $sb;
+    $rows = $sb->select('brokers', 'email,is_active,role', ['role=eq.owner']);
+    $emails = [];
+    foreach ($rows as $r) {
+        if (($r['is_active'] ?? true) === false) continue;
+        $e = trim($r['email'] ?? '');
+        if ($e !== '') $emails[] = $e;
+    }
+    return array_values(array_unique($emails));
+}
+
+/**
+ * Email-notify owners + the assigned broker when a tour is scheduled,
+ * rescheduled, or cancelled. Also logs each send into communications so the
+ * lead's timeline reflects it.
+ *
+ * $tour expects keys: scheduled_at, lead_email, lead_phone, unit, broker_id, source
+ * $eventType: 'scheduled' | 'rescheduled' | 'cancelled'
+ */
+function sendTourScheduledEmail(array $tour, string $eventType = 'scheduled'): void {
+    global $sb;
+
+    $leadEmail = $tour['lead_email'] ?? null;
+    $leadPhone = $tour['lead_phone'] ?? null;
+    $brokerId  = $tour['broker_id'] ?? null;
+    $unit      = $tour['unit'] ?? '';
+    $source    = $tour['source'] ?? 'manual';
+    $scheduledAt = $tour['scheduled_at'] ?? '';
+
+    if (!$scheduledAt) return;
+
+    // Lead name lookup
+    $leadName = '';
+    if ($leadEmail) {
+        foreach (['waitlist_submissions', 'unit_inquiries'] as $t) {
+            $l = $sb->selectOne($t, 'first_name,last_name', ['email=eq.' . urlencode($leadEmail)]);
+            if ($l) { $leadName = trim(($l['first_name'] ?? '') . ' ' . ($l['last_name'] ?? '')); break; }
+        }
+    }
+    if (!$leadName) $leadName = $leadEmail ?: ($leadPhone ?: 'Unknown lead');
+
+    // Broker lookup
+    $brokerName = '';
+    $brokerEmail = '';
+    if ($brokerId) {
+        $b = $sb->selectOne('brokers', 'name,email', ['id=eq.' . intval($brokerId)]);
+        if ($b) {
+            $brokerName  = $b['name'] ?? '';
+            $brokerEmail = $b['email'] ?? '';
+        }
+    }
+
+    $tz = new DateTimeZone('America/New_York');
+    $dt = new DateTime($scheduledAt, $tz);
+    $when = $dt->format('l, F j, Y \\a\\t g:ia T');
+
+    $verb = $eventType === 'rescheduled' ? 'Rescheduled' : ($eventType === 'cancelled' ? 'Cancelled' : 'Scheduled');
+    $sourceLabel = $source === 'sms_ai' ? 'SMS AI conversation' : ($source === 'manual' ? 'Admin dashboard' : $source);
+
+    $subject = "Tour {$verb}: {$leadName} — " . $dt->format('D, M j \\a\\t g:ia');
+
+    $body = "<!DOCTYPE html><html><body style=\"font-family:Arial,Helvetica,sans-serif;color:#222;max-width:560px;margin:0 auto;padding:24px\">"
+          . "<h2 style=\"margin:0 0 12px;font-weight:500\">Tour {$verb}</h2>"
+          . "<p style=\"margin:0 0 16px;color:#666\">A tour was {$eventType} via {$sourceLabel}.</p>"
+          . "<table cellpadding=\"6\" style=\"border-collapse:collapse;font-size:14px;width:100%\">"
+          . "<tr><td style=\"color:#888;width:120px\">Lead</td><td><strong>" . htmlspecialchars($leadName) . "</strong></td></tr>"
+          . ($leadEmail ? "<tr><td style=\"color:#888\">Email</td><td>" . htmlspecialchars($leadEmail) . "</td></tr>" : '')
+          . ($leadPhone ? "<tr><td style=\"color:#888\">Phone</td><td>" . htmlspecialchars($leadPhone) . "</td></tr>" : '')
+          . "<tr><td style=\"color:#888\">When</td><td><strong>" . htmlspecialchars($when) . "</strong></td></tr>"
+          . ($unit ? "<tr><td style=\"color:#888\">Unit interest</td><td>" . htmlspecialchars($unit) . "</td></tr>" : '')
+          . ($brokerName ? "<tr><td style=\"color:#888\">Broker</td><td>" . htmlspecialchars($brokerName) . "</td></tr>" : '')
+          . "</table>"
+          . "<p style=\"margin-top:24px\"><a href=\"https://eleanorbk.com/admin/calendar.php\" style=\"color:#5b9bf6\">Open Calendar →</a></p>"
+          . "</body></html>";
+
+    // Recipients: all active owners + assigned broker (deduped, broker may be an owner)
+    $recipients = getOwnerEmails();
+    if ($brokerEmail && !in_array($brokerEmail, $recipients, true)) {
+        $recipients[] = $brokerEmail;
+    }
+
+    foreach ($recipients as $to) {
+        $sent = smtpSend($to, $subject, $body, null, true);
+        if (!$sent) {
+            error_log("Tour {$eventType} email to {$to} failed (lead: {$leadName})");
+        }
+        if ($leadEmail) {
+            $sb->insert('communications', [
+                'lead_email' => $leadEmail,
+                'direction'  => 'internal',
+                'channel'    => 'email',
+                'subject'    => $subject,
+                'body'       => "Tour {$eventType} notification sent to {$to}.",
+                'sender'     => 'System',
+                'recipient'  => $to,
+                'status'     => $sent ? 'sent' : 'failed',
+            ]);
+        }
+    }
+}

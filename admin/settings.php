@@ -45,13 +45,9 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
                     <div class="settings-tab-pane" id="settingsTab-general">
                         <div class="card bg-body-tertiary border-0 mb-4">
                             <div class="card-body p-4">
-                                <h5 class="fw-semibold mb-1">Notification Emails</h5>
-                                <p class="text-white-50 small mb-3">Comma-separated list of email addresses that receive lead notifications and enrichment reports.</p>
-                                <div class="mb-3">
-                                    <textarea class="form-control bg-dark border-secondary text-white" id="settingsNotificationEmails" rows="3" placeholder="email1@example.com, email2@example.com"></textarea>
-                                </div>
-                                <div id="settingsStatus" class="small mb-3" style="display:none"></div>
-                                <button class="btn btn-primary" onclick="saveSettingsForm()">Save Changes</button>
+                                <h5 class="fw-semibold mb-1">Notification Recipients</h5>
+                                <p class="text-white-50 small mb-3">Lead notifications, enrichment reports, and tour-scheduled alerts go to every account with the <strong>Owner</strong> role. Manage who that is on the <a href="/admin/brokers.php" class="text-info">Brokers</a> page.</p>
+                                <div id="ownerRecipientsList" class="small text-white-50">Loading owners…</div>
                             </div>
                         </div>
                     </div>

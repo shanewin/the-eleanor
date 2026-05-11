@@ -4,7 +4,6 @@ async function loadSettings() {
     try {
         const res = await fetch('/api/admin-api.php?action=get_settings');
         const settings = await res.json();
-        document.getElementById('settingsNotificationEmails').value = settings.notification_emails || '';
 
         // SMS settings
         document.getElementById('smsEnabled').checked = (settings.sms_enabled === 'on');
@@ -43,36 +42,29 @@ function updateDayBtnStyle(cb) {
     }
 }
 
-async function saveSettingsForm() {
-    const statusEl = document.getElementById('settingsStatus');
-    const emails = document.getElementById('settingsNotificationEmails').value.trim();
-
-    if (!emails) {
-        statusEl.className = 'small mb-3 text-danger';
-        statusEl.textContent = 'Please enter at least one email address.';
-        statusEl.style.display = 'block';
-        return;
-    }
-
+// Render the current owner-role brokers on the General tab so admins can see
+// at a glance who will receive notification emails.
+async function loadOwnerRecipients() {
+    const el = document.getElementById('ownerRecipientsList');
+    if (!el) return;
     try {
-        const res = await fetch('/api/admin-api.php?action=save_settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ notification_emails: emails })
-        });
-        const data = await res.json();
-        if (data.success) {
-            statusEl.className = 'small mb-3 text-success';
-            statusEl.textContent = 'Settings saved successfully.';
-        } else {
-            statusEl.className = 'small mb-3 text-danger';
-            statusEl.textContent = data.error || 'Failed to save settings.';
+        const res = await fetch('/api/admin-api.php?action=get_brokers');
+        const brokers = await res.json();
+        const owners = (Array.isArray(brokers) ? brokers : []).filter(b => b.role === 'owner');
+        if (owners.length === 0) {
+            el.innerHTML = '<span class="text-warning">No owner accounts found. Add one on the Brokers page so notifications have a recipient.</span>';
+            return;
         }
+        el.innerHTML = owners.map(o =>
+            '<div class="d-flex align-items-center gap-2 mb-1">'
+          + '<i class="bi bi-envelope-fill text-info"></i>'
+          + '<span class="text-white">' + (o.name || '(unnamed)') + '</span>'
+          + '<span class="text-white-50">&lt;' + (o.email || '') + '&gt;</span>'
+          + '</div>'
+        ).join('');
     } catch (e) {
-        statusEl.className = 'small mb-3 text-danger';
-        statusEl.textContent = 'Network error. Please try again.';
+        el.innerHTML = '<span class="text-danger">Failed to load owner list.</span>';
     }
-    statusEl.style.display = 'block';
 }
 
 async function saveSMSSettings() {
@@ -288,5 +280,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     loadSettings();
+    loadOwnerRecipients();
     loadLeadJobs();
 });

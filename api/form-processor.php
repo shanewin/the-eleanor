@@ -38,10 +38,14 @@ function clean(string $field): string {
  * Falls back to NOTIFICATION_EMAIL constant if settings unavailable.
  */
 function getNotificationEmails(): array {
-    global $sb;
-    $row = $sb->selectOne('settings', 'value', ['key=eq.notification_emails']);
-    $raw = $row['value'] ?? (defined('NOTIFICATION_EMAIL') ? NOTIFICATION_EMAIL : '');
-    return array_filter(array_map('trim', explode(',', $raw)));
+    require_once __DIR__ . '/smtp-mail.php';
+    $owners = getOwnerEmails();
+    if (!empty($owners)) return $owners;
+    // Fallback: NOTIFICATION_EMAIL constant if no owners exist yet
+    if (defined('NOTIFICATION_EMAIL') && NOTIFICATION_EMAIL) {
+        return array_filter(array_map('trim', explode(',', NOTIFICATION_EMAIL)));
+    }
+    return [];
 }
 
 /**
