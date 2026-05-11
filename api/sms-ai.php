@@ -152,8 +152,18 @@ function generateAIResponse($leadPhone, $inboundText) {
             ];
         }
 
-        // Append assistant response + tool results to messages for next loop
-        $payload['messages'][] = ['role' => 'assistant', 'content' => $response['content']];
+        // Append assistant response + tool results to messages for next loop.
+        // Coerce empty tool_use.input arrays back to objects — PHP json_decode
+        // turns `{}` into `[]`, and Claude rejects array-typed tool_use input.
+        $assistantContent = $response['content'];
+        foreach ($assistantContent as &$block) {
+            if (($block['type'] ?? '') === 'tool_use' && isset($block['input']) && is_array($block['input']) && empty($block['input'])) {
+                $block['input'] = new stdClass();
+            }
+        }
+        unset($block);
+
+        $payload['messages'][] = ['role' => 'assistant', 'content' => $assistantContent];
         $payload['messages'][] = ['role' => 'user', 'content' => $toolResults];
     }
 
