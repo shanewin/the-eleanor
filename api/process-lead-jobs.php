@@ -9,6 +9,9 @@
 
 require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/job-runner.php';
+require_once __DIR__ . '/cron-helpers.php';
+
+cronRunStart('process-lead-jobs');
 
 $staleCutoff = gmdate('Y-m-d\TH:i:s\Z', time() - LEAD_JOB_STALE_LOCK_SECONDS);
 
@@ -37,4 +40,5 @@ if (empty($jobs)) {
 
 foreach ($jobs as $job) {
     runLeadProcessingJob((int) $job['id']);
+    cronRunIncItems(1);
 }

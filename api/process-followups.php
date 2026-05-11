@@ -11,6 +11,9 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/sms-ai.php';
 require_once __DIR__ . '/telnyx-sms.php';
+require_once __DIR__ . '/cron-helpers.php';
+
+cronRunStart('process-followups');
 
 // Only process if within send window
 if (!isSMSMasterEnabled() || !isWithinSendWindow()) {
@@ -78,6 +81,7 @@ foreach ($toProcess as $item) {
     $result = sendSMS($phone, $reply);
 
     if ($result['success']) {
+        cronRunIncItems(1);
         // Log the message
         $sb->insert('sms_messages', [
             'lead_phone'        => $phone,

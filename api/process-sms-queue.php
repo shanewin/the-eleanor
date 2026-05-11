@@ -7,6 +7,9 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/sms-ai.php';
 require_once __DIR__ . '/telnyx-sms.php';
+require_once __DIR__ . '/cron-helpers.php';
+
+cronRunStart('process-sms-queue');
 
 // Only process if we're within the send window now
 if (!isSMSMasterEnabled()) {
@@ -90,6 +93,7 @@ foreach ($pending as $queued) {
         ], ['id=eq.' . $queueId]);
 
         markFirstResponseIfUnset($email, 'sms');
+        cronRunIncItems(1);
 
         error_log("SMS queue: sent delayed response to $phone");
     } else {

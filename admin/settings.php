@@ -218,6 +218,24 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
 
                     <!-- ═══ Jobs Tab ═══ -->
                     <div class="settings-tab-pane" id="settingsTab-jobs" style="display:none">
+
+                        <!-- Cron jobs status -->
+                        <div class="card bg-body-tertiary border-0 mb-4">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <h5 class="fw-semibold mb-1">Cron jobs</h5>
+                                        <p class="text-white-50 small mb-0">Scheduled background work. Healthy jobs run on time and finish without errors.</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="loadCronJobs()" title="Refresh">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <div id="cronJobsBody" class="small">Loading…</div>
+                            </div>
+                        </div>
+
+                        <!-- Lead-processing jobs -->
                         <div class="card bg-body-tertiary border-0 mb-4">
                             <div class="card-body p-4">
                                 <div class="d-flex justify-content-between align-items-start mb-3">

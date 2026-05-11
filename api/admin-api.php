@@ -63,6 +63,7 @@ switch ($action) {
     case 'google_calendar_availability': googleCalendarAvailability(); break;
     case 'get_lead_jobs': getLeadJobs(); break;
     case 'retry_lead_job': retryLeadJob(); break;
+    case 'get_cron_runs': getCronRuns(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -2282,6 +2283,62 @@ function getLeadJobs() {
         'stuck'       => $stuck ?: [],
         'recent_done' => $recentDone ?: [],
     ]);
+}
+
+/**
+ * Cron status dashboard data.
+ *
+ * Returns one entry per cron job_name with:
+ *  - latest run (status, started_at, finished_at, items_processed, error)
+ *  - 24h success / failure counts
+ *  - most recent failure (if any) for quick visibility
+ */
+function getCronRuns() {
+    global $sb;
+    if (!isOwner()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Owner only']);
+        return;
+    }
+
+    $rows = $sb->select(
+        'cron_runs',
+        'id,job_name,started_at,finished_at,status,error,items_processed',
+        [],
+        'started_at.desc',
+        500
+    );
+    if (!is_array($rows)) $rows = [];
+
+    $now = time();
+    $cutoff24h = $now - 86400;
+    $byJob = [];
+
+    foreach ($rows as $r) {
+        $name = $r['job_name'] ?? '';
+        if ($name === '') continue;
+        if (!isset($byJob[$name])) {
+            $byJob[$name] = [
+                'name' => $name,
+                'latest' => $r,
+                'last_failure' => null,
+                'success_24h' => 0,
+                'failure_24h' => 0,
+                'running_24h' => 0,
+            ];
+        }
+        $ts = strtotime($r['started_at'] ?? '');
+        if ($ts && $ts >= $cutoff24h) {
+            if ($r['status'] === 'success') $byJob[$name]['success_24h']++;
+            elseif ($r['status'] === 'failed') $byJob[$name]['failure_24h']++;
+            elseif ($r['status'] === 'running') $byJob[$name]['running_24h']++;
+        }
+        if ($r['status'] === 'failed' && !$byJob[$name]['last_failure']) {
+            $byJob[$name]['last_failure'] = $r;
+        }
+    }
+
+    echo json_encode(array_values($byJob));
 }
 
 /**

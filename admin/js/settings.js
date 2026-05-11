@@ -157,7 +157,81 @@ function showSettingsTab(tab, event) {
         pane.style.display = pane.id === 'settingsTab-' + tab ? 'block' : 'none';
     });
     // Refresh on open for tabs whose data may be stale
-    if (tab === 'jobs') loadLeadJobs();
+    if (tab === 'jobs') {
+        loadCronJobs();
+        loadLeadJobs();
+    }
+}
+
+// ─── Cron jobs status ───────────────────────────────────────────────────────
+
+const CRON_JOB_LABELS = {
+    'process-lead-jobs':     { label: 'Lead processing jobs',  expectedEvery: '5 min' },
+    'process-sms-queue':     { label: 'SMS queue drain',       expectedEvery: '5 min' },
+    'process-followups':     { label: 'Stale-lead follow-ups', expectedEvery: '30 min' },
+    'process-tour-reminders':{ label: 'Tour reminders',        expectedEvery: '1 hr'  },
+};
+
+function cronAgeLabel(iso) {
+    if (!iso) return '—';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (isNaN(ms)) return iso;
+    const mins = Math.round(ms / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    return Math.round(hrs / 24) + 'd ago';
+}
+
+function renderCronCard(j) {
+    const cfg = CRON_JOB_LABELS[j.name] || { label: j.name, expectedEvery: null };
+    const latest = j.latest || {};
+    const status = latest.status || 'unknown';
+    const color = status === 'success' ? 'success' : status === 'failed' ? 'danger' : status === 'running' ? 'warning' : 'secondary';
+    const ranAt = cronAgeLabel(latest.started_at);
+    const items = latest.items_processed || 0;
+
+    let err = '';
+    if (j.last_failure && j.last_failure.error) {
+        err = `<div class="text-danger small mt-2" style="word-break:break-word"><strong>Last error:</strong> ${escapeJobsHtml(j.last_failure.error)} <span class="text-white-50">(${cronAgeLabel(j.last_failure.started_at)})</span></div>`;
+    }
+
+    return `
+        <div class="d-flex justify-content-between align-items-start py-3 border-bottom border-secondary">
+            <div style="min-width:0;flex:1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="fw-semibold text-white">${escapeJobsHtml(cfg.label)}</span>
+                    <span class="badge bg-${color}">${escapeJobsHtml(status)}</span>
+                </div>
+                <div class="text-white-50" style="font-size:0.8rem">
+                    Ran ${escapeJobsHtml(ranAt)}${items ? ' · ' + items + ' item' + (items === 1 ? '' : 's') + ' processed' : ''}${cfg.expectedEvery ? ' · expected every ' + cfg.expectedEvery : ''}
+                </div>
+                ${err}
+            </div>
+            <div class="text-end text-white-50" style="font-size:0.75rem;white-space:nowrap;padding-left:12px">
+                24h: <span class="text-success">${j.success_24h} ok</span> · <span class="text-danger">${j.failure_24h} fail</span>
+            </div>
+        </div>
+    `;
+}
+
+async function loadCronJobs() {
+    const body = document.getElementById('cronJobsBody');
+    if (!body) return;
+    try {
+        const res = await fetch('/api/admin-api.php?action=get_cron_runs');
+        const jobs = await res.json();
+        if (!Array.isArray(jobs) || jobs.length === 0) {
+            body.innerHTML = '<div class="text-white-50">No cron runs recorded yet. Once the next scheduled run fires, status will appear here.</div>';
+            return;
+        }
+        // Sort by job name for stable rendering
+        jobs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        body.innerHTML = jobs.map(renderCronCard).join('');
+    } catch (e) {
+        body.innerHTML = '<div class="text-danger">Failed to load cron status.</div>';
+    }
 }
 
 // ─── Lead-processing jobs tab ───────────────────────────────────────────────
@@ -282,4 +356,5 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
     loadOwnerRecipients();
     loadLeadJobs();
+    loadCronJobs();
 });

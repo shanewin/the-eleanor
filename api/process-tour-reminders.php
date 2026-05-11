@@ -8,6 +8,9 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/telnyx-sms.php';
+require_once __DIR__ . '/cron-helpers.php';
+
+cronRunStart('process-tour-reminders');
 
 // Calculate tomorrow's date range (Eastern time)
 $tz = new DateTimeZone('America/New_York');
@@ -60,6 +63,7 @@ foreach ($tours as $tour) {
     $result = sendSMS($phone, $message);
 
     if ($result['success']) {
+        cronRunIncItems(1);
         // Log the message
         $sb->insert('sms_messages', [
             'lead_phone'        => $phone,
