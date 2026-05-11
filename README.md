@@ -1,148 +1,169 @@
 # The Eleanor | Luxury Residences in Boerum Hill, Brooklyn
 
-The Eleanor is a luxury residential building at 52 4th Avenue, Brooklyn. This repository contains the marketing website, lead capture system, enrichment pipeline, and admin dashboard.
+The Eleanor is a luxury residential building at 52 4th Avenue, Brooklyn. This repository contains the marketing website, lead capture, enrichment pipeline, conversational SMS AI, and admin command center.
 
 ---
 
 ## Core Features
 
-- **Marketing Website**: Mobile-responsive landing page with smooth animations, video background, image sliders, neighborhood guide, and unit availability browser.
-- **Lead Capture**: Waitlist form, unit interest popup, and mailing list — all with real-time behavioral tracking (sections viewed, buttons clicked, time spent).
-- **Lead Enrichment Pipeline**: Chains FullContact, Apollo.io, and a LinkedIn scraper to build rich prospect profiles from just a name, personal email, and phone number.
-- **Admin Dashboard**: Lead management with A+ to F grading, enrichment data, behavioral journey timeline, and AI-generated prospect summaries.
-- **Email Notifications**: SMTP delivery via Hostinger for form submissions and enrichment profiles.
-
-
-
-## Tech Stack
-
-- **Backend**: PHP 8+, MySQL (PDO)
-- **Frontend**: Vanilla JS (ES6+), CSS3 (Glassmorphism), Bootstrap 5, Swiper.js
-- **APIs**:
-  - **FullContact**: Identity resolution from email + phone + name. Discovers work emails for personal email leads.
-  - **Apollo.io**: Professional enrichment by email. Returns job title, company, firmographics, LinkedIn URL.
-  - **Fresh LinkedIn Profile Data (RapidAPI)**: Scrapes live LinkedIn data. Used as the final source of truth for title, company, photo, and location.
-  - **Anthropic Claude**: On-demand AI prospect summaries in the admin dashboard.
+- **Marketing Website** — mobile-responsive landing page with video background, image sliders, neighborhood guide, and live unit availability.
+- **Lead Capture** — waitlist form, unit interest popup, and mailing list, all with behavioral tracking (sections viewed, buttons clicked, time on page).
+- **Enrichment Pipeline** — pairs Apollo.io and a LinkedIn scraper to build rich prospect profiles from a name + email + phone.
+- **Conversational SMS AI** — Claude-powered two-way SMS over Telnyx that greets every new lead, qualifies them, and books tours autonomously. Tool use covers `check_tour_availability`, `book_tour`, `reschedule_tour`, and `cancel_tour`.
+- **Tour Calendar** — integrates with each broker's Google Calendar (OAuth + FreeBusy + event creation). Falls back to default availability when a broker hasn't connected a calendar.
+- **Admin Command Center** — owner/broker accounts (Supabase auth), unified CRM timeline, conversation panel with AI handoff, A+ to F lead grading, real-time notifications + unread badges, and a settings panel for SMS automation rules.
+- **Notifications** — every owner-role account receives email alerts on new leads, enrichment reports, and tour scheduling events.
 
 ---
 
-## Enrichment Pipeline
+## Tech Stack
 
-The system chains three services to accurately identify leads, even when they submit personal emails:
+- **Backend**: PHP 8+ (Supabase REST via PHP cURL — no local SQL server)
+- **Frontend**: Vanilla JS (ES6+), Bootstrap 5, Swiper.js
+- **Data**: Supabase (Postgres + Auth)
+- **External services**:
+  - **Anthropic Claude** — SMS conversation engine (tool use) and on-demand prospect summaries
+  - **Telnyx** — inbound + outbound SMS, signed webhooks (Ed25519)
+  - **Google Calendar API** — broker calendar integration (OAuth 2.0)
+  - **Apollo.io** — professional enrichment by email (job title, company, LinkedIn URL)
+  - **Fresh LinkedIn Profile Data (RapidAPI)** — live LinkedIn scrape used as the source of truth for title, company, photo, location
+  - **Hostinger SMTP** — transactional email delivery
+
+---
+
+## SMS AI Flow
 
 ```
-Form Submission (name + email + phone)
+Lead submits waitlist form
         │
         ▼
-   FullContact ──→ Identifies person, discovers work email
+   Welcome SMS (Claude-generated, personalized)
         │
         ▼
-     Apollo ──→ Matches on work email for professional profile + LinkedIn URL
+   Lead replies ──→ telnyx-webhook.php
         │
         ▼
-  LinkedIn Scraper ──→ Fetches live profile data (source of truth)
+   Claude + tools  ←──┐
+        │             │ (multi-loop tool use)
+        ▼             │
+   AI reply ──────────┘
         │
         ▼
-   Database ──→ Stores enriched data, triggers email notification
+   Books tour →  tour_requests + Google Calendar event +
+                 SMS confirmation to lead +
+                 email to owners & assigned broker
 ```
 
-- **Corporate email** (e.g. `name@company.com`): Apollo matches directly. FullContact and LinkedIn scraper enhance the data.
-- **Personal email** (e.g. `name@gmail.com`): FullContact resolves identity via phone + name, finds work email. Apollo matches on work email. LinkedIn scraper provides fresh data.
-- **No match found**: Lead is saved with submitted form data only. No incorrect guesses.
+Messages received outside the configured send window are queued (`process-sms-queue.php`, cron every 5 min) and replied to when the window opens. If the AI detects frustration or an explicit ask for a human, it appends `[HANDOFF]`, pauses automation, and notifies the assigned broker.
 
 ---
 
 ## Project Structure
 
 ```
-├── admin/                # Admin dashboard
-│   ├── index.php         # Lead management interface
-│   ├── login.php         # Password login
-│   ├── auth.php          # Session authentication
-│   └── admin.css         # Dashboard styles
-├── api/                  # Backend API
-│   ├── config.php        # API keys and constants (not in git)
-│   ├── config.example.php# Template for config.php
-│   ├── db_config.php     # Database connection (not in git)
-│   ├── db_config.example.php
-│   ├── enrichment.php    # Enrichment pipeline (FullContact → Apollo → LinkedIn)
-│   ├── smtp-mail.php     # SMTP email sender
-│   ├── form-handler.php  # Waitlist form handler
-│   ├── unit-interest.php # Unit inquiry handler
-│   ├── email-list.php    # Mailing list handler
-│   ├── track.php         # Behavioral tracking endpoint
-│   ├── admin-api.php     # Admin dashboard API
-│   ├── ai-summary.php    # Claude AI prospect summaries
-│   ├── apollo-webhook.php# Apollo webhook receiver
-│   ├── setup_db.sql      # Database schema
-│   └── .htaccess         # Protects config files from public access
-├── assets/floor-plans/   # Unit floor plan images
-├── css/                  # Stylesheets
-├── js/                   # Frontend scripts
-├── img/                  # Site images
-├── video/                # Background video
-└── index.php             # Main site (password-gated)
+├── admin/                      # Admin command center (broker login)
+│   ├── index.php               # Overview dashboard
+│   ├── leads.php               # Lead list + filters
+│   ├── lead.php                # Lead detail / unified timeline
+│   ├── communications.php      # SMS + email conversation panel
+│   ├── calendar.php            # Tour calendar (drag-to-schedule)
+│   ├── brokers.php             # Broker/owner management (owner only)
+│   ├── profile.php             # My profile + Google Calendar connect
+│   ├── settings.php            # SMS window, AI prompts, jobs
+│   ├── login.php               # Supabase email/password login
+│   └── auth.php                # Session + Supabase auth helpers
+├── api/
+│   ├── config.php              # API keys & constants (gitignored)
+│   ├── db_config.php           # Supabase REST client
+│   ├── form-handler.php        # Waitlist submissions
+│   ├── form-processor.php      # Async lead enrichment + welcome SMS
+│   ├── unit-interest.php       # Unit inquiry popup
+│   ├── email-list.php          # Mailing list signup
+│   ├── track.php               # Behavioral tracking endpoint
+│   ├── enrichment.php          # Apollo → LinkedIn pipeline + report email
+│   ├── apollo-webhook.php      # Apollo webhook receiver
+│   ├── telnyx-sms.php          # Outbound SMS helper
+│   ├── telnyx-webhook.php      # Inbound SMS webhook (Ed25519 verified)
+│   ├── sms-ai.php              # Claude conversation engine + calendar tools
+│   ├── google-calendar.php     # OAuth tokens + FreeBusy + events
+│   ├── google-calendar-auth.php# OAuth callback
+│   ├── public-tours.php        # Public-facing tour booking page
+│   ├── admin-api.php           # Admin dashboard JSON API
+│   ├── ai-summary.php          # Claude prospect summaries
+│   ├── smtp-mail.php           # SMTP sender + notification helpers
+│   ├── job-runner.php          # Lead processing job pipeline
+│   ├── process-lead-jobs.php   # Cron: lead enrichment jobs
+│   ├── process-sms-queue.php   # Cron: replay queued inbound SMS
+│   ├── process-followups.php   # Cron: proactive AI follow-ups
+│   ├── process-tour-reminders.php # Cron: tour reminder SMS
+│   ├── cron-runner.php         # Cron entry point
+│   ├── get-csrf-token.php      # CSRF token issuance
+│   └── .htaccess               # Blocks config files from public access
+├── tours.php                   # Public tour booking page
+└── index.php                   # Marketing site (password-gated)
 ```
 
 ---
 
 ## Setup
 
-### 1. Database
+### 1. Supabase
 
-Create a MySQL database and import the schema:
+Create a Supabase project and apply the schema (see your project's Supabase dashboard for the existing tables: `waitlist_submissions`, `unit_inquiries`, `mailing_list`, `tracking_sessions`, `lead_enrichment`, `brokers`, `tour_requests`, `sms_messages`, `sms_automation`, `sms_queue`, `communications`, `notifications`, `lead_processing_jobs`, `settings`).
 
-```sql
-mysql -u username -p database_name < api/setup_db.sql
-```
-
-This creates 6 tables: `waitlist_submissions`, `unit_inquiries`, `mailing_list`, `tracking_sessions`, `activity_logs`, `lead_enrichment`.
+Create at least one user via Supabase Auth and a matching row in `brokers` with `role = 'owner'`.
 
 ### 2. Configuration
 
-Copy the example files and fill in your credentials:
-
 ```bash
 cp api/config.example.php api/config.php
-cp api/db_config.example.php api/db_config.php
 ```
 
-**`api/config.php`** requires:
-| Constant | Description |
-|---|---|
-| `FULLCONTACT_API_KEY` | FullContact API key for identity resolution |
-| `APOLLO_API_KEY` | Apollo.io API key for professional enrichment |
-| `RAPIDAPI_KEY` | RapidAPI key for LinkedIn scraper |
-| `ANTHROPIC_API_KEY` | Anthropic API key for AI summaries |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | SMTP credentials for email delivery |
-| `NOTIFICATION_EMAIL` | Email address to receive lead notifications |
-| `ADMIN_PASSWORD_HASH` | Admin dashboard password |
-| `PREVIEW_PASSWORD` | Frontend preview gate password |
+`api/config.php` requires:
 
-**`api/db_config.php`** requires: `$db_host`, `$db_name`, `$db_user`, `$db_pass`
+| Constant | Purpose |
+|---|---|
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_ANON_KEY` | Supabase project |
+| `ANTHROPIC_API_KEY` | Claude API (SMS AI + summaries) |
+| `TELNYX_API_KEY`, `TELNYX_FROM_NUMBER`, `TELNYX_PUBLIC_KEY` | SMS send + webhook verification |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Broker calendar OAuth |
+| `APOLLO_API_KEY`, `RAPIDAPI_KEY` | Enrichment |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Hostinger SMTP |
+| `PREVIEW_PASSWORD` | Marketing-site gate |
+| `NOTIFICATION_EMAIL` | *Fallback only* — used if no `role='owner'` accounts exist yet |
 
 ### 3. Deployment (Hostinger)
 
-1. Connect the GitHub repo via **Advanced → Git** in hPanel
-2. Click **Deploy** to pull files to `public_html`
-3. Create `api/config.php` and `api/db_config.php` manually on the server (they are gitignored)
-4. Import `api/setup_db.sql` via phpMyAdmin
+1. Connect the repo via **Advanced → Git** in hPanel and deploy.
+2. Create `api/config.php` on the server (gitignored).
+3. In hPanel **PHP Configuration → Extensions**, enable `sodium` so Telnyx webhook signatures verify. The webhook auto-skips verification if the extension is missing, but enabling it closes the spoof window.
+4. Point your Telnyx Messaging Profile webhook to `https://<domain>/api/telnyx-webhook.php` (API v2).
+5. In Google Cloud Console, add `https://<domain>/api/google-calendar-auth.php` as an OAuth redirect URI.
+6. Add cron jobs (every 5 min):
+   ```
+   php /home/.../api/process-lead-jobs.php
+   php /home/.../api/process-sms-queue.php
+   php /home/.../api/process-followups.php
+   php /home/.../api/process-tour-reminders.php
+   ```
 
 ### 4. Verify
 
-- Visit the site URL — should show the password gate
-- Submit a test waitlist entry — check email delivery and admin dashboard
-- Visit `/admin/` — log in and verify lead data
+- Visit `/admin/` → log in with a Supabase user
+- Submit a test waitlist entry → verify enrichment email + welcome SMS
+- Text the Telnyx number → AI should reply within ~5–15 seconds
+- Book a tour through the SMS conversation → check `tour_requests` and email alerts
 
 ---
 
 ## Security
 
-- **Config files** (`config.php`, `db_config.php`) are gitignored and protected by `.htaccess`
-- **CSRF tokens** protect all form submissions
-- **Password gate** on the public site and admin dashboard
-- **No test/debug endpoints** in production
-- **SQL files** blocked from public access
+- `config.php` is gitignored and blocked via `.htaccess`
+- Supabase Auth gates the admin dashboard (no shared password)
+- CSRF tokens on every form submission
+- Telnyx webhooks are Ed25519-signed and verified when the PHP `sodium` extension is available
+- Owner-only routes server-side check `isOwner()` independent of the UI
+- Public marketing site is gated by `PREVIEW_PASSWORD` while in pre-launch
 
 ---
 
