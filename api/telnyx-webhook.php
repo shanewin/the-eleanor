@@ -128,6 +128,17 @@ if ($eventType === 'message.received') {
 function handleInboundSMS($payload) {
     global $sb;
 
+    // TEMP: trace entry to handler
+    @$sb->insert('communications', [
+        'lead_email' => 'webhook-debug@local',
+        'direction'  => 'internal',
+        'channel'    => 'note',
+        'subject'    => 'Webhook trace: handleInboundSMS ENTER',
+        'body'       => 'from=' . ($payload['from']['phone_number'] ?? '?') . ' text=' . substr($payload['text'] ?? '', 0, 100),
+        'sender'     => 'Telnyx Webhook Debug',
+        'status'     => 'system'
+    ]);
+
     $fromPhone = $payload['from']['phone_number'] ?? '';
     $toPhone   = $payload['to'][0]['phone_number'] ?? ($payload['to']['phone_number'] ?? '');
     $text      = $payload['text'] ?? '';
@@ -205,7 +216,20 @@ function handleInboundSMS($payload) {
     }
 
     // Generate and send AI response
+    $aiStart = microtime(true);
     $reply = generateAIResponse($normalizedPhone, $text);
+    $aiElapsed = round(microtime(true) - $aiStart, 2);
+
+    // TEMP: capture AI result state to DB for diagnosis
+    @$sb->insert('communications', [
+        'lead_email' => $leadEmail ?: 'webhook-debug@local',
+        'direction'  => 'internal',
+        'channel'    => 'note',
+        'subject'    => 'AI debug: reply=' . ($reply ? 'text(' . strlen($reply) . ')' : 'NULL') . ' in ' . $aiElapsed . 's',
+        'body'       => $reply ? substr($reply, 0, 500) : 'generateAIResponse returned null/empty',
+        'sender'     => 'Telnyx Webhook Debug',
+        'status'     => 'system'
+    ]);
 
     if ($reply) {
         // Check for handoff/not-interested tags
