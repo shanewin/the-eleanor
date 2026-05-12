@@ -207,6 +207,61 @@ function calculateLeadGrade(lead) {
     return { score: totalScore, letter, insights, missed, gradeClass };
 }
 
+// ── Grade Breakdown Card ──
+function renderGradeBreakdown(gradeInfo) {
+    let html = '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">';
+
+    // Header with score
+    html += '<div class="d-flex justify-content-between align-items-center mb-3">'
+        + '<div>'
+        + '<h6 class="text-white-50 text-uppercase fw-semibold mb-0" style="font-size:0.7rem;letter-spacing:0.1em">'
+        + '<i class="bi bi-graph-up-arrow me-1 text-info"></i>Grade Breakdown'
+        + '</h6>'
+        + '<small class="text-white-50">Why this lead got a ' + esc(gradeInfo.letter) + '</small>'
+        + '</div>'
+        + '<div class="d-flex align-items-center gap-2">'
+        + '<span class="grade-pill ' + esc(gradeInfo.gradeClass) + '" style="width:48px;height:48px;font-size:1.2rem">' + esc(gradeInfo.letter) + '</span>'
+        + '<span class="text-white-50 fw-semibold" style="font-size:0.95rem">' + gradeInfo.score + '/100</span>'
+        + '</div>'
+        + '</div>';
+
+    // Earned signals
+    if (gradeInfo.insights.length > 0) {
+        html += '<div class="mb-3"><div class="small fw-semibold text-success mb-2"><i class="bi bi-check2-circle me-1"></i>Earned</div>';
+        gradeInfo.insights.forEach(i => {
+            const sign = i.points > 0 ? '+' : '';
+            const color = i.points > 0 ? 'text-success' : (i.points < 0 ? 'text-danger' : 'text-white-50');
+            html += '<div class="rounded-3 p-2 mb-2" style="background:rgba(255,255,255,0.03)">'
+                + '<div class="d-flex justify-content-between align-items-center mb-1">'
+                + '<span class="text-white" style="font-size:0.85rem">' + i.icon + ' ' + esc(i.label) + '</span>'
+                + '<span class="' + color + ' fw-semibold" style="font-size:0.85rem">' + sign + i.points + '</span>'
+                + '</div>'
+                + (i.reason ? '<div class="text-white-50" style="font-size:0.75rem;line-height:1.5">' + esc(i.reason) + '</div>' : '')
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Missed opportunities
+    if (gradeInfo.missed && gradeInfo.missed.length > 0) {
+        html += '<div><div class="small fw-semibold text-white-50 mb-2"><i class="bi bi-dash-circle me-1"></i>Missed Opportunities</div>';
+        gradeInfo.missed.forEach(m => {
+            html += '<div class="rounded-3 p-2 mb-2" style="background:rgba(255,255,255,0.02);border-left:2px solid rgba(255,255,255,0.08)">'
+                + '<div class="text-white-50" style="font-size:0.8rem">' + esc(m.label) + '</div>'
+                + (m.reason ? '<div class="text-white-50" style="font-size:0.72rem;line-height:1.5;opacity:0.7;margin-top:2px">' + esc(m.reason) + '</div>' : '')
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    if (gradeInfo.insights.length === 0 && (!gradeInfo.missed || gradeInfo.missed.length === 0)) {
+        html += '<div class="text-white-50 text-center" style="font-size:0.85rem">No scoring signals available</div>';
+    }
+
+    html += '</div></div>';
+    return html;
+}
+
 // ── Clipboard ──
 function copyToClipboard(text, btn) {
     navigator.clipboard.writeText(text).then(() => {

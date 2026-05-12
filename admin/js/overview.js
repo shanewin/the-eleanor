@@ -311,6 +311,7 @@ function renderLeadProfile(intel, logs, container, isPanel) {
         + '</div>'
         + socialLinks
         + '<div class="mx-auto mt-4" style="max-width:600px">'
+            + renderGradeBreakdown(gradeInfo)
             + '<div class="accordion" id="submissionAccordion">'
             + '<div class="accordion-item bg-body-tertiary border-0">'
             + '<h2 class="accordion-header">'
