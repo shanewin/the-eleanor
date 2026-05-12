@@ -1,12 +1,23 @@
 <?php
-$pageTitle = 'My Profile';
+$targetBrokerId = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$pageTitle = $targetBrokerId ? 'Broker Profile' : 'My Profile';
 $activePage = 'profile';
 $extraJs = ['/admin/js/profile.js'];
 include __DIR__ . '/includes/layout-header.php';
 ?>
 
+<script>
+    // Set before profile.js loads so the page can pick up the target broker.
+    window.PROFILE_TARGET_ID = <?= $targetBrokerId ? (int)$targetBrokerId : 'null' ?>;
+</script>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 fw-bold mb-0">My Profile</h1>
+    <div class="d-flex align-items-center gap-3">
+        <a href="/admin/brokers.php" id="profileBackLink" class="btn btn-sm btn-outline-secondary" style="display:none" title="Back to brokers">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="h3 fw-bold mb-0" id="profileHeading"><?= $targetBrokerId ? 'Broker Profile' : 'My Profile' ?></h1>
+    </div>
     <button class="btn btn-primary" onclick="saveProfile()" id="profileSaveBtn">
         <i class="bi bi-check-lg me-1"></i>Save Changes
     </button>

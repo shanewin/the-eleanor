@@ -2,6 +2,10 @@
 
 let profileData = null;
 
+// When set, profile.php was loaded as /admin/profile.php?id=N. The backend
+// decides whether the current user is allowed to edit; the UI just reflects it.
+const PROFILE_TARGET_ID = (typeof window !== 'undefined' && window.PROFILE_TARGET_ID) ? window.PROFILE_TARGET_ID : null;
+
 // ── Avatar Helpers ──
 const AVATAR_COLORS = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444'];
 
@@ -44,7 +48,8 @@ document.querySelectorAll('.avail-day-btn').forEach(btn => {
 // ── Load Profile ──
 async function loadProfile() {
     try {
-        const res = await fetch(API + '?action=get_my_profile');
+        const url = API + '?action=get_my_profile' + (PROFILE_TARGET_ID ? '&id=' + PROFILE_TARGET_ID : '');
+        const res = await fetch(url);
         const data = await res.json();
         if (data.error) {
             showProfileAlert('Could not load profile: ' + data.error, 'danger');
@@ -52,9 +57,52 @@ async function loadProfile() {
         }
         profileData = data;
         populateForm(data);
+        applyAccessMode(data);
     } catch (err) {
         showProfileAlert('Connection error loading profile.', 'danger');
     }
+}
+
+// Reflect the backend's permission decision in the UI: read-only when the
+// viewer can't edit; hide self-only controls (avatar upload, GCal connect)
+// when viewing someone else.
+function applyAccessMode(data) {
+    const isSelf = !!data.is_self;
+    const canEdit = !!data.can_edit;
+
+    // Header + back link when viewing someone else
+    const heading = document.getElementById('profileHeading');
+    const back = document.getElementById('profileBackLink');
+    if (!isSelf) {
+        if (heading) heading.textContent = (data.name || 'Broker') + "'s Profile";
+        if (back) back.style.display = '';
+    } else {
+        if (heading) heading.textContent = 'My Profile';
+        if (back) back.style.display = 'none';
+    }
+
+    // Lock form when not editable
+    const formIds = ['profileName','profileTitle','profilePhone','profileLicense','profileCompany','profileBio','profilePreferredContact','profileAvailStart','profileAvailEnd'];
+    formIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !canEdit;
+    });
+    document.querySelectorAll('.avail-day-btn').forEach(btn => {
+        btn.style.pointerEvents = canEdit ? '' : 'none';
+        btn.style.opacity = canEdit ? '' : '0.7';
+    });
+
+    const saveBtn = document.getElementById('profileSaveBtn');
+    if (saveBtn) saveBtn.style.display = canEdit ? '' : 'none';
+
+    // Avatar upload + Google Calendar are self-only (OAuth flow + photo upload
+    // require the broker's own browser session).
+    const avatarUpload = document.getElementById('profilePictureInput');
+    if (avatarUpload) avatarUpload.disabled = !isSelf;
+    const avatarLabel = avatarUpload ? avatarUpload.closest('label') : null;
+    if (avatarLabel) avatarLabel.style.display = isSelf ? '' : 'none';
+    const removeBtn = document.getElementById('removeAvatarBtn');
+    if (removeBtn && !isSelf) removeBtn.style.display = 'none';
 }
 
 function populateForm(data) {
@@ -94,22 +142,30 @@ function populateForm(data) {
 
 function renderGcalStatus(data) {
     const container = document.getElementById('gcalStatus');
+    const isSelf = !!data.is_self;
     if (data.google_calendar_connected) {
+        // Owner-only disconnect for someone else is supported by the API, but
+        // we surface it only on self for now to avoid surprising the broker.
+        const action = isSelf
+            ? '<button class="btn btn-sm btn-outline-danger" onclick="disconnectGoogleCalendar()"><i class="bi bi-x-circle me-1"></i>Disconnect</button>'
+            : '';
         container.innerHTML = `
             <div class="d-flex align-items-center gap-2 mb-2">
                 <span class="badge bg-success bg-opacity-25 text-success">Connected</span>
             </div>
-            <div class="small text-white-50 mb-3">${esc(data.google_calendar_email)}</div>
-            <button class="btn btn-sm btn-outline-danger" onclick="disconnectGoogleCalendar()">
-                <i class="bi bi-x-circle me-1"></i>Disconnect
-            </button>
+            <div class="small text-white-50 mb-3">${esc(data.google_calendar_email || '')}</div>
+            ${action}
         `;
-    } else {
+    } else if (isSelf) {
         container.innerHTML = `
             <div class="small text-white-50 mb-3">Connect your Google Calendar to share your availability for tour scheduling.</div>
             <button class="btn btn-sm btn-primary" onclick="connectGoogleCalendar()">
                 <i class="bi bi-google me-1"></i>Connect Google Calendar
             </button>
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="small text-white-50">Not connected. Only this broker can connect their own Google account.</div>
         `;
     }
 }
@@ -135,6 +191,7 @@ async function saveProfile() {
         default_availability_end: document.getElementById('profileAvailEnd').value,
         default_availability_days: activeDays
     };
+    if (PROFILE_TARGET_ID) payload.id = PROFILE_TARGET_ID;
 
     if (!payload.name) {
         showProfileAlert('Name is required.', 'danger');

@@ -2353,29 +2353,57 @@ function getCurrentBroker() {
 }
 
 function getMyProfile() {
-    $broker = getCurrentBroker();
+    global $sb;
+    $current = getCurrentBroker();
+    if (!$current) {
+        echo json_encode(['error' => 'Profile not found']);
+        return;
+    }
+
+    // Optional ?id=N lets other admins view a broker's profile read-only.
+    // Self is always allowed; non-self requires being signed in as a broker.
+    $targetId = isset($_GET['id']) ? intval($_GET['id']) : intval($current['id']);
+    $isSelf = ($targetId === intval($current['id']));
+
+    $broker = $isSelf
+        ? $current
+        : $sb->selectOne('brokers', '*', ['id=eq.' . $targetId]);
     if (!$broker) {
         echo json_encode(['error' => 'Profile not found']);
         return;
     }
-    // Parse JSONB fields
+
     if (is_string($broker['default_availability_days'])) {
         $broker['default_availability_days'] = json_decode($broker['default_availability_days'], true);
     }
     // Never expose tokens to frontend
     unset($broker['google_calendar_token']);
+
+    // Tell the UI whether the viewer is allowed to edit this profile.
+    $broker['is_self'] = $isSelf;
+    $broker['can_edit'] = ($isSelf || isOwner());
+
     echo json_encode($broker);
 }
 
 function updateMyProfile() {
     global $sb;
-    $broker = getCurrentBroker();
-    if (!$broker) {
+    $current = getCurrentBroker();
+    if (!$current) {
         echo json_encode(['error' => 'Profile not found']);
         return;
     }
 
     $input = json_decode(file_get_contents('php://input'), true);
+    $targetId = isset($input['id']) ? intval($input['id']) : intval($current['id']);
+    $isSelf = ($targetId === intval($current['id']));
+
+    if (!$isSelf && !isOwner()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Only owners can edit another broker.']);
+        return;
+    }
+
     $allowed = ['name', 'title', 'phone', 'license_number', 'company', 'bio', 'preferred_contact', 'default_availability_start', 'default_availability_end', 'default_availability_days'];
 
     $data = [];
@@ -2395,23 +2423,32 @@ function updateMyProfile() {
         $data['default_availability_days'] = json_encode($data['default_availability_days']);
     }
 
-    $sb->update('brokers', $data, ['id=eq.' . $broker['id']]);
+    $sb->update('brokers', $data, ['id=eq.' . $targetId]);
 
-    // Clear cached role in case name changed
-    unset($_SESSION['user_role']);
+    // Clear cached role in case name changed (only relevant for self)
+    if ($isSelf) unset($_SESSION['user_role']);
 
     echo json_encode(['success' => true]);
 }
 
 function uploadProfilePicture() {
     global $sb;
-    $broker = getCurrentBroker();
-    if (!$broker) {
+    $current = getCurrentBroker();
+    if (!$current) {
         echo json_encode(['error' => 'Profile not found']);
         return;
     }
 
     $input = json_decode(file_get_contents('php://input'), true);
+    $targetId = isset($input['id']) ? intval($input['id']) : intval($current['id']);
+    $isSelf = ($targetId === intval($current['id']));
+
+    if (!$isSelf && !isOwner()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Only owners can change another broker\'s photo.']);
+        return;
+    }
+
     $image = $input['image'] ?? null;
 
     // Validate base64 if provided
@@ -2420,7 +2457,7 @@ function uploadProfilePicture() {
         return;
     }
 
-    $sb->update('brokers', ['profile_picture' => $image], ['id=eq.' . $broker['id']]);
+    $sb->update('brokers', ['profile_picture' => $image], ['id=eq.' . $targetId]);
     echo json_encode(['success' => true]);
 }
 

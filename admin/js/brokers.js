@@ -94,8 +94,9 @@ function renderBrokersTable(brokers) {
             + '<td>' + gcalCell + '</td>'
             + '<td>' + summarizeAvailability(broker) + '</td>'
             + '<td class="text-end">'
-            + '<button class="btn btn-sm btn-outline-primary me-1" onclick="showBrokerModal(' + esc(String(broker.id)) + ')"><i class="bi bi-pencil"></i></button>'
-            + '<button class="btn btn-sm btn-outline-danger" onclick="deleteBroker(' + esc(String(broker.id)) + ')"><i class="bi bi-trash"></i></button>'
+            + '<a class="btn btn-sm btn-outline-secondary me-1" href="/admin/profile.php?id=' + encodeURIComponent(broker.id) + '" title="View profile"><i class="bi bi-person"></i></a>'
+            + '<button class="btn btn-sm btn-outline-primary me-1" onclick="showBrokerModal(' + esc(String(broker.id)) + ')" title="Quick edit"><i class="bi bi-pencil"></i></button>'
+            + '<button class="btn btn-sm btn-outline-danger" onclick="deleteBroker(' + esc(String(broker.id)) + ')" title="Delete"><i class="bi bi-trash"></i></button>'
             + '</td>';
         tbody.appendChild(row);
     });
