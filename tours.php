@@ -28,6 +28,59 @@
             <div class="tours-address">52 4th Avenue, Brooklyn, New York</div>
         </header>
 
+        <!-- Editorial gallery: a structured asymmetric grid of life inside The Eleanor. -->
+        <section class="tours-gallery" aria-label="Inside The Eleanor">
+            <div class="tours-gallery-eyebrow">
+                <span class="tours-gallery-rule"></span>
+                <span class="tours-gallery-label">A Look Inside</span>
+                <span class="tours-gallery-rule"></span>
+            </div>
+            <div class="tours-gallery-grid">
+                <figure class="tg-tile tg-tile--hero">
+                    <img src="img/slider-pics/skyline_living.jpg" alt="Skyline Living at The Eleanor" loading="lazy">
+                    <figcaption>
+                        <span class="tg-num">01</span>
+                        <span class="tg-name">Skyline Living</span>
+                    </figcaption>
+                </figure>
+                <figure class="tg-tile tg-tile--bedroom">
+                    <img src="img/slider-pics/skyline_bedroom.jpg" alt="Skyline Bedroom at The Eleanor" loading="lazy">
+                    <figcaption>
+                        <span class="tg-num">02</span>
+                        <span class="tg-name">Skyline Bedroom</span>
+                    </figcaption>
+                </figure>
+                <figure class="tg-tile tg-tile--library">
+                    <img src="img/slider-pics/residents_library.jpg" alt="The Library at The Eleanor" loading="lazy">
+                    <figcaption>
+                        <span class="tg-num">03</span>
+                        <span class="tg-name">The Library</span>
+                    </figcaption>
+                </figure>
+                <figure class="tg-tile tg-tile--openplan">
+                    <img src="img/slider-pics/open_plan_living.jpg" alt="Open Plan Living at The Eleanor" loading="lazy">
+                    <figcaption>
+                        <span class="tg-num">04</span>
+                        <span class="tg-name">Open Plan Living</span>
+                    </figcaption>
+                </figure>
+                <figure class="tg-tile tg-tile--courtyard">
+                    <img src="img/slider-pics/garden_courtyard.jpg" alt="The Courtyard at The Eleanor" loading="lazy">
+                    <figcaption>
+                        <span class="tg-num">05</span>
+                        <span class="tg-name">The Courtyard</span>
+                    </figcaption>
+                </figure>
+                <figure class="tg-tile tg-tile--terrace">
+                    <img src="img/slider-pics/terrace_living.jpg" alt="Terrace Living at The Eleanor" loading="lazy">
+                    <figcaption>
+                        <span class="tg-num">06</span>
+                        <span class="tg-name">Terrace Living</span>
+                    </figcaption>
+                </figure>
+            </div>
+        </section>
+
         <section class="tours-hero">
             <h1>Schedule a Private Tour</h1>
             <p>Choose a date and time that works for you. A leasing agent will confirm your visit by text shortly after.</p>
@@ -120,5 +173,28 @@
     </main>
 
     <script src="/js/tours.js?v=<?php echo @filemtime(__DIR__ . '/js/tours.js'); ?>"></script>
+    <script>
+    // Gallery reveal: tiles fade up as they enter view, with a subtle stagger.
+    (function () {
+        const tiles = document.querySelectorAll('.tg-tile');
+        if (!tiles.length || !('IntersectionObserver' in window)) {
+            tiles.forEach(t => t.classList.add('is-in'));
+            return;
+        }
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            tiles.forEach(t => t.classList.add('is-in'));
+            return;
+        }
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((entry, i) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-in');
+                    io.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+        tiles.forEach(t => io.observe(t));
+    })();
+    </script>
 </body>
 </html>
