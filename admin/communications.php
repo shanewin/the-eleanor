@@ -71,6 +71,10 @@ include __DIR__ . '/includes/layout-header.php';
     <!-- Tour Banner (active or recent tour) -->
     <div id="tourBanner" style="display:none" class="mb-3"></div>
 
+    <!-- Latest internal note — elevated from the Internal Log so the most
+         recent system event is visible at a glance. -->
+    <div id="latestInternalNote" style="display:none" class="mb-3"></div>
+
     <!-- Form Submissions -->
     <div id="formSubmissionsCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
         <div class="card-body p-3">

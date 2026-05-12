@@ -344,6 +344,7 @@ function renderInternalLog(items) {
     const card = document.getElementById('internalLogCard');
     const list = document.getElementById('internalLogList');
     const countEl = document.getElementById('internalLogCount');
+    const latestEl = document.getElementById('latestInternalNote');
     if (!card || !list) return;
 
     const internalItems = items
@@ -352,7 +353,29 @@ function renderInternalLog(items) {
 
     if (!internalItems.length) {
         card.style.display = 'none';
+        if (latestEl) { latestEl.style.display = 'none'; latestEl.innerHTML = ''; }
         return;
+    }
+
+    // Surface the most recent internal note as a banner at the top.
+    if (latestEl) {
+        const latest = internalItems[0];
+        const dt = new Date(latest.created_at);
+        const time = dt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const subject = latest.subject || (latest.type === 'email' ? 'Email notification' : 'Note');
+        const body = latest.body ? '<div class="text-white-50 mt-1" style="font-size:0.82rem;line-height:1.45">' + esc(latest.body) + '</div>' : '';
+
+        latestEl.style.display = '';
+        latestEl.innerHTML = '<div class="d-flex align-items-start gap-3 p-3 rounded-3" style="border-left:3px solid #6b7280;background:rgba(107,114,128,0.08)">'
+            + '<i class="bi bi-bell-fill" style="color:#9ca3af;font-size:1.05rem;margin-top:1px"></i>'
+            + '<div class="flex-grow-1" style="min-width:0">'
+            + '<div class="d-flex justify-content-between align-items-baseline gap-2">'
+            + '<span class="fw-semibold text-white" style="font-size:0.9rem">' + esc(subject) + '</span>'
+            + '<span class="text-white-50" style="font-size:0.72rem;white-space:nowrap">' + esc(time) + '</span>'
+            + '</div>'
+            + body
+            + '</div>'
+            + '</div>';
     }
 
     card.style.display = '';
