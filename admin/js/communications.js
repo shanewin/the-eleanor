@@ -258,20 +258,21 @@ function renderNextPlanned(next, lead) {
 
     let skipBtn = '';
     if (next.skip_action === 'skip_followups') {
-        skipBtn = '<button class="btn btn-sm btn-outline-light" onclick="skipFollowups()">Skip follow-ups</button>';
+        skipBtn = '<button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size:0.72rem" onclick="skipFollowups()">Skip</button>';
     } else if (next.skip_action === 'skip_tour_reminder') {
-        skipBtn = '<button class="btn btn-sm btn-outline-light" onclick="skipTourReminder(' + (next.skip_target || 'null') + ')">Skip reminder</button>';
+        skipBtn = '<button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size:0.72rem" onclick="skipTourReminder(' + (next.skip_target || 'null') + ')">Skip</button>';
     }
 
     el.style.display = '';
-    el.innerHTML = '<div class="d-flex align-items-start gap-3 p-3 rounded-3" style="border-left:3px solid ' + p.border + ';background:' + p.bg + '">'
-        + '<i class="bi ' + p.icon + '" style="color:' + p.color + ';font-size:1.3rem;margin-top:2px"></i>'
-        + '<div class="flex-grow-1" style="min-width:0">'
-        + '<div style="font-size:0.7rem;color:' + p.color + ';font-weight:700;letter-spacing:0.1em">UP NEXT</div>'
-        + '<div class="fw-semibold text-white" style="font-size:0.95rem">' + esc(next.label) + (whenStr ? ' — <span class="text-white-50 fw-normal">' + esc(whenStr) + '</span>' : '') + '</div>'
-        + (next.detail ? '<div class="text-white-50 mt-1" style="font-size:0.8rem;line-height:1.4">' + esc(next.detail) + '</div>' : '')
+    el.innerHTML = '<div class="d-flex align-items-center gap-2 px-3 py-2" style="border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);background:' + p.bg + '">'
+        + '<i class="bi ' + p.icon + '" style="color:' + p.color + ';font-size:0.95rem"></i>'
+        + '<div class="flex-grow-1" style="min-width:0;line-height:1.35">'
+        + '<span style="font-size:0.62rem;color:' + p.color + ';font-weight:700;letter-spacing:0.1em">UP NEXT · </span>'
+        + '<span class="text-white" style="font-size:0.78rem;font-weight:500">' + esc(next.label) + '</span>'
+        + (whenStr ? '<span class="text-white-50" style="font-size:0.75rem"> · ' + esc(whenStr) + '</span>' : '')
+        + (next.detail ? '<div class="text-white-50" style="font-size:0.72rem">' + esc(next.detail) + '</div>' : '')
         + '</div>'
-        + (skipBtn ? '<div style="align-self:center">' + skipBtn + '</div>' : '')
+        + skipBtn
         + '</div>';
 }
 

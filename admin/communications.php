@@ -75,9 +75,6 @@ include __DIR__ . '/includes/layout-header.php';
          recent system event is visible at a glance. -->
     <div id="latestInternalNote" style="display:none" class="mb-3"></div>
 
-    <!-- Up next — what the automation will send next for this lead, with a one-click skip. -->
-    <div id="nextPlannedCard" style="display:none" class="mb-3"></div>
-
     <!-- Form Submissions -->
     <div id="formSubmissionsCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
         <div class="card-body p-3">
@@ -97,6 +94,8 @@ include __DIR__ . '/includes/layout-header.php';
                     </div>
                     <small class="text-white-50" id="smsThreadCount"></small>
                 </div>
+                <!-- Up next — what the SMS automation will send next, with a one-click skip. -->
+                <div id="nextPlannedCard" style="display:none"></div>
                 <div class="card-body p-3 flex-grow-1" id="smsThreadContainer" style="overflow-y:auto;max-height:calc(100vh - 480px);min-height:300px">
                     <div class="text-center text-body-tertiary py-4 small">Loading...</div>
                 </div>
