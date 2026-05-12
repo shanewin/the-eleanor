@@ -345,20 +345,25 @@ function renderFormSubmissions(submissions) {
 
     card.style.display = '';
 
-    list.innerHTML = submissions.map(s => {
+    // First three fields stay visible as a preview; the rest live behind "Show more".
+    const PREVIEW_COUNT = 3;
+
+    const renderRow = (f, raw) => {
+        const filled = raw !== null && raw !== undefined && String(raw).trim() !== '';
+        const valueHtml = filled
+            ? '<span class="text-white">' + esc(String(raw)) + '</span>'
+            : '<span class="text-white-50" style="opacity:0.5">—</span>';
+        return '<div class="row g-2 mb-1"><div class="col-4 small text-white-50">' + esc(f.label) + '</div><div class="col-8 small">' + valueHtml + '</div></div>';
+    };
+
+    list.innerHTML = submissions.map((s, idx) => {
         const dt = s.created_at ? new Date(s.created_at) : null;
         const timeStr = dt ? dt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Unknown time';
         const sourceColor = s.source === 'Waitlist' ? 'primary' : 'success';
 
-        // Show ALL fields — blanks render as a dim em-dash so the broker can see what wasn't filled in.
-        const fieldRows = SUBMISSION_FIELDS.map(f => {
-            const raw = s[f.key];
-            const filled = raw !== null && raw !== undefined && String(raw).trim() !== '';
-            const valueHtml = filled
-                ? '<span class="text-white">' + esc(String(raw)) + '</span>'
-                : '<span class="text-white-50" style="opacity:0.5">—</span>';
-            return '<div class="row g-2 mb-1"><div class="col-4 small text-white-50">' + esc(f.label) + '</div><div class="col-8 small">' + valueHtml + '</div></div>';
-        }).join('');
+        const preview = SUBMISSION_FIELDS.slice(0, PREVIEW_COUNT).map(f => renderRow(f, s[f.key])).join('');
+        const rest    = SUBMISSION_FIELDS.slice(PREVIEW_COUNT).map(f => renderRow(f, s[f.key])).join('');
+        const restId  = 'submissionRest-' + idx;
 
         return '<div class="border border-secondary rounded-3 p-3 mb-2" style="background:rgba(255,255,255,0.02)">'
             + '<div class="d-flex justify-content-between align-items-start mb-3">'
@@ -368,9 +373,22 @@ function renderFormSubmissions(submissions) {
             + '</div>'
             + '<span class="badge bg-' + sourceColor + ' bg-opacity-25 text-' + sourceColor + '" style="font-size:0.7rem">' + esc(s.source || '') + '</span>'
             + '</div>'
-            + fieldRows
+            + preview
+            + (rest
+                ? '<div id="' + restId + '" style="display:none">' + rest + '</div>'
+                  + '<button class="btn btn-link btn-sm text-info p-0 mt-2" style="font-size:0.78rem;text-decoration:none" onclick="toggleSubmissionRest(\'' + restId + '\', this)">'
+                  + '<i class="bi bi-chevron-down me-1"></i>Show more</button>'
+                : '')
             + '</div>';
     }).join('');
+}
+
+function toggleSubmissionRest(restId, btn) {
+    const el = document.getElementById(restId);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : '';
+    btn.innerHTML = (open ? '<i class="bi bi-chevron-down me-1"></i>Show more' : '<i class="bi bi-chevron-up me-1"></i>Show less');
 }
 
 // ── Conversation columns (SMS + Email) and Internal Log ──
