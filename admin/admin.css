@@ -401,6 +401,45 @@ th.sortable.active { color: #6366f1; }
 #showingsCalendar .fc-timegrid-bg-harness .fc-bg-event {
     opacity: 0.35 !important;
 }
+
+/* Busy-time chip in month view: small, broker-colored, distinguishable from
+   real tour events. Background uses the broker's color at low alpha; border
+   carries the saturated color so the broker is identifiable at a glance. */
+#showingsCalendar .fc-event-busy-chip {
+    opacity: 0.85;
+    cursor: default;
+}
+#showingsCalendar .fc-event-busy-chip:hover { opacity: 1; }
+#showingsCalendar .fc-event-busy-chip .fc-event-title { font-style: italic; font-weight: 500; }
+
+/* Openings mode: green slot chips. Click to prefill the new-showing modal. */
+#showingsCalendar .fc-event-open-slot {
+    cursor: pointer;
+    opacity: 0.9;
+    transition: opacity 0.1s, transform 0.1s;
+}
+#showingsCalendar .fc-event-open-slot:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(34, 197, 94, 0.35);
+}
+#showingsCalendar .fc-event-open-slot .fc-event-title { font-weight: 600; }
+#showingsCalendar .fc-event-open-day .fc-event-title { font-size: 0.75rem; }
+
+/* Broker availability toggle: when active, tint with the broker's color so
+   each toggle is visually associated with its calendar overlay. */
+.broker-avail-toggle { transition: background-color 0.15s, border-color 0.15s; }
+.broker-avail-toggle.active {
+    background-color: color-mix(in oklab, var(--toggle-color, #6366f1) 25%, transparent) !important;
+    border-color: var(--toggle-color, #6366f1) !important;
+    color: #fff !important;
+}
+.broker-avail-toggle.active:hover {
+    background-color: color-mix(in oklab, var(--toggle-color, #6366f1) 35%, transparent) !important;
+}
+.broker-avail-toggle.is-unconnected .bi { opacity: 0.6; }
+#availabilityHint a { color: inherit; text-decoration: underline; }
+#availabilityHint a:hover { text-decoration: none; }
 .showing-item { padding: 0.75rem 1rem; border-radius: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 1rem; }
 .showing-item .showing-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .showing-dot.confirmed { background: #22c55e; }

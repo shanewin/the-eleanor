@@ -2514,7 +2514,10 @@ function googleCalendarDisconnect() {
 
 function googleCalendarStatus() {
     global $sb;
-    $brokers = $sb->select('brokers', 'id,name,email,role,google_calendar_connected,google_calendar_email', [], 'name.asc');
+    // Filter to active brokers — matches getActiveBrokers() on the public
+    // tour form so the admin calendar and the public picker show the same
+    // set of brokers (and the same union of slots in Openings mode).
+    $brokers = $sb->select('brokers', 'id,name,email,role,google_calendar_connected,google_calendar_email', ['is_active=neq.false'], 'name.asc');
     echo json_encode($brokers);
 }
 
@@ -2565,12 +2568,19 @@ function googleCalendarAvailability() {
         }
 
         $busy = googleQueryFreeBusy($accessToken, $timeMin, $timeMax);
-        $broker = $sb->selectOne('brokers', 'name', ['id=eq.' . $brokerId]);
+        $broker = $sb->selectOne('brokers', 'name,default_availability_start,default_availability_end,default_availability_days', ['id=eq.' . $brokerId]);
 
         $result[$brokerId] = [
             'name'      => $broker['name'] ?? 'Unknown',
             'connected' => true,
-            'busy'      => $busy ?: []
+            'busy'      => $busy ?: [],
+            'defaults'  => [
+                'start' => $broker['default_availability_start'] ?? '09:00',
+                'end'   => $broker['default_availability_end'] ?? '18:00',
+                'days'  => is_string($broker['default_availability_days'] ?? '')
+                    ? json_decode($broker['default_availability_days'], true)
+                    : ($broker['default_availability_days'] ?? [1,2,3,4,5])
+            ]
         ];
     }
 

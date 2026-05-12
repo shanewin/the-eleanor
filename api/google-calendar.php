@@ -363,9 +363,12 @@ function computeAvailableSlots($busyBlocks, $startDate, $endDate, $tourHoursStar
                 }
             }
 
-            // Skip past slots (must be in the future)
-            $now = new DateTime('now', $tz);
-            if ($slotTime <= $now) {
+            // Enforce the 1-hour-ahead booking cutoff. publicBookTour rejects
+            // anything closer than this, the admin Openings UI hides the same
+            // window, and the AI SMS scheduler shouldn't offer "in 20 minutes"
+            // slots either — so the filter belongs here, in shared logic.
+            $earliest = (new DateTime('now', $tz))->modify('+1 hour');
+            if ($slotTime < $earliest) {
                 $isBusy = true;
             }
 
@@ -403,16 +406,14 @@ function getAvailableTourSlots($brokerId, $startDate, $endDate) {
 
     if (!$broker) return [];
 
-    // Get tour hours from settings (guarded — public endpoints don't load admin-api.php)
-    if (function_exists('getSMSSettings')) {
-        $aiSettings = getSMSSettings();
-        $tourHours = $aiSettings['ai_tour_hours'] ?? 'weekdays 10am-6pm, Saturdays 11am-4pm';
-    }
-
-    // Default tour schedule
-    $tourStart = '10:00';
-    $tourEnd = '18:00';
-    $tourDays = [1, 2, 3, 4, 5, 6]; // Mon-Sat
+    // Use the broker's stored default availability as the working window in
+    // both paths. The admin calendar's Openings mode does the same — so the
+    // public tour picker and the admin agree on which hours are bookable.
+    $tourStart = substr($broker['default_availability_start'] ?? '09:00', 0, 5);
+    $tourEnd   = substr($broker['default_availability_end']   ?? '18:00', 0, 5);
+    $tourDays  = $broker['default_availability_days'] ?? [1, 2, 3, 4, 5];
+    if (is_string($tourDays)) $tourDays = json_decode($tourDays, true);
+    if (!is_array($tourDays) || empty($tourDays)) $tourDays = [1, 2, 3, 4, 5];
 
     if ($broker['google_calendar_connected']) {
         $accessToken = googleGetValidToken($brokerId);
@@ -430,13 +431,8 @@ function getAvailableTourSlots($brokerId, $startDate, $endDate) {
         }
     }
 
-    // Fallback: use default availability (no busy blocks)
-    $defaultStart = $broker['default_availability_start'] ?? '09:00';
-    $defaultEnd = $broker['default_availability_end'] ?? '18:00';
-    $defaultDays = $broker['default_availability_days'] ?? [1, 2, 3, 4, 5];
-    if (is_string($defaultDays)) $defaultDays = json_decode($defaultDays, true);
-
-    $slots = computeAvailableSlots([], $startDate, $endDate, $defaultStart, $defaultEnd, $defaultDays ?: [1,2,3,4,5]);
+    // Fallback (no Google Calendar): same working window, no busy blocks.
+    $slots = computeAvailableSlots([], $startDate, $endDate, $tourStart, $tourEnd, $tourDays);
     file_put_contents($cacheFile, json_encode($slots));
     return $slots;
 }
