@@ -2531,11 +2531,13 @@ function googleCalendarAvailability() {
         return;
     }
 
-    // Limit date range to 31 days
+    // Limit date range to 90 days — FullCalendar's month view shows up to a
+    // 42-day grid (pads adjacent months), and Google FreeBusy supports up to
+    // 3 months per request anyway, so this gives plenty of headroom.
     $minDate = strtotime($timeMin);
     $maxDate = strtotime($timeMax);
-    if ($maxDate - $minDate > 31 * 86400) {
-        echo json_encode(['error' => 'Date range cannot exceed 31 days']);
+    if ($maxDate - $minDate > 90 * 86400) {
+        echo json_encode(['error' => 'Date range cannot exceed 90 days']);
         return;
     }
 
