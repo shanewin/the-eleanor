@@ -129,6 +129,153 @@ function renderGradeBreakdown(gradeInfo) {
     return html;
 }
 
+// ── Engagement Timeline ──
+//
+// Quick-win simplification of the raw activity log:
+//   1. Pair section_enter/section_leave for the same section into a single
+//      "Viewed X for Ns" row. Cuts the row count roughly in half.
+//   2. Group rows under day headers ("Today" / "Yesterday" / "May 8") so the
+//      broker sees not just *when in the day* but *which day*.
+//
+// Orphan halves (a leave without a prior enter, common because the captured
+// log window starts mid-session) collapse to a duration-less "Viewed X" row.
+
+function formatEngagementDuration(seconds) {
+    if (seconds == null || seconds < 0) return '';
+    if (seconds < 60) return Math.max(1, Math.round(seconds)) + 's';
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds - m * 60);
+    if (m < 60) return s > 0 ? m + 'm ' + s + 's' : m + 'm';
+    const h = Math.floor(m / 60);
+    const remM = m - h * 60;
+    return remM > 0 ? h + 'h ' + remM + 'm' : h + 'h';
+}
+
+function formatEngagementDayLabel(date) {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayDiff = Math.round((startOfToday - startOfDate) / 86400000);
+    if (dayDiff === 0) return 'Today';
+    if (dayDiff === 1) return 'Yesterday';
+    if (dayDiff > 1 && dayDiff < 7) return date.toLocaleDateString([], { weekday: 'long' });
+    const sameYear = date.getFullYear() === today.getFullYear();
+    return date.toLocaleDateString([], sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Walks chronologically, pairing section_enter/leave by section name. Returns
+// display rows sorted newest-first.
+function buildEngagementRows(logs) {
+    const ascLogs = [...logs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const openSections = new Map(); // section name → { created_at }
+    const rows = [];
+
+    ascLogs.forEach(log => {
+        const evtData = typeof log.event_data === 'string'
+            ? (() => { try { return JSON.parse(log.event_data || '{}'); } catch (_) { return {}; } })()
+            : (log.event_data || {});
+        const name = log.event_name || '';
+        const section = evtData.section || '';
+
+        if (name === 'section_enter' && section) {
+            openSections.set(section, log.created_at);
+            return;
+        }
+        if (name === 'section_leave' && section) {
+            const enterAt = openSections.get(section);
+            if (enterAt) {
+                const dur = (new Date(log.created_at) - new Date(enterAt)) / 1000;
+                rows.push({
+                    created_at: enterAt,
+                    icon: 'bi-eye',
+                    label: 'Viewed',
+                    detail: section,
+                    duration: dur
+                });
+                openSections.delete(section);
+            } else {
+                // Leave without a matching enter — still worth showing as a
+                // visit, just without a duration we can trust.
+                rows.push({
+                    created_at: log.created_at,
+                    icon: 'bi-eye',
+                    label: 'Viewed',
+                    detail: section
+                });
+            }
+            return;
+        }
+
+        // Everything else passes through as-is.
+        rows.push({
+            created_at: log.created_at,
+            icon: 'bi-circle-fill',
+            label: name.replace(/_/g, ' '),
+            detail: section || evtData.text || ''
+        });
+    });
+
+    // Sections still open at the end (lead is currently on the page) — surface
+    // as in-progress so the broker knows.
+    openSections.forEach((enterAt, section) => {
+        rows.push({
+            created_at: enterAt,
+            icon: 'bi-eye',
+            label: 'Viewing',
+            detail: section,
+            inProgress: true
+        });
+    });
+
+    rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return rows;
+}
+
+function renderEngagementTimeline(logs) {
+    if (!logs || logs.length === 0) {
+        return '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4 text-center text-white-50" style="font-size:0.85rem">No engagement events recorded.</div></div>';
+    }
+
+    const rows = buildEngagementRows(logs).slice(0, 50);
+
+    let html = '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
+        + '<h6 class="text-white-50 text-uppercase fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:0.1em">'
+        + '<i class="bi bi-activity me-1 text-info"></i>Engagement Timeline (' + rows.length + ' actions)'
+        + '</h6>'
+        + '<div class="d-flex flex-column gap-1 mt-2" style="max-height:400px;overflow-y:auto">';
+
+    let currentDay = '';
+    rows.forEach(row => {
+        const date = new Date(row.created_at);
+        const dayKey = date.toDateString();
+        if (dayKey !== currentDay) {
+            currentDay = dayKey;
+            html += '<div class="text-white-50 fw-semibold mt-2 pt-2 border-top border-secondary" style="font-size:0.7rem;letter-spacing:0.05em;text-transform:uppercase">'
+                + esc(formatEngagementDayLabel(date))
+                + '</div>';
+        }
+        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const durBadge = row.duration != null
+            ? '<span class="text-white-50 ms-1" style="font-size:0.7rem">· ' + esc(formatEngagementDuration(row.duration)) + '</span>'
+            : '';
+        const progressBadge = row.inProgress
+            ? '<span class="badge bg-success bg-opacity-25 text-success ms-1" style="font-size:0.6rem">live</span>'
+            : '';
+        html += '<div class="d-flex gap-2 align-items-center">'
+            + '<small class="text-white-50" style="width:60px;flex-shrink:0">' + esc(time) + '</small>'
+            + '<small class="text-white">'
+            + esc(row.label)
+            + (row.detail ? ' <span class="text-white-50">— ' + esc(row.detail) + '</span>' : '')
+            + durBadge
+            + progressBadge
+            + '</small>'
+            + '</div>';
+    });
+
+    html += '</div></div></div>';
+    return html;
+}
+
 function renderProfessionalIntel(intel, raw, org, experiences, educations) {
     const hasAny = intel.job_title || intel.company || intel.industry || intel.inferred_salary
         || experiences.length > 0 || educations.length > 0;
@@ -261,26 +408,7 @@ function renderFullProfile(intel, logs, container) {
     html += renderGradeBreakdown(gradeInfo);
 
     // Engagement Timeline
-    if (logs.length > 0) {
-        html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4">'
-            + '<h6 class="text-white-50 text-uppercase fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:0.1em">'
-            + '<i class="bi bi-activity me-1 text-info"></i>Engagement Timeline (' + logs.length + ' events)'
-            + '</h6>'
-            + '<div class="d-flex flex-column gap-2 mt-2" style="max-height:400px;overflow-y:auto">';
-        logs.slice(-25).reverse().forEach(function(log) {
-            const evtData = typeof log.event_data === 'string' ? JSON.parse(log.event_data || '{}') : (log.event_data || {});
-            const time = new Date(log.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            const label = esc((log.event_name || '').replace(/_/g, ' '));
-            const detail = evtData.section || evtData.text || '';
-            html += '<div class="d-flex gap-2 align-items-center">'
-                + '<small class="text-white-50" style="width:50px;flex-shrink:0">' + esc(time) + '</small>'
-                + '<small class="text-white">' + label + (detail ? ' — <span class="text-white-50">' + esc(detail) + '</span>' : '') + '</small>'
-                + '</div>';
-        });
-        html += '</div></div></div>';
-    } else {
-        html += '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4 text-center text-white-50" style="font-size:0.85rem">No engagement events recorded.</div></div>';
-    }
+    html += renderEngagementTimeline(logs);
 
     html += '<div class="text-center mt-2">'
         + '<a href="/admin/communications.php?email=' + encodeURIComponent(intel.email || '') + '" class="text-primary text-decoration-none" style="font-size:0.85rem">'
