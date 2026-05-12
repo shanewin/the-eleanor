@@ -16,6 +16,7 @@ require_once __DIR__ . '/db_config.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/smtp-mail.php';
 require_once __DIR__ . '/enrichment.php';
+require_once __DIR__ . '/applicant-email.php';
 
 const LEAD_JOB_MAX_ATTEMPTS = 3;
 const LEAD_JOB_STALE_LOCK_SECONDS = 300; // 5 min — cron rescue cutoff
@@ -112,9 +113,29 @@ function runLeadProcessingJob(int $jobId): bool {
         $done[] = 'sms_welcome';
     }
 
+    // Step 4: applicant welcome email (parallel with SMS — independent send).
+    // Skip for mailing-list signups; applicant-email.php also enforces this and
+    // the email_suppressions list internally.
+    $skipApplicantEmail = !empty($payload['is_mailing_list']);
+    if (!$skipApplicantEmail && !in_array('applicant_email', $done, true)) {
+        try {
+            sendApplicantEmail($payload, $job['lead_email']);
+            $done[] = 'applicant_email';
+            $sb->update('lead_processing_jobs',
+                ['steps_done' => $done, 'updated_at' => date('c')],
+                ['id=eq.' . $jobId]);
+        } catch (Throwable $e) {
+            $errors[] = 'applicant_email: ' . $e->getMessage();
+            error_log("Lead job $jobId applicant_email failed: " . $e->getMessage());
+        }
+    } elseif ($skipApplicantEmail && !in_array('applicant_email', $done, true)) {
+        $done[] = 'applicant_email';
+    }
+
     $allDone = in_array('notify_email', $done, true)
         && in_array('enrich', $done, true)
-        && in_array('sms_welcome', $done, true);
+        && in_array('sms_welcome', $done, true)
+        && in_array('applicant_email', $done, true);
 
     if ($allDone) {
         $sb->update('lead_processing_jobs', [
