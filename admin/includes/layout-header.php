@@ -12,9 +12,7 @@ if (isset($_GET['logout'])) { logout(); }
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <?php if (!empty($useCalendar)): ?>
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.css" rel="stylesheet">
-    <?php endif; ?>
+    <?php // FullCalendar v6 bundles its CSS into the JS — no separate stylesheet needed. ?>
     <link href="/admin/admin.css" rel="stylesheet">
     <?php if (!empty($extraCss)): foreach ($extraCss as $css): ?>
     <link href="<?= htmlspecialchars($css) ?>" rel="stylesheet">
