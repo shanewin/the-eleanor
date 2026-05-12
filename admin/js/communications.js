@@ -90,17 +90,29 @@ async function loadCommPipeline() {
     }
 }
 
-function showCommPipeline() {
+function showCommPipeline(skipUrlUpdate) {
     document.getElementById('commPipelineView').style.display = 'block';
     document.getElementById('commTimelineView').style.display = 'none';
+    if (!skipUrlUpdate) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('email');
+        history.pushState({ view: 'pipeline' }, '', url.pathname + url.search);
+    }
+    document.title = 'Communications | The Eleanor';
     loadCommPipeline();
 }
 
 // ── Timeline View ──
-async function showCommTimeline(email) {
+async function showCommTimeline(email, skipUrlUpdate) {
     document.getElementById('commPipelineView').style.display = 'none';
     document.getElementById('commTimelineView').style.display = 'block';
     document.getElementById('currentLeadEmail').value = email;
+
+    if (!skipUrlUpdate) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('email', email);
+        history.pushState({ view: 'timeline', email: email }, '', url.pathname + url.search);
+    }
 
     const smsContainer = document.getElementById('smsThreadContainer');
     const emailContainer = document.getElementById('emailThreadContainer');
@@ -145,6 +157,7 @@ function renderTimelineHeader(data) {
     document.getElementById('timelineLeadName').textContent = lead.name || lead.email;
     document.getElementById('timelineLeadEmail').textContent = lead.email;
     document.getElementById('timelineLeadPhone').textContent = lead.phone ? ' · ' + lead.phone : '';
+    document.title = (lead.name || lead.email) + ' — Communications | The Eleanor';
 }
 
 // ── Status Pipeline ──
@@ -731,4 +744,24 @@ async function saveComm() {
 }
 
 // ── Init ──
-document.addEventListener('DOMContentLoaded', loadCommPipeline);
+// Route on initial load: ?email=foo lands directly on that lead's timeline,
+// otherwise show the pipeline. Browser back/forward swap between the two.
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email');
+    if (email) {
+        showCommTimeline(email, true);
+    } else {
+        loadCommPipeline();
+    }
+});
+
+window.addEventListener('popstate', () => {
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email');
+    if (email) {
+        showCommTimeline(email, true);
+    } else {
+        showCommPipeline(true);
+    }
+});
