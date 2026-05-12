@@ -380,6 +380,8 @@ async function loadBrokerAvailability() {
 }
 
 function renderAvailabilityEvents(brokersData) {
+    console.log('[availability] render called with:', brokersData);
+
     if (availabilityEventSource) {
         availabilityEventSource.remove();
         availabilityEventSource = null;
@@ -391,6 +393,8 @@ function renderAvailabilityEvents(brokersData) {
     for (const [brokerId, info] of Object.entries(brokersData)) {
         const checkbox = document.querySelector(`.broker-avail-check[value="${brokerId}"]`);
         const color = checkbox ? checkbox.dataset.color : BROKER_COLORS[brokerIndex % BROKER_COLORS.length];
+
+        console.log('[availability] broker', brokerId, info.name, 'connected:', info.connected, 'busy count:', info.busy ? info.busy.length : 0, 'color:', color);
 
         if (info.connected && info.busy) {
             info.busy.forEach(block => {
@@ -408,8 +412,13 @@ function renderAvailabilityEvents(brokersData) {
         brokerIndex++;
     }
 
+    console.log('[availability] events to add:', events.length, 'sample:', events[0]);
+
     if (events.length > 0) {
         availabilityEventSource = showingsCalendar.addEventSource(events);
+        const allEvents = showingsCalendar.getEvents();
+        const bgEvents = allEvents.filter(e => e.display === 'background');
+        console.log('[availability] post-add: total events =', allEvents.length, 'background events =', bgEvents.length);
     }
 }
 
