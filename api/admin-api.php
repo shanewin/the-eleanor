@@ -64,6 +64,8 @@ switch ($action) {
     case 'get_lead_jobs': getLeadJobs(); break;
     case 'retry_lead_job': retryLeadJob(); break;
     case 'get_cron_runs': getCronRuns(); break;
+    case 'skip_followups': skipFollowups(); break;
+    case 'skip_tour_reminder': skipTourReminder(); break;
     default: echo json_encode(['error' => 'Invalid action']);
 }
 
@@ -1342,6 +1344,8 @@ function getUnifiedTimeline($email) {
         }
     }
 
+    $nextPlanned = computeNextPlanned($email, $leadPhone, $aiStatus, $tour);
+
     echo json_encode([
         'lead' => [
             'name'        => $leadName,
@@ -1352,11 +1356,215 @@ function getUnifiedTimeline($email) {
             'assigned_to' => $lead['assigned_to'] ?? null,
             'broker_name' => $brokerName
         ],
-        'ai_status'   => $aiStatus,
-        'submissions' => $submissions,
-        'timeline'    => $timeline,
-        'tour'        => $tour
+        'ai_status'    => $aiStatus,
+        'submissions'  => $submissions,
+        'timeline'     => $timeline,
+        'tour'         => $tour,
+        'next_planned' => $nextPlanned
     ]);
+}
+
+/**
+ * Compute the next planned automated event for a lead, mirroring the gating
+ * logic in process-followups.php and process-tour-reminders.php. Returns:
+ *
+ *   ['type'         => 'followup_1' | 'followup_2' | 'tour_reminder' | 'paused' | 'none',
+ *    'label'        => human-readable description,
+ *    'scheduled_for'=> ISO 8601 string or null,
+ *    'skip_action'  => 'skip_followups' | 'skip_tour_reminder' | null,
+ *    'skip_target'  => phone for skip_followups, tour id for skip_tour_reminder]
+ *
+ * Order of precedence (matches what the crons would actually do next):
+ *   1. AI paused             → 'paused', nothing scheduled
+ *   2. Tour reminder pending → if a confirmed future tour exists and the
+ *                              [REMINDER_SENT] marker isn't on it
+ *   3. Stale-lead follow-ups → gated by followup_status + last_lead_message_at
+ *   4. Otherwise             → 'none'
+ */
+function computeNextPlanned($email, $leadPhone, $aiStatus, $tour) {
+    global $sb;
+
+    $statusVal = $aiStatus['status'] ?? 'active';
+
+    // Pull the automation row so we can read followup_status + last_lead_message_at.
+    $auto = null;
+    if ($leadPhone) {
+        require_once __DIR__ . '/telnyx-sms.php';
+        $normalizedPhone = normalizePhone($leadPhone);
+        if ($normalizedPhone) {
+            $auto = $sb->selectOne('sms_automation', 'lead_phone,status,followup_status,last_lead_message_at',
+                ['lead_phone=eq.' . urlencode($normalizedPhone)]);
+        }
+    }
+
+    // 1. AI paused (manual, handoff, or opt-out) — no automated SMS is queued.
+    if ($statusVal !== 'active') {
+        $reasonMap = [
+            'paused_handoff' => 'AI handed off to a broker',
+            'paused_manual'  => 'AI paused manually',
+            'paused_optout'  => 'Lead opted out (STOP)',
+        ];
+        return [
+            'type'  => 'paused',
+            'label' => $reasonMap[$statusVal] ?? 'AI paused',
+            'detail'=> 'No automated SMS will be sent until AI Auto-Reply is turned back on.',
+            'scheduled_for' => null,
+            'skip_action'   => null,
+            'skip_target'   => null,
+        ];
+    }
+
+    // 2. Tour reminder — confirmed future tour, day-before reminder not yet sent.
+    if ($tour && ($tour['status'] ?? '') === 'confirmed' && !empty($tour['scheduled_at'])) {
+        $reminderSent = !empty($tour['notes']) && strpos($tour['notes'], '[REMINDER_SENT]') !== false;
+        if (!$reminderSent) {
+            try {
+                $tz = new DateTimeZone('America/New_York');
+                $tourTime = new DateTime($tour['scheduled_at'], $tz);
+                $now = new DateTime('now', $tz);
+                if ($tourTime > $now) {
+                    // Reminder runs hourly the day before. Compute that midnight-to-midnight window.
+                    $reminderDay = (clone $tourTime)->modify('-1 day')->setTime(9, 0); // approx — show 9am of the day before
+                    return [
+                        'type'  => 'tour_reminder',
+                        'label' => 'Tour reminder SMS',
+                        'detail'=> 'A reminder for the tour on ' . $tourTime->format('l, F j \\a\\t g:ia')
+                                 . ' goes out the day before.',
+                        'scheduled_for' => $reminderDay->format('c'),
+                        'skip_action'   => 'skip_tour_reminder',
+                        'skip_target'   => $tour['id'],
+                    ];
+                }
+            } catch (Throwable $e) {}
+        }
+    }
+
+    // 3. Stale-lead follow-ups — only if the lead has texted us at least once
+    //    and a tour isn't confirmed (process-followups skips when a confirmed
+    //    tour exists). 3 days for follow-up #1, 6 days for #2, then cold.
+    $hasConfirmedTour = $tour && ($tour['status'] ?? '') === 'confirmed';
+    if ($auto && !$hasConfirmedTour) {
+        $lastMsgAt = $auto['last_lead_message_at'] ?? null;
+        $followupStatus = $auto['followup_status'] ?? 'none';
+
+        if ($lastMsgAt && $followupStatus !== 'cold' && $followupStatus !== 'sent_2') {
+            $lastMsgTs = strtotime($lastMsgAt);
+            if ($lastMsgTs) {
+                if ($followupStatus === 'none') {
+                    $fireTs = $lastMsgTs + (3 * 86400);
+                    return [
+                        'type'  => 'followup_1',
+                        'label' => 'Stale-lead follow-up #1',
+                        'detail'=> "An AI nudge will go out 3 days after the lead's last message.",
+                        'scheduled_for' => date('c', $fireTs),
+                        'skip_action'   => 'skip_followups',
+                        'skip_target'   => $auto['lead_phone'],
+                    ];
+                }
+                if ($followupStatus === 'sent_1') {
+                    $fireTs = $lastMsgTs + (6 * 86400);
+                    return [
+                        'type'  => 'followup_2',
+                        'label' => 'Stale-lead follow-up #2 (final)',
+                        'detail'=> 'Final AI nudge. After this the lead is marked Cold.',
+                        'scheduled_for' => date('c', $fireTs),
+                        'skip_action'   => 'skip_followups',
+                        'skip_target'   => $auto['lead_phone'],
+                    ];
+                }
+            }
+        }
+    }
+
+    return [
+        'type'          => 'none',
+        'label'         => 'No automated SMS planned',
+        'detail'        => null,
+        'scheduled_for' => null,
+        'skip_action'   => null,
+        'skip_target'   => null,
+    ];
+}
+
+/**
+ * Mark a lead's follow-up state as cold so process-followups.php stops
+ * considering them. Reactive AI replies still work — this is a targeted
+ * stop for the stale-lead nudges only.
+ */
+function skipFollowups() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+    $phone = $input['phone'] ?? '';
+    if (!$phone) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Phone is required']);
+        return;
+    }
+    require_once __DIR__ . '/telnyx-sms.php';
+    $normalized = normalizePhone($phone);
+    if (!$normalized) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid phone']);
+        return;
+    }
+    $sb->update('sms_automation',
+        ['followup_status' => 'cold', 'updated_at' => date('c')],
+        ['lead_phone=eq.' . urlencode($normalized)]);
+
+    // Log to the lead's communications so the action is visible in the Internal Log.
+    $auto = $sb->selectOne('sms_automation', 'lead_email', ['lead_phone=eq.' . urlencode($normalized)]);
+    if ($auto && !empty($auto['lead_email'])) {
+        $sb->insert('communications', [
+            'lead_email' => $auto['lead_email'],
+            'direction'  => 'internal',
+            'channel'    => 'note',
+            'subject'    => 'Stale-lead follow-ups skipped',
+            'body'       => 'A broker manually skipped the remaining AI follow-up nudges. Reactive AI replies still work.',
+            'sender'     => 'System',
+            'status'     => 'system'
+        ]);
+    }
+    echo json_encode(['success' => true]);
+}
+
+/**
+ * Mark a tour as "reminder already sent" so process-tour-reminders.php
+ * skips it. Used when the broker prefers to handle the reminder personally
+ * or doesn't want one to go out.
+ */
+function skipTourReminder() {
+    global $sb;
+    $input = json_decode(file_get_contents('php://input'), true);
+    $id = $input['id'] ?? null;
+    if (!$id) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Tour id is required']);
+        return;
+    }
+    $tour = $sb->selectOne('tour_requests', 'lead_email,notes', ['id=eq.' . $id]);
+    if (!$tour) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Tour not found']);
+        return;
+    }
+    $existingNotes = trim($tour['notes'] ?? '');
+    if (strpos($existingNotes, '[REMINDER_SENT]') === false) {
+        $sb->update('tour_requests',
+            ['notes' => trim($existingNotes . ' [REMINDER_SENT]'), 'updated_at' => date('c')],
+            ['id=eq.' . $id]);
+    }
+    if (!empty($tour['lead_email'])) {
+        $sb->insert('communications', [
+            'lead_email' => $tour['lead_email'],
+            'direction'  => 'internal',
+            'channel'    => 'note',
+            'subject'    => 'Tour reminder skipped',
+            'body'       => 'A broker manually skipped the automated day-before tour reminder for this lead.',
+            'sender'     => 'System',
+            'status'     => 'system'
+        ]);
+    }
+    echo json_encode(['success' => true]);
 }
 
 /* ── Tour Requests ── */

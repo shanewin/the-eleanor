@@ -75,6 +75,9 @@ include __DIR__ . '/includes/layout-header.php';
          recent system event is visible at a glance. -->
     <div id="latestInternalNote" style="display:none" class="mb-3"></div>
 
+    <!-- Up next — what the automation will send next for this lead, with a one-click skip. -->
+    <div id="nextPlannedCard" style="display:none" class="mb-3"></div>
+
     <!-- Form Submissions -->
     <div id="formSubmissionsCard" class="card bg-body-tertiary border-0 mb-3" style="display:none">
         <div class="card-body p-3">

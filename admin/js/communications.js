@@ -121,6 +121,7 @@ async function showCommTimeline(email) {
         renderTimelineHeader(data);
         renderStatusPipeline(data.lead);
         renderTourBanner(data.tour);
+        renderNextPlanned(data.next_planned, data.lead);
         renderFormSubmissions(data.submissions || []);
         renderConversations(data.timeline || []);
         renderInternalLog(data.timeline || []);
@@ -216,6 +217,105 @@ function renderTourBanner(tour) {
         + '</div>'
         + '<a href="/admin/calendar.php" class="btn btn-sm btn-outline-light">Open Calendar</a>'
         + '</div>';
+}
+
+// ── Up Next (planned automated event) ──
+function renderNextPlanned(next, lead) {
+    const el = document.getElementById('nextPlannedCard');
+    if (!el) return;
+    if (!next) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+    // Don't surface 'none' — empty state is just noise on the page.
+    if (next.type === 'none') { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+    const palette = {
+        followup_1:    { color: '#a78bfa', icon: 'bi-chat-square-dots',     border: 'rgba(139,92,246,0.5)', bg: 'rgba(139,92,246,0.08)' },
+        followup_2:    { color: '#f59e0b', icon: 'bi-chat-square-dots-fill',border: 'rgba(245,158,11,0.5)', bg: 'rgba(245,158,11,0.08)' },
+        tour_reminder: { color: '#3b82f6', icon: 'bi-calendar-event',       border: 'rgba(59,130,246,0.5)', bg: 'rgba(59,130,246,0.08)' },
+        paused:        { color: '#9ca3af', icon: 'bi-pause-circle',         border: 'rgba(107,114,128,0.5)',bg: 'rgba(107,114,128,0.08)' },
+    };
+    const p = palette[next.type] || palette.paused;
+
+    let whenStr = '';
+    if (next.scheduled_for) {
+        const dt = new Date(next.scheduled_for);
+        const now = new Date();
+        const diffMs = dt - now;
+        const sameDay = dt.toDateString() === now.toDateString();
+        const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+        const isTomorrow = dt.toDateString() === tomorrow.toDateString();
+        const timeStr = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        if (diffMs < 0) {
+            whenStr = 'Overdue — will fire on the next cron tick';
+        } else if (sameDay) {
+            whenStr = 'Today at ' + timeStr;
+        } else if (isTomorrow) {
+            whenStr = 'Tomorrow at ' + timeStr;
+        } else {
+            whenStr = dt.toLocaleString([], { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+    }
+
+    let skipBtn = '';
+    if (next.skip_action === 'skip_followups') {
+        skipBtn = '<button class="btn btn-sm btn-outline-light" onclick="skipFollowups()">Skip follow-ups</button>';
+    } else if (next.skip_action === 'skip_tour_reminder') {
+        skipBtn = '<button class="btn btn-sm btn-outline-light" onclick="skipTourReminder(' + (next.skip_target || 'null') + ')">Skip reminder</button>';
+    }
+
+    el.style.display = '';
+    el.innerHTML = '<div class="d-flex align-items-start gap-3 p-3 rounded-3" style="border-left:3px solid ' + p.border + ';background:' + p.bg + '">'
+        + '<i class="bi ' + p.icon + '" style="color:' + p.color + ';font-size:1.3rem;margin-top:2px"></i>'
+        + '<div class="flex-grow-1" style="min-width:0">'
+        + '<div style="font-size:0.7rem;color:' + p.color + ';font-weight:700;letter-spacing:0.1em">UP NEXT</div>'
+        + '<div class="fw-semibold text-white" style="font-size:0.95rem">' + esc(next.label) + (whenStr ? ' — <span class="text-white-50 fw-normal">' + esc(whenStr) + '</span>' : '') + '</div>'
+        + (next.detail ? '<div class="text-white-50 mt-1" style="font-size:0.8rem;line-height:1.4">' + esc(next.detail) + '</div>' : '')
+        + '</div>'
+        + (skipBtn ? '<div style="align-self:center">' + skipBtn + '</div>' : '')
+        + '</div>';
+}
+
+async function skipFollowups() {
+    if (!confirm('Stop the AI follow-up nudges for this lead?\n\nReactive AI replies will still work if the lead texts in.')) return;
+    const phone = document.getElementById('currentLeadPhone').value;
+    const email = document.getElementById('currentLeadEmail').value;
+    if (!phone) return;
+    try {
+        const res = await fetch(API + '?action=skip_followups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phone })
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (email) showCommTimeline(email);
+        } else {
+            alert(data.error || 'Failed to skip follow-ups');
+        }
+    } catch (e) {
+        alert('Network error');
+    }
+}
+
+async function skipTourReminder(tourId) {
+    if (!tourId) return;
+    if (!confirm('Skip the automated day-before tour reminder for this tour?')) return;
+    const email = document.getElementById('currentLeadEmail').value;
+    try {
+        const res = await fetch(API + '?action=skip_tour_reminder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: tourId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (email) showCommTimeline(email);
+        } else {
+            alert(data.error || 'Failed to skip reminder');
+        }
+    } catch (e) {
+        alert('Network error');
+    }
 }
 
 // ── Form Submissions Section ──
