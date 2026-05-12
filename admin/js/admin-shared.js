@@ -75,14 +75,16 @@ function calculateLeadGrade(lead) {
                 reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is well below \u2014 likely needs guarantor or higher co-signer income.`
             });
         }
-    } else {
+    } else if (budget > 0) {
+        // Budget is on file but enrichment didn't return a salary.
         missed.push({
             label: "Affordability unknown",
-            reason: !budget
-                ? "No budget submitted, so we can't run the 40x affordability check."
-                : "No inferred salary in enrichment data \u2014 affordability skipped."
+            reason: "Budget on file but no salary data from enrichment \u2014 we can't run the 40x check (up to +30 untouchable)."
         });
     }
+    // Note: if budget is missing entirely, we surface that as a single combined
+    // missed-opportunity in the Budget section below (covers both the +5 budget
+    // signal and the affordability skip), so we don't duplicate it here.
 
     // 2. Intent Signal (20 pts)
     if (source.includes('unit interest')) {
@@ -141,6 +143,8 @@ function calculateLeadGrade(lead) {
     }
 
     // 5. Budget Provided (5 pts)
+    // When no budget is on file, this single missed-opportunity also explains
+    // why the +30 affordability check was skipped (instead of two duplicate rows).
     if (budget > 0) {
         insights.push({
             label: "Budget Provided", type: "info", icon: "\u{1F4B0}", points: 5,
@@ -148,8 +152,8 @@ function calculateLeadGrade(lead) {
         });
     } else {
         missed.push({
-            label: "No budget (+5 missed)",
-            reason: "Lead didn't fill in a budget \u2014 harder to qualify."
+            label: "No budget (+5 missed, affordability check skipped)",
+            reason: "Lead didn't fill in a budget \u2014 they miss the +5 for providing one, and without it we can't run the 40x affordability check (up to +30 untouchable)."
         });
     }
 
