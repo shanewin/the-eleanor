@@ -129,9 +129,9 @@ function renderGradeBreakdown(gradeInfo) {
     return html;
 }
 
-function renderProfessionalIntel(intel, raw, org, experiences, educations, about) {
+function renderProfessionalIntel(intel, raw, org, experiences, educations) {
     const hasAny = intel.job_title || intel.company || intel.industry || intel.inferred_salary
-        || experiences.length > 0 || educations.length > 0 || about;
+        || experiences.length > 0 || educations.length > 0;
 
     if (!hasAny) {
         return '<div class="card bg-body-tertiary border-0 mb-3"><div class="card-body p-4 text-white-50 text-center" style="font-size:0.85rem">No professional enrichment data available for this lead.</div></div>';
@@ -141,13 +141,6 @@ function renderProfessionalIntel(intel, raw, org, experiences, educations, about
         + '<h6 class="text-white-50 text-uppercase fw-semibold mb-3" style="font-size:0.7rem;letter-spacing:0.1em">'
         + '<i class="bi bi-briefcase me-1 text-info"></i>Professional Intel'
         + '</h6>';
-
-    // Bio / About
-    if (about) {
-        html += '<div class="mb-3"><div class="small text-white-50 mb-1">About</div>'
-            + '<p class="text-white-50 mb-0" style="font-size:0.85rem;line-height:1.6">' + esc(about).substring(0, 600) + (about.length > 600 ? '…' : '') + '</p>'
-            + '</div>';
-    }
 
     // Key facts table
     html += '<table class="table table-sm table-dark mb-3" style="font-size:0.85rem"><tbody>'
@@ -215,7 +208,6 @@ function renderFullProfile(intel, logs, container) {
     const liData = raw.linkedin_scraper || raw.pdl_by_linkedin || {};
     const experiences = liData.experiences || employment;
     const educations = liData.educations || education;
-    const about = liData.about || '';
 
     // Header card — color-coded grade pill in top-right
     let html = '<div class="card bg-body-tertiary border-0 mb-4"><div class="card-body p-4 text-center">'
@@ -261,7 +253,7 @@ function renderFullProfile(intel, logs, container) {
     // Left column: Form Submissions + Professional Intel
     html += '<div class="col-lg-7">';
     html += renderFormSubmissions(intel.submissions && intel.submissions.length > 0 ? intel.submissions : [intel]);
-    html += renderProfessionalIntel(intel, raw, org, experiences, educations, about);
+    html += renderProfessionalIntel(intel, raw, org, experiences, educations);
     html += '</div>';
 
     // Right column: Grade Breakdown + Engagement
