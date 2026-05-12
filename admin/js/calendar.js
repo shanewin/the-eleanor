@@ -329,13 +329,18 @@ async function initBrokerToggles() {
         });
     });
 
-    // Auto-enable every broker that has Google Calendar connected so their busy
-    // times render immediately. Without this, the toggles are all off by default
-    // and the calendar looks empty, which has led to double-bookings.
-    const connectedIds = new Set(connectedBrokers.filter(b => b.google_calendar_connected).map(b => String(b.id)));
-    if (connectedIds.size > 0) {
+    // Default which toggles are on:
+    //   - Owner: ALL brokers (they need the big-picture view to avoid double-bookings)
+    //   - Broker: only brokers with a connected Google Calendar
+    const isOwner = (typeof USER_ROLE !== 'undefined' && USER_ROLE === 'owner');
+    const defaultOnIds = new Set(
+        connectedBrokers
+            .filter(b => isOwner || b.google_calendar_connected)
+            .map(b => String(b.id))
+    );
+    if (defaultOnIds.size > 0) {
         container.querySelectorAll('.broker-avail-check').forEach(cb => {
-            if (connectedIds.has(cb.value)) {
+            if (defaultOnIds.has(cb.value)) {
                 cb.checked = true;
                 cb.closest('.broker-avail-toggle').classList.add('active');
             }
