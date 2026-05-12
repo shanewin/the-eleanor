@@ -47,7 +47,7 @@ The score is designed to answer one question for the broker: **"How likely is th
 
 ### 1. Affordability Match (up to +30 or -10)
 
-**Source:** PDL `inferred_salary` field + submitted `budget`
+**Source:** PDL `inferred_salary` field + budget (submitted or implied)
 
 **Industry Standard:** Monthly rent should be no more than 1/40th of annual gross salary (the "40x rule"). For a $3,500/month apartment, the applicant should earn at least $140,000/year.
 
@@ -62,12 +62,20 @@ ELSE:
     -10 points — "Budget Risk" ❌
 ```
 
+**Budget resolution order:**
+1. **Submitted budget** — what they entered in the form
+2. **Implied from specific unit** — if they filled out Unit Interest with a unit number, we use that unit's listed rent
+3. **Implied from unit-type preference** — if they picked a unit type on the Waitlist, we use the lowest rent for that type
+4. **Implied from portfolio minimum** — fallback for Waitlist signups with no specifics; we use the cheapest available unit (most generous to the lead — if they can afford the floor, they have a shot)
+
+When the budget is implied, the affordability badge reads "Can Afford (implied budget)" and the reason explains the source.
+
 **Example:**
 - Budget: $3,500/month → requires $140,000/year
 - PDL inferred salary: $150,000-250,000 → lower bound $150,000
 - $150,000 >= $140,000 → **Can Afford (+30)**
 
-**Note:** If salary data is unavailable (PDL didn't return it), this signal is skipped entirely — no points added or subtracted.
+**Note:** If salary data is unavailable (PDL didn't return it), this signal is skipped entirely — no points added or subtracted, regardless of whether budget is submitted or implied.
 
 ### 2. Intent Signal (+10 or +20)
 

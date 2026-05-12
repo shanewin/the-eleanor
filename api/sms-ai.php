@@ -1024,60 +1024,9 @@ function buildSystemPrompt($lead) {
  * Fetch live unit data from the Google Sheet endpoint (same source as the website).
  * Cached for 5 minutes to avoid hammering the endpoint on every message.
  */
-function fetchAvailableUnits() {
-    $cacheFile = sys_get_temp_dir() . '/eleanor_units_cache.json';
-    $cacheTTL = 300; // 5 minutes
-
-    // Return cached data if fresh
-    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTTL) {
-        $cached = json_decode(file_get_contents($cacheFile), true);
-        if ($cached) return $cached;
-    }
-
-    $endpoint = 'https://script.google.com/macros/s/AKfycbz_-tiYBDHaMa4O4Rk6bdgJagBMLHZDf5R3SJmuZyymEUXp5ipfA8q7QHT-kS8WkbLfxQ/exec';
-
-    $ch = curl_init($endpoint);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode < 200 || $httpCode >= 300 || empty($response)) {
-        error_log("Failed to fetch Google Sheet units ($httpCode)");
-        // Return stale cache if available
-        if (file_exists($cacheFile)) {
-            return json_decode(file_get_contents($cacheFile), true) ?: [];
-        }
-        return [];
-    }
-
-    $data = json_decode($response, true);
-    if (!is_array($data)) return [];
-
-    // Normalize the data
-    $units = [];
-    foreach ($data as $unit) {
-        $units[] = [
-            'unit'     => $unit['unit'] ?? '',
-            'type'     => $unit['type'] ?? '',
-            'bedbath'  => $unit['bedbath'] ?? $unit['bedBath'] ?? '',
-            'rent'     => preg_replace('/[^0-9]/', '', $unit['rent'] ?? ''),
-            'sqft'     => $unit['squarefootage'] ?? $unit['sqft'] ?? '',
-            'outdoor'  => $unit['outdoor'] ?? '',
-            'view'     => $unit['view'] ?? '',
-            'isleased' => !empty($unit['isleased']),
-        ];
-    }
-
-    // Cache it
-    file_put_contents($cacheFile, json_encode($units));
-
-    return $units;
-}
+// fetchAvailableUnits() moved to api/unit-inventory.php so admin-api.php
+// can use it for implied-budget calculation too.
+require_once __DIR__ . '/unit-inventory.php';
 
 /**
  * Load SMS settings from DB (cached 60 seconds).

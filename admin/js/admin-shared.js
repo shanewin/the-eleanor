@@ -48,8 +48,15 @@ function calculateLeadGrade(lead) {
     const source = (lead.source || lead.submission_type || '').toLowerCase();
 
     // 1. Affordability Check (30 pts max, -10 worst case)
+    // If the lead didn't submit a budget, the server computes an implied_budget
+    // from their unit or the portfolio minimum so we can still run the check.
     const salary = lead.inferred_salary || '';
-    const budget = parseFloat((lead.budget || '0').replace(/[^0-9.]/g, ''));
+    const explicitBudget = parseFloat((lead.budget || '0').replace(/[^0-9.]/g, ''));
+    const impliedBudget = parseFloat(lead.implied_budget || 0);
+    const budget = explicitBudget > 0 ? explicitBudget : impliedBudget;
+    const budgetIsImplied = explicitBudget <= 0 && impliedBudget > 0;
+    const budgetSource = budgetIsImplied ? (lead.implied_budget_source || 'implied') : 'submitted';
+
     if (salary && budget > 0) {
         const salaryMatch = salary.replace(/,/g, '').match(/(\d+)/);
         const annualSalary = salaryMatch ? parseInt(salaryMatch[1]) : 0;
@@ -57,34 +64,39 @@ function calculateLeadGrade(lead) {
 
         const reqK = Math.round(requiredSalary / 1000);
         const haveK = Math.round(annualSalary / 1000);
-        const monthly = '$' + budget.toLocaleString();
+        const monthly = '$' + Math.round(budget).toLocaleString();
+        const budgetNote = budgetIsImplied
+            ? ` (using ${budgetSource} since no budget was submitted)`
+            : '';
 
         if (annualSalary >= requiredSalary) {
             insights.push({
-                label: "Can Afford", type: "success", icon: "\u2705", points: 30,
-                reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ clears the 40x rule.`
+                label: budgetIsImplied ? "Can Afford (implied budget)" : "Can Afford",
+                type: "success", icon: "\u2705", points: 30,
+                reason: `${monthly}/mo${budgetNote} needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ clears the 40x rule.`
             });
         } else if (annualSalary >= requiredSalary * 0.6) {
             insights.push({
-                label: "Borderline Afford", type: "warning", icon: "\u26A0\uFE0F", points: 15,
-                reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is below the 40x rule but within reach with a guarantor or partner.`
+                label: budgetIsImplied ? "Borderline Afford (implied budget)" : "Borderline Afford",
+                type: "warning", icon: "\u26A0\uFE0F", points: 15,
+                reason: `${monthly}/mo${budgetNote} needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is below the 40x rule but within reach with a guarantor or partner.`
             });
         } else {
             insights.push({
-                label: "Budget Risk", type: "danger", icon: "\u274C", points: -10,
-                reason: `${monthly}/mo rent needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is well below \u2014 likely needs guarantor or higher co-signer income.`
+                label: budgetIsImplied ? "Budget Risk (implied budget)" : "Budget Risk",
+                type: "danger", icon: "\u274C", points: -10,
+                reason: `${monthly}/mo${budgetNote} needs ~$${reqK}k/yr. Inferred salary $${haveK}k+ is well below \u2014 likely needs guarantor or higher co-signer income.`
             });
         }
     } else if (budget > 0) {
-        // Budget is on file but enrichment didn't return a salary.
+        // Budget is on file (explicit or implied) but enrichment didn't return a salary.
         missed.push({
             label: "Affordability unknown",
-            reason: "Budget on file but no salary data from enrichment \u2014 we can't run the 40x check (up to +30 untouchable)."
+            reason: "No salary data from enrichment \u2014 we can't run the 40x check (up to +30 untouchable)."
         });
     }
-    // Note: if budget is missing entirely, we surface that as a single combined
-    // missed-opportunity in the Budget section below (covers both the +5 budget
-    // signal and the affordability skip), so we don't duplicate it here.
+    // If neither budget nor implied budget exists (rare \u2014 no inventory + no form data),
+    // the combined missed-opportunity in the Budget section below covers it.
 
     // 2. Intent Signal (20 pts)
     if (source.includes('unit interest')) {
@@ -142,18 +154,24 @@ function calculateLeadGrade(lead) {
         });
     }
 
-    // 5. Budget Provided (5 pts)
-    // When no budget is on file, this single missed-opportunity also explains
-    // why the +30 affordability check was skipped (instead of two duplicate rows).
-    if (budget > 0) {
+    // 5. Budget Provided (5 pts) \u2014 only awarded for an explicitly submitted budget.
+    // If we used an implied budget for the affordability check, the +5 is still
+    // missed (we don't reward inferred data), but we don't say "check skipped"
+    // because the implied value let us run the check.
+    if (explicitBudget > 0) {
         insights.push({
             label: "Budget Provided", type: "info", icon: "\u{1F4B0}", points: 5,
-            reason: `Budget on file: $${budget.toLocaleString()}/month.`
+            reason: `Budget on file: $${explicitBudget.toLocaleString()}/month.`
+        });
+    } else if (budgetIsImplied) {
+        missed.push({
+            label: "No budget submitted (+5 missed)",
+            reason: `Lead didn't fill in a budget \u2014 we ran the affordability check using the ${budgetSource} as a fallback, but they still miss the +5 for explicit data.`
         });
     } else {
         missed.push({
             label: "No budget (+5 missed, affordability check skipped)",
-            reason: "Lead didn't fill in a budget \u2014 they miss the +5 for providing one, and without it we can't run the 40x affordability check (up to +30 untouchable)."
+            reason: "Lead didn't fill in a budget and we couldn't infer one from the portfolio \u2014 both the +5 and the +30 affordability check are unavailable."
         });
     }
 

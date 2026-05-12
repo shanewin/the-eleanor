@@ -6,6 +6,7 @@ header('Content-Type: application/json');
 require_once 'db_config.php';
 require_once '../admin/auth.php';
 require_once 'google-calendar.php';
+require_once 'unit-inventory.php';
 
 if (!isAdmin()) {
     http_response_code(401);
@@ -221,6 +222,17 @@ function getLeads() {
             $lead['submissions'] = $submissionRow ? [$submissionRow] : [];
             $lead['submission_count'] = $submissionRow ? 1 : 0;
 
+            // Compute implied budget if the lead didn't submit one but we can
+            // still infer a reasonable price point from their unit or the portfolio.
+            $hasBudget = !empty($lead['budget']) && preg_replace('/[^0-9]/', '', $lead['budget']) > 0;
+            if (!$hasBudget) {
+                $implied = getImpliedBudgetForLead($lead);
+                if ($implied) {
+                    $lead['implied_budget'] = $implied['budget'];
+                    $lead['implied_budget_source'] = $implied['source'];
+                }
+            }
+
             $unique[] = $lead;
             if (count($unique) >= 50) break;
         }
@@ -332,6 +344,16 @@ function getLeadDetail($email) {
 
     $merged['submissions'] = $submissions;
     $merged['submission_count'] = count($submissions);
+
+    // Compute implied budget if no explicit budget on file
+    $hasBudget = !empty($merged['budget']) && preg_replace('/[^0-9]/', '', $merged['budget']) > 0;
+    if (!$hasBudget) {
+        $implied = getImpliedBudgetForLead($merged);
+        if ($implied) {
+            $merged['implied_budget'] = $implied['budget'];
+            $merged['implied_budget_source'] = $implied['source'];
+        }
+    }
 
     // Resolve broker name
     if (!empty($merged['assigned_to'])) {
