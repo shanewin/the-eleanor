@@ -571,11 +571,23 @@ endif;
                             </div>
                         </div>
                     </div>
+                    <!-- 5: The Arrival (Lobby) — lightbox only, no grid tile -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image"><img src="img/slider-pics/lobby.jpg" alt="The Eleanor Lobby"></div>
+                            <div class="slide-content">
+                                <h3>The Arrival</h3>
+                                <div class="slide-divider"></div>
+                                <p>The handful of seconds between the street and your front door. Considered details that reveal themselves slowly — texture underfoot, light overhead, sound softening as you walk in.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="swiper-button-prev"></div>
                 <div class="swiper-button-next"></div>
             </div>
-            <div class="lrg-lightbox__counter" aria-live="polite">1 of 5</div>
+            <div class="lrg-lightbox__counter" aria-live="polite">1 of 6</div>
         </div>
       </div>
     </section>
