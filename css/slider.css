@@ -43,7 +43,21 @@
 .lrg-stack {
     display: flex;
     flex-direction: column;
-    gap: 64px;
+    gap: 48px;
+}
+
+/* Subtle section divider — sits between Live/Rest and Rest/Gather */
+.lrg-row-divider {
+    border: 0;
+    height: 1px;
+    width: 100%;
+    margin: 0;
+    background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 0.22) 50%,
+        rgba(0, 0, 0, 0) 100%
+    );
 }
 
 .lrg-row {
@@ -245,6 +259,17 @@
     background-size: 18px;
 }
 
+/* Gather: extra wide row below the main 3-column grid */
+.lrg-gather-extras {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.lrg-thumb--wide {
+    aspect-ratio: 16 / 10;
+}
+
 /* CTA button — kept as .slide-button for backwards-compat with existing styles elsewhere */
 .slide-button {
     display: inline-flex;
@@ -279,8 +304,12 @@
     inset: 0;
     z-index: 1000;
     display: none;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 32px;
+    padding: 40px 0;
+    box-sizing: border-box;
     opacity: 0;
     transition: opacity 0.35s ease;
 }
@@ -293,17 +322,59 @@
 .lrg-lightbox__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(20, 20, 20, 0.78);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(8, 8, 10, 0.97);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     cursor: pointer;
 }
 
 .lrg-lightbox__stage {
     position: relative;
     width: min(94vw, 1100px);
-    height: min(90vh, 800px);
+    height: min(78vh, 760px);
     z-index: 2;
+}
+
+/* Section header — sits above the stage in the flex column */
+.lrg-lightbox__header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 10;
+    pointer-events: none;
+    text-align: center;
+}
+
+.lrg-lightbox__eyebrow {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.lrg-lightbox__title {
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 3vw, 2.85rem);
+    font-weight: 300;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+    margin: 0;
+    line-height: 1;
+    white-space: nowrap;
+    /* subtle accent — matches the on-page section feel */
+    padding: 0 0.16em;
+}
+
+.lrg-lightbox__divider {
+    width: 64px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.45);
+    margin-top: 4px;
 }
 
 .lrg-lightbox__swiper {
@@ -337,17 +408,23 @@
     transform: scale(1.05);
 }
 
-/* Counter — small, bottom-right of image area (above the card) */
+/* Counter — small pill at top-left of the image */
 .lrg-lightbox__counter {
     position: absolute;
     top: 16px;
-    left: 24px;
-    color: rgba(255, 255, 255, 0.85);
+    left: 16px;
+    color: #fff;
     font-family: var(--font-body);
-    font-size: 0.7rem;
-    letter-spacing: 0.18em;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 7px 14px;
+    border-radius: 999px;
     z-index: 15;
     pointer-events: none;
 }
@@ -395,13 +472,13 @@
 /* Card: white, centered horizontally, overlaps image bottom */
 .lrg-lightbox .slide-content {
     position: absolute;
-    bottom: 32px;
+    bottom: 28px;
     left: 50%;
     transform: translateX(-50%);
-    width: min(880px, 88%);
+    width: min(680px, 86%);
     background: #fff;
     border-radius: 12px;
-    padding: 44px 56px 36px;
+    padding: 30px 40px 26px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -412,12 +489,12 @@
 
 .lrg-lightbox .slide-content h3 {
     font-family: var(--font-display);
-    font-size: clamp(1.8rem, 2.6vw, 2.5rem);
+    font-size: clamp(1.5rem, 2.2vw, 2rem);
     font-weight: 300;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--eleanor-charcoal);
-    margin: 0 0 22px;
+    margin: 0 0 14px;
     text-align: center;
     line-height: 1.15;
 }
@@ -425,12 +502,12 @@
 .lrg-lightbox .slide-content p {
     font-family: var(--font-body);
     font-weight: 300;
-    font-size: 1rem;
-    line-height: 1.7;
+    font-size: 0.95rem;
+    line-height: 1.6;
     color: rgba(0, 0, 0, 0.72);
-    margin: 0 auto 28px;
+    margin: 0 auto 20px;
     text-align: center;
-    max-width: 56ch;
+    max-width: 52ch;
 }
 
 /* CTA: wide rectangular charcoal bar inside the card */
@@ -438,53 +515,60 @@
     align-self: stretch;
     width: 100%;
     border-radius: 8px;
-    padding: 16px 28px;
+    padding: 13px 24px;
     text-align: center;
     justify-content: center;
 }
 
-/* Lightbox nav arrows — plain white chevrons on image (no glass circle) */
+/* Lightbox nav arrows — glass pill on image, matches counter/close pill language */
 .lrg-lightbox .swiper-button-prev,
 .lrg-lightbox .swiper-button-next {
-    width: 44px;
-    height: 44px;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
+    width: 54px;
+    height: 54px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
     top: 32%;
     transform: translateY(-50%);
-    transition: opacity 0.2s ease;
-    opacity: 0.85;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    opacity: 1;
 }
 
 .lrg-lightbox .swiper-button-prev {
-    left: 24px;
+    left: 20px;
 }
 
 .lrg-lightbox .swiper-button-next {
-    right: 24px;
+    right: 20px;
 }
 
 .lrg-lightbox .swiper-button-prev:hover,
 .lrg-lightbox .swiper-button-next:hover {
-    background: transparent;
-    opacity: 1;
+    background: rgba(0, 0, 0, 0.65);
+    border-color: rgba(255, 255, 255, 0.45);
+    transform: translateY(-50%) scale(1.06);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
 }
 
 .lrg-lightbox .swiper-button-prev:after,
 .lrg-lightbox .swiper-button-next:after {
-    font-size: 2rem;
-    font-weight: 300;
+    font-size: 1.5rem;
+    font-weight: 400;
     color: #fff;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
 /* Lock body scroll when lightbox is open */
 body.lrg-lightbox-open {
     overflow: hidden;
+}
+
+/* Hide the floating page section-nav while a lightbox is open */
+body.lrg-lightbox-open .section-nav {
+    display: none;
 }
 
 /* ============================================================
@@ -596,10 +680,48 @@ body.lrg-lightbox-open {
         aspect-ratio: 4 / 3;
     }
 
+    .lrg-gather-extras {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .lrg-thumb--wide {
+        aspect-ratio: 4 / 3;
+    }
+
     /* Lightbox: stack image then card, no overlap */
+    .lrg-lightbox {
+        gap: 16px;
+        padding: 20px 0;
+    }
+
     .lrg-lightbox__stage {
         width: 96vw;
-        height: 92vh;
+        height: min(82vh, 800px);
+    }
+
+    .lrg-lightbox__header {
+        gap: 6px;
+    }
+
+    .lrg-lightbox__eyebrow {
+        font-size: 0.55rem;
+        letter-spacing: 0.26em;
+    }
+
+    .lrg-lightbox__title {
+        font-size: 1.15rem;
+        letter-spacing: 0.24em;
+    }
+
+    .lrg-lightbox__divider {
+        width: 40px;
+    }
+
+    .lrg-lightbox .swiper-button-prev,
+    .lrg-lightbox .swiper-button-next {
+        width: 44px;
+        height: 44px;
     }
 
     .lrg-lightbox__close {

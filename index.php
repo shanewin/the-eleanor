@@ -293,7 +293,7 @@ endif;
 
                 <!-- LIVE -->
                 <article class="lrg-row" data-category="live">
-                    <a class="lrg-hero" href="#" data-lightbox-index="0" data-label="Skyline Living" aria-label="Open Skyline Living in gallery">
+                    <a class="lrg-hero" href="#" data-lightbox-target="live" data-lightbox-index="0" data-label="Skyline Living" aria-label="Open Skyline Living in gallery">
                         <img src="img/slider-pics/skyline_living.jpg" alt="The Eleanor Skyline Living">
                     </a>
                     <div class="lrg-content">
@@ -304,22 +304,24 @@ endif;
                         <a href="#waitlist" class="slide-button">Join the Waitlist</a>
                     </div>
                     <div class="lrg-thumbs lrg-thumbs--stack">
-                        <a class="lrg-thumb" href="#" data-lightbox-index="1" data-label="Open Plan Living" aria-label="Open Open Plan Living in gallery">
+                        <a class="lrg-thumb" href="#" data-lightbox-target="live" data-lightbox-index="1" data-label="Open Plan Living" aria-label="Open Open Plan Living in gallery">
                             <img src="img/slider-pics/open_plan_living.jpg" alt="The Eleanor Open Plan Living">
                         </a>
-                        <a class="lrg-thumb" href="#" data-lightbox-index="2" data-label="Terrace Living" aria-label="Open Terrace Living in gallery">
+                        <a class="lrg-thumb" href="#" data-lightbox-target="live" data-lightbox-index="2" data-label="Terrace Living" aria-label="Open Terrace Living in gallery">
                             <img src="img/slider-pics/terrace_living.jpg" alt="The Eleanor Terrace Living">
                         </a>
                     </div>
                 </article>
 
+                <hr class="lrg-row-divider" aria-hidden="true">
+
                 <!-- REST (inverted layout: thumbs left, hero right) -->
                 <article class="lrg-row lrg-row--reverse" data-category="rest">
                     <div class="lrg-thumbs lrg-thumbs--stack">
-                        <a class="lrg-thumb" href="#" data-lightbox-index="4" data-label="Tucked Away" aria-label="Open Tucked Away in gallery">
+                        <a class="lrg-thumb" href="#" data-lightbox-target="rest" data-lightbox-index="1" data-label="Tucked Away" aria-label="Open Tucked Away in gallery">
                             <img src="img/slider-pics/private_suite.jpg" alt="The Eleanor Tucked Away">
                         </a>
-                        <a class="lrg-thumb" href="#" data-lightbox-index="5" data-label="Effortless Living" aria-label="Open Effortless Living in gallery">
+                        <a class="lrg-thumb" href="#" data-lightbox-target="rest" data-lightbox-index="2" data-label="Effortless Living" aria-label="Open Effortless Living in gallery">
                             <img src="img/slider-pics/studio_living.jpg" alt="The Eleanor Effortless Living">
                         </a>
                     </div>
@@ -330,14 +332,16 @@ endif;
                         <p class="lrg-description">Bedrooms made for slow mornings, quiet evenings, and the kind of sleep you don't want to leave. Step out of the city and into a room that knows how to hold its calm.</p>
                         <a href="#availability" class="slide-button">View Floor Plans</a>
                     </div>
-                    <a class="lrg-hero" href="#" data-lightbox-index="3" data-label="Skyline Bedroom" aria-label="Open Skyline Bedroom in gallery">
+                    <a class="lrg-hero" href="#" data-lightbox-target="rest" data-lightbox-index="0" data-label="Skyline Bedroom" aria-label="Open Skyline Bedroom in gallery">
                         <img src="img/slider-pics/skyline_bedroom.jpg" alt="The Eleanor Skyline Bedroom">
                     </a>
                 </article>
 
+                <hr class="lrg-row-divider" aria-hidden="true">
+
                 <!-- GATHER -->
                 <article class="lrg-row lrg-row--gather" data-category="gather">
-                    <a class="lrg-hero" href="#" data-lightbox-index="6" data-label="The Library" aria-label="Open The Library in gallery">
+                    <a class="lrg-hero" href="#" data-lightbox-target="gather" data-lightbox-index="0" data-label="The Library" aria-label="Open The Library in gallery">
                         <img src="img/slider-pics/residents_library.jpg" alt="The Eleanor The Library">
                     </a>
                     <div class="lrg-content">
@@ -348,22 +352,37 @@ endif;
                         <a href="#availability" class="slide-button">Check Availability</a>
                     </div>
                     <div class="lrg-thumbs lrg-thumbs--stack">
-                        <a class="lrg-thumb" href="#" data-lightbox-index="7" data-label="Strength, On Your Terms" aria-label="Open Strength, On Your Terms in gallery">
+                        <a class="lrg-thumb" href="#" data-lightbox-target="gather" data-lightbox-index="1" data-label="Strength, On Your Terms" aria-label="Open Strength, On Your Terms in gallery">
                             <img src="img/slider-pics/fitness_center.jpg" alt="The Eleanor Strength, On Your Terms">
                         </a>
-                        <a class="lrg-thumb" href="#" data-lightbox-index="8" data-label="The Courtyard" aria-label="Open The Courtyard in gallery">
+                        <a class="lrg-thumb" href="#" data-lightbox-target="gather" data-lightbox-index="2" data-label="The Courtyard" aria-label="Open The Courtyard in gallery">
                             <img src="img/slider-pics/garden_courtyard.jpg" alt="The Eleanor The Courtyard">
                         </a>
                     </div>
                 </article>
 
+                <!-- GATHER — extra wide row -->
+                <div class="lrg-gather-extras">
+                    <a class="lrg-thumb lrg-thumb--wide" href="#" data-lightbox-target="gather" data-lightbox-index="3" data-label="The Rooftop" aria-label="Open The Rooftop in gallery">
+                        <img src="img/slider-pics/rooftop.jpg" alt="The Eleanor Rooftop">
+                    </a>
+                    <a class="lrg-thumb lrg-thumb--wide" href="#" data-lightbox-target="gather" data-lightbox-index="4" data-label="Heads-Down Hours" aria-label="Open Heads-Down Hours in gallery">
+                        <img src="img/slider-pics/work-station.jpg" alt="The Eleanor Work Lounge">
+                    </a>
+                </div>
+
             </div>
         </div>
       </div>
 
-      <!-- ======= LIGHTBOX (10-slide gallery) ======= -->
-      <div id="lrg-lightbox" class="lrg-lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Live, Rest, Gather gallery">
+      <!-- ======= LIGHTBOX: LIVE (3 slides) ======= -->
+      <div id="lrg-lightbox-live" class="lrg-lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Live gallery">
         <div class="lrg-lightbox__backdrop" data-lightbox-close></div>
+        <div class="lrg-lightbox__header">
+            <div class="lrg-lightbox__eyebrow">01 — Residences</div>
+            <h2 class="lrg-lightbox__title">Live</h2>
+            <div class="lrg-lightbox__divider"></div>
+        </div>
         <div class="lrg-lightbox__stage">
             <button class="lrg-lightbox__close" type="button" data-lightbox-close aria-label="Close gallery">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -372,7 +391,7 @@ endif;
             </button>
             <div class="swiper lrg-lightbox__swiper">
                 <div class="swiper-wrapper">
-                    <!-- 0: Skyline Living (LIVE hero) -->
+                    <!-- 0: Skyline Living -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/skyline_living.jpg" alt="The Eleanor Skyline Living"></div>
@@ -384,7 +403,7 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 1: Open Plan Living (LIVE thumb 1) -->
+                    <!-- 1: Open Plan Living -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/open_plan_living.jpg" alt="The Eleanor Open Plan Living"></div>
@@ -396,7 +415,7 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 2: Terrace Living (LIVE thumb 2) -->
+                    <!-- 2: Terrace Living -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/terrace_living.jpg" alt="The Eleanor Terrace Living"></div>
@@ -408,7 +427,31 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 3: Skyline Bedroom (REST hero) -->
+                </div>
+                <div class="swiper-button-prev"></div>
+                <div class="swiper-button-next"></div>
+            </div>
+            <div class="lrg-lightbox__counter" aria-live="polite">1 of 3</div>
+        </div>
+      </div>
+
+      <!-- ======= LIGHTBOX: REST (3 slides) ======= -->
+      <div id="lrg-lightbox-rest" class="lrg-lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Rest gallery">
+        <div class="lrg-lightbox__backdrop" data-lightbox-close></div>
+        <div class="lrg-lightbox__header">
+            <div class="lrg-lightbox__eyebrow">02 — Sanctuary</div>
+            <h2 class="lrg-lightbox__title">Rest</h2>
+            <div class="lrg-lightbox__divider"></div>
+        </div>
+        <div class="lrg-lightbox__stage">
+            <button class="lrg-lightbox__close" type="button" data-lightbox-close aria-label="Close gallery">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <div class="swiper lrg-lightbox__swiper">
+                <div class="swiper-wrapper">
+                    <!-- 0: Skyline Bedroom -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/skyline_bedroom.jpg" alt="The Eleanor Skyline Bedroom"></div>
@@ -420,7 +463,7 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 4: Tucked Away (REST thumb 1) -->
+                    <!-- 1: Tucked Away -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/private_suite.jpg" alt="The Eleanor Tucked Away"></div>
@@ -432,7 +475,7 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 5: Effortless Living (REST thumb 2) -->
+                    <!-- 2: Effortless Living -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/studio_living.jpg" alt="The Eleanor Effortless Living"></div>
@@ -444,7 +487,31 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 6: The Library (GATHER hero) -->
+                </div>
+                <div class="swiper-button-prev"></div>
+                <div class="swiper-button-next"></div>
+            </div>
+            <div class="lrg-lightbox__counter" aria-live="polite">1 of 3</div>
+        </div>
+      </div>
+
+      <!-- ======= LIGHTBOX: GATHER (5 slides) ======= -->
+      <div id="lrg-lightbox-gather" class="lrg-lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Gather gallery">
+        <div class="lrg-lightbox__backdrop" data-lightbox-close></div>
+        <div class="lrg-lightbox__header">
+            <div class="lrg-lightbox__eyebrow">03 — Amenities</div>
+            <h2 class="lrg-lightbox__title">Gather</h2>
+            <div class="lrg-lightbox__divider"></div>
+        </div>
+        <div class="lrg-lightbox__stage">
+            <button class="lrg-lightbox__close" type="button" data-lightbox-close aria-label="Close gallery">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <div class="swiper lrg-lightbox__swiper">
+                <div class="swiper-wrapper">
+                    <!-- 0: The Library -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/residents_library.jpg" alt="The Eleanor The Library"></div>
@@ -456,7 +523,7 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 7: Strength, On Your Terms (GATHER thumb 1) -->
+                    <!-- 1: Strength, On Your Terms -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/fitness_center.jpg" alt="The Eleanor Strength, On Your Terms"></div>
@@ -468,14 +535,38 @@ endif;
                             </div>
                         </div>
                     </div>
-                    <!-- 8: The Courtyard (GATHER thumb 2) -->
+                    <!-- 2: The Courtyard -->
                     <div class="swiper-slide">
                         <div class="portfolio-slide">
                             <div class="slide-image"><img src="img/slider-pics/garden_courtyard.jpg" alt="The Eleanor The Courtyard"></div>
                             <div class="slide-content">
                                 <h3>The Courtyard</h3>
                                 <div class="slide-divider"></div>
-                                <p>A private outdoor escape just downstairs. Settle into the swing with a coffee, host friends for a long lunch, or take on the oversized chess board — fresh air and open sky, without ever leaving home.</p>
+                                <p>A slow morning with coffee on the swing. An afternoon chess game that runs into three. The courtyard moves at its own pace — quieter, greener, and just past your door.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 3: The Rooftop -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image"><img src="img/slider-pics/rooftop.jpg" alt="The Eleanor Rooftop"></div>
+                            <div class="slide-content">
+                                <h3>The Rooftop</h3>
+                                <div class="slide-divider"></div>
+                                <p>The rooftop is for evenings that turn into nights. Golden hour overhead, the city laid out below, and the kind of view that makes everyone stay for one more drink.</p>
+                                <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 4: Heads-Down Hours (Work Lounge) -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image"><img src="img/slider-pics/work-station.jpg" alt="The Eleanor Work Lounge"></div>
+                            <div class="slide-content">
+                                <h3>Heads-Down Hours</h3>
+                                <div class="slide-divider"></div>
+                                <p>Somewhere quieter than your kitchen table. A real desk, real light, and a door between you and the rest of the day — for when work actually needs to get done.</p>
                                 <a href="#availability" class="slide-button" data-lightbox-close>Schedule a Tour</a>
                             </div>
                         </div>
@@ -484,7 +575,7 @@ endif;
                 <div class="swiper-button-prev"></div>
                 <div class="swiper-button-next"></div>
             </div>
-            <div class="lrg-lightbox__counter" aria-live="polite">1 of 10</div>
+            <div class="lrg-lightbox__counter" aria-live="polite">1 of 5</div>
         </div>
       </div>
     </section>

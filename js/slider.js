@@ -1,42 +1,51 @@
-// Live, Rest, Gather — lightbox-driven gallery
+// Live, Rest, Gather — three independent lightbox galleries (live / rest / gather)
 document.addEventListener('DOMContentLoaded', function () {
     const exploreSection = document.getElementById('explore');
     if (!exploreSection) return;
 
-    const lightbox = document.getElementById('lrg-lightbox');
-    const swiperEl = lightbox?.querySelector('.lrg-lightbox__swiper');
-    const counterEl = lightbox?.querySelector('.lrg-lightbox__counter');
-    if (!lightbox || !swiperEl) return;
+    const categories = ['live', 'rest', 'gather'];
+    const sliders = {};
 
-    const totalSlides = swiperEl.querySelectorAll('.swiper-slide').length;
+    categories.forEach((cat) => {
+        const lightbox = document.getElementById(`lrg-lightbox-${cat}`);
+        if (!lightbox) return;
+        const swiperEl = lightbox.querySelector('.lrg-lightbox__swiper');
+        const counterEl = lightbox.querySelector('.lrg-lightbox__counter');
+        if (!swiperEl) return;
 
-    const updateCounter = (index) => {
-        if (!counterEl) return;
-        counterEl.textContent = `${index + 1} of ${totalSlides}`;
-    };
+        const totalSlides = swiperEl.querySelectorAll('.swiper-slide').length;
+        const updateCounter = (index) => {
+            if (counterEl) counterEl.textContent = `${index + 1} of ${totalSlides}`;
+        };
 
-    const slider = new Swiper(swiperEl, {
-        direction: 'horizontal',
-        loop: true,
-        speed: 600,
-        navigation: {
-            nextEl: '#lrg-lightbox .swiper-button-next',
-            prevEl: '#lrg-lightbox .swiper-button-prev',
-        },
-        effect: 'fade',
-        fadeEffect: { crossFade: true },
-        keyboard: { enabled: true },
-        on: {
-            slideChange: function () {
-                updateCounter(this.realIndex);
+        const slider = new Swiper(swiperEl, {
+            direction: 'horizontal',
+            loop: totalSlides > 1,
+            speed: 600,
+            navigation: {
+                nextEl: `#lrg-lightbox-${cat} .swiper-button-next`,
+                prevEl: `#lrg-lightbox-${cat} .swiper-button-prev`,
+            },
+            effect: 'fade',
+            fadeEffect: { crossFade: true },
+            // Keyboard wired manually below so only the open lightbox responds.
+            keyboard: { enabled: false },
+            on: {
+                slideChange: function () {
+                    updateCounter(this.realIndex);
+                }
             }
-        }
+        });
+
+        sliders[cat] = { lightbox, slider, updateCounter };
     });
 
-    const openLightbox = (index) => {
-        // Show lightbox first so Swiper can measure its container.
-        // If we call slideToLoop while the lightbox is display:none, Swiper
-        // sees 0-width slides and can't navigate — stays stuck at slide 0.
+    const openLightbox = (cat, index) => {
+        const entry = sliders[cat];
+        if (!entry) return;
+        const { lightbox, slider, updateCounter } = entry;
+        // Show first so Swiper can measure the container (slideToLoop on a
+        // display:none swiper sticks at slide 0 — same race as before).
         lightbox.classList.add('is-open');
         lightbox.setAttribute('aria-hidden', 'false');
         document.body.classList.add('lrg-lightbox-open');
@@ -48,38 +57,45 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
-    const closeLightbox = () => {
-        lightbox.classList.remove('is-open');
-        lightbox.setAttribute('aria-hidden', 'true');
+    const closeAll = () => {
+        Object.values(sliders).forEach(({ lightbox }) => {
+            lightbox.classList.remove('is-open');
+            lightbox.setAttribute('aria-hidden', 'true');
+        });
         document.body.classList.remove('lrg-lightbox-open');
     };
 
-    // Open on hero / thumb click
-    exploreSection.querySelectorAll('[data-lightbox-index]').forEach((el) => {
+    // Open on hero / thumb click — dispatch by data-lightbox-target
+    exploreSection.querySelectorAll('[data-lightbox-target]').forEach((el) => {
         el.addEventListener('click', (e) => {
             e.preventDefault();
+            const cat = el.getAttribute('data-lightbox-target');
             const idx = parseInt(el.getAttribute('data-lightbox-index'), 10);
-            if (Number.isFinite(idx)) openLightbox(idx);
+            if (Number.isFinite(idx) && sliders[cat]) openLightbox(cat, idx);
         });
     });
 
-    // Close handlers (backdrop, ✕ button, in-slide CTA buttons)
-    lightbox.querySelectorAll('[data-lightbox-close]').forEach((el) => {
+    // Close handlers (backdrop, ✕ button, in-slide CTA buttons) for all lightboxes
+    document.querySelectorAll('.lrg-lightbox [data-lightbox-close]').forEach((el) => {
         el.addEventListener('click', (e) => {
-            // Allow CTA links to navigate; just close the modal so the anchor scroll works.
+            // CTAs are anchor links — let them navigate, just close the modal.
             if (el.tagName === 'A' && el.getAttribute('href')?.startsWith('#')) {
-                closeLightbox();
+                closeAll();
                 return;
             }
             e.preventDefault();
-            closeLightbox();
+            closeAll();
         });
     });
 
-    // Esc to close
+    // Esc closes; ← / → only acts on the currently open lightbox
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && lightbox.classList.contains('is-open')) {
-            closeLightbox();
-        }
+        const openEntry = Object.values(sliders).find(({ lightbox }) =>
+            lightbox.classList.contains('is-open')
+        );
+        if (!openEntry) return;
+        if (e.key === 'Escape') closeAll();
+        else if (e.key === 'ArrowRight') openEntry.slider.slideNext();
+        else if (e.key === 'ArrowLeft') openEntry.slider.slidePrev();
     });
 });
