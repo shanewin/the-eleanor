@@ -39,6 +39,7 @@ switch ($action) {
     case 'get_communications': getCommunications($_GET['email'] ?? ''); break;
     case 'add_communication': addCommunication(); break;
     case 'delete_communication': deleteCommunication(); break;
+    case 'send_email': sendEmailToLead(); break;
     case 'sms_conversations': getSMSConversations(); break;
     case 'sms_thread': getSMSThread($_GET['phone'] ?? ''); break;
     case 'sms_send': sendSMSFromDashboard(); break;
@@ -1174,6 +1175,111 @@ function addCommunication() {
     ]);
 
     echo json_encode(['success' => true, 'communication' => $result]);
+}
+
+/**
+ * Send an outbound email to a lead from the Communications dashboard.
+ *
+ * From:     "The Eleanor" <leasing@eleanor.nyc> (via SMTP_FROM)
+ * Reply-To: the logged-in broker's email (so replies route back to them)
+ * Body:     plaintext, wrapped in minimal HTML + signature footer
+ *
+ * Logs the send into communications so it appears in the Email column of the
+ * unified timeline immediately.
+ */
+function sendEmailToLead() {
+    global $sb;
+
+    require_once __DIR__ . '/smtp-mail.php';
+    require_once __DIR__ . '/sms-ai.php'; // markFirstResponseIfUnset + autoUpdateLeadStatusFromWebhook
+
+    $broker = getCurrentBroker();
+    if (!$broker) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Authentication required']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    $leadEmail = trim($input['lead_email'] ?? '');
+    $subject   = trim($input['subject']    ?? '');
+    $body      = trim($input['body']       ?? '');
+
+    if (!filter_var($leadEmail, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'A valid lead email is required']);
+        return;
+    }
+    if ($subject === '' || $body === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Subject and body are required']);
+        return;
+    }
+
+    $brokerName  = trim($broker['name']  ?? '') ?: 'The Eleanor';
+    $brokerEmail = trim($broker['email'] ?? '') ?: SMTP_FROM;
+
+    // Convert the plaintext body to safe HTML — escape, then turn double
+    // newlines into <p> blocks and single newlines into <br>.
+    $escaped   = htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
+    $paragraphs = preg_split('/\n\s*\n/', $escaped);
+    $bodyHtml   = '';
+    foreach ($paragraphs as $p) {
+        $p = trim($p);
+        if ($p === '') continue;
+        $bodyHtml .= '<p style="margin:0 0 14px;line-height:1.6">' . nl2br($p) . "</p>\n";
+    }
+
+    $brokerNameSafe = htmlspecialchars($brokerName, ENT_QUOTES, 'UTF-8');
+    $address        = defined('THE_ELEANOR_ADDRESS') ? htmlspecialchars(THE_ELEANOR_ADDRESS, ENT_QUOTES, 'UTF-8') : '52 4th Avenue, Brooklyn, NY 11217';
+
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>'
+        . '<body style="margin:0;padding:0;background:#f5f3ef;font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif">'
+        . '<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f5f3ef"><tr><td align="center" style="padding:32px 16px">'
+        . '<table width="560" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:560px;border-radius:6px;overflow:hidden;border:1px solid #e8e4dc">'
+        . '<tr><td style="padding:32px 40px 8px;font-size:15px;color:#222">'
+        . $bodyHtml
+        . '<p style="margin:24px 0 0;color:#555">— ' . $brokerNameSafe . '<br>The Eleanor</p>'
+        . '</td></tr>'
+        . '<tr><td style="padding:24px 40px 28px;border-top:1px solid #ebe7df;text-align:center;font-size:12px;color:#888;line-height:1.6">'
+        . 'The Eleanor &middot; ' . $address . '<br>'
+        . '<a href="https://eleanor.nyc" style="color:#888;text-decoration:underline">eleanor.nyc</a>'
+        . '</td></tr>'
+        . '</table></td></tr></table></body></html>';
+
+    // From: "The Eleanor" <leasing@eleanor.nyc> (set in config.php via SMTP_FROM).
+    // Reply-To: the broker's own email so applicant responses route to them.
+    $sent = smtpSend($leadEmail, $subject, $html, $brokerEmail, true);
+
+    $sb->insert('communications', [
+        'lead_email' => strtolower($leadEmail),
+        'direction'  => 'outbound',
+        'channel'    => 'email',
+        'subject'    => $subject,
+        'body'       => $html,
+        'sender'     => $brokerName,
+        'recipient'  => $leadEmail,
+        'status'     => $sent ? 'sent' : 'failed',
+    ]);
+
+    if ($sent) {
+        // Advance the pipeline (no-op if already at or past Contacted) and
+        // stamp first_response_at so SLA dashboards stay accurate.
+        if (function_exists('autoUpdateLeadStatusFromWebhook')) {
+            autoUpdateLeadStatusFromWebhook(strtolower($leadEmail), 'Contacted');
+        }
+        if (function_exists('markFirstResponseIfUnset')) {
+            markFirstResponseIfUnset(strtolower($leadEmail), 'email');
+        }
+    }
+
+    if (!$sent) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Email send failed (logged as failed in communications)']);
+        return;
+    }
+
+    echo json_encode(['success' => true]);
 }
 
 function deleteCommunication() {

@@ -130,8 +130,13 @@ include __DIR__ . '/includes/layout-header.php';
                 <div class="card-body p-3 flex-grow-1" id="emailThreadContainer" style="overflow-y:auto;max-height:calc(100vh - 480px);min-height:300px">
                     <div class="text-center text-body-tertiary py-4 small">Loading...</div>
                 </div>
-                <div class="border-top border-secondary p-3 text-center">
-                    <small class="text-white-50"><i class="bi bi-info-circle me-1"></i>Outbound email composer coming soon</small>
+                <div id="emailComposeBox" class="border-top border-secondary p-3" style="display:none">
+                    <button class="btn btn-primary w-100" onclick="openEmailComposer()">
+                        <i class="bi bi-pencil-square me-1"></i>Compose Email
+                    </button>
+                </div>
+                <div id="noEmailMessage" class="border-top border-secondary p-3 text-center" style="display:none">
+                    <small class="text-white-50"><i class="bi bi-exclamation-circle me-1"></i>No email address on file</small>
                 </div>
             </div>
         </div>
@@ -210,6 +215,58 @@ include __DIR__ . '/includes/layout-header.php';
             <div class="modal-footer border-secondary">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveComm()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Compose Email Modal -->
+<div class="modal fade" id="emailComposeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-envelope-fill me-2"></i>Compose Email</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small text-white-50">To</label>
+                    <input type="email" class="form-control bg-body-tertiary border-secondary text-white" id="emailComposeTo" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-white-50">Subject</label>
+                    <input type="text" class="form-control bg-dark border-secondary text-white" id="emailComposeSubject" placeholder="Subject">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-white-50">Message</label>
+                    <textarea class="form-control bg-dark border-secondary text-white" id="emailComposeBody" rows="10" placeholder="Write your message..."></textarea>
+                    <div class="form-text text-white-50 small">Sent as <strong>leasing@eleanor.nyc</strong>. Replies route to <span id="emailComposeReplyTo" class="text-info"></span>. Your name and a footer are appended automatically.</div>
+                </div>
+                <div id="emailComposeStatus" class="small" style="display:none"></div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="emailComposeSendBtn" onclick="sendEmailFromComposer()">
+                    <i class="bi bi-send me-1"></i>Send
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Viewer Modal -->
+<div class="modal fade" id="emailViewerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <div class="me-3" style="min-width:0;flex:1">
+                    <h5 class="modal-title text-white mb-1" id="emailViewerSubject" style="font-size:1rem">Email</h5>
+                    <div class="text-white-50 small" id="emailViewerMeta"></div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" style="background:#f5f3ef">
+                <iframe id="emailViewerFrame" sandbox="allow-same-origin" style="width:100%;min-height:60vh;border:0;background:#f5f3ef" srcdoc=""></iframe>
             </div>
         </div>
     </div>

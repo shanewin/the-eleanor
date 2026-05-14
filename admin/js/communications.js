@@ -138,6 +138,7 @@ async function showCommTimeline(email, skipUrlUpdate) {
         renderConversations(data.timeline || []);
         renderInternalLog(data.timeline || []);
         setupReplyBox(data.lead);
+        setupEmailComposer(data.lead);
         setupAIToggle(data);
 
         // Mark messages as read
@@ -435,6 +436,15 @@ function renderConversationColumn(containerId, countId, items, kind) {
         return;
     }
 
+    if (kind === 'email') {
+        container.innerHTML = renderEmailThreads(items);
+        // Cache items by id so the viewer modal can pull rich HTML body on demand
+        // without re-fetching the timeline.
+        cacheEmailItems(items);
+        container.scrollTop = container.scrollHeight;
+        return;
+    }
+
     const grouped = {};
     items.forEach(item => {
         const day = new Date(item.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -446,7 +456,7 @@ function renderConversationColumn(containerId, countId, items, kind) {
     Object.entries(grouped).forEach(([day, dayItems]) => {
         html += '<div class="text-center my-2"><span class="badge bg-body-secondary text-white-50 px-3 py-1" style="font-size:0.65rem;letter-spacing:0.05em">' + esc(day) + '</span></div>';
         dayItems.forEach(item => {
-            html += kind === 'sms' ? renderSMSBubble(item) : renderEmailCard(item);
+            html += renderSMSBubble(item);
         });
     });
 
@@ -454,22 +464,116 @@ function renderConversationColumn(containerId, countId, items, kind) {
     container.scrollTop = container.scrollHeight;
 }
 
-function renderEmailCard(item) {
-    const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// ── Email rendering ────────────────────────────────────────────────────────
+//
+// Emails are grouped by normalised subject (Re:/Fwd: stripped) so a future
+// reply thread collapses into one card. Each card shows: latest subject,
+// who/when, and a plain-text preview. Click "View full email" to open the
+// original HTML in a sandboxed iframe modal.
+
+const _emailCache = {};
+
+function cacheEmailItems(items) {
+    items.forEach(it => { if (it && it.id != null) _emailCache[it.id] = it; });
+}
+
+function normalizeSubject(s) {
+    if (!s) return '(no subject)';
+    return String(s).replace(/^\s*((re|fwd?):\s*)+/i, '').trim() || '(no subject)';
+}
+
+function stripHtmlToText(html) {
+    if (!html) return '';
+    // If it doesn't look like HTML, return as-is (likely plain text from a manual log).
+    if (!/<[a-z][\s\S]*?>/i.test(html)) return html;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    // Drop <style> and <script> blocks before extracting text.
+    tmp.querySelectorAll('style, script').forEach(n => n.remove());
+    return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function renderEmailThreads(items) {
+    // Group by normalised subject and render each thread oldest-first inside,
+    // newest-thread-first overall.
+    const threads = {};
+    items.forEach(item => {
+        const key = normalizeSubject(item.subject);
+        if (!threads[key]) threads[key] = [];
+        threads[key].push(item);
+    });
+
+    const orderedKeys = Object.keys(threads).sort((a, b) => {
+        const aLast = Math.max(...threads[a].map(i => new Date(i.created_at).getTime()));
+        const bLast = Math.max(...threads[b].map(i => new Date(i.created_at).getTime()));
+        return aLast - bLast; // chronological — newest at bottom (matches SMS)
+    });
+
+    return orderedKeys.map(key => {
+        const msgs = threads[key].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        return msgs.map((m, idx) => renderEmailCard(m, idx === 0, msgs.length, key)).join('');
+    }).join('');
+}
+
+function renderEmailCard(item, isThreadHead, threadCount, threadKey) {
+    const time = new Date(item.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const isInbound = item.direction === 'inbound';
-    const borderColor = isInbound ? 'rgba(16,185,129,0.5)' : 'rgba(59,130,246,0.5)';
-    const labelColor = isInbound ? '#10b981' : '#3b82f6';
+    const borderColor = isInbound ? 'rgba(16,185,129,0.5)' : 'rgba(91,155,246,0.55)';
+    const labelColor = isInbound ? '#10b981' : '#5b9bf6';
     const dirLabel = isInbound ? 'Inbound' : 'Outbound';
 
+    const preview = stripHtmlToText(item.body || '');
+    const previewShort = preview.length > 180 ? preview.slice(0, 180).trim() + '…' : preview;
+
+    const threadBadge = (isThreadHead && threadCount > 1)
+        ? '<span class="badge bg-secondary bg-opacity-25 text-white-50 ms-2" style="font-size:0.6rem">' + threadCount + ' in thread</span>'
+        : '';
+
+    const subjectLine = isThreadHead
+        ? '<div class="fw-semibold text-white mb-1" style="font-size:0.88rem">' + esc(threadKey) + threadBadge + '</div>'
+        : '';
+
+    const senderLabel = item.sender ? esc(item.sender) : (isInbound ? 'Lead' : 'Eleanor');
+    const statusBadge = item.status === 'failed'
+        ? '<span class="badge bg-danger bg-opacity-25 text-danger ms-2" style="font-size:0.6rem">failed</span>'
+        : '';
+
     return '<div class="rounded-3 mb-2 p-2" style="border-left:3px solid ' + borderColor + ';background:rgba(255,255,255,0.02)">'
+        + subjectLine
         + '<div class="d-flex justify-content-between align-items-center mb-1">'
-        + '<span style="font-size:0.65rem;color:' + labelColor + ';font-weight:600">' + dirLabel + '</span>'
-        + '<span class="text-white-50" style="font-size:0.7rem">' + time + '</span>'
+        + '<span style="font-size:0.7rem"><span style="color:' + labelColor + ';font-weight:600">' + dirLabel + '</span>'
+        + ' <span class="text-white-50">· ' + senderLabel + '</span>'
+        + statusBadge + '</span>'
+        + '<span class="text-white-50" style="font-size:0.7rem">' + esc(time) + '</span>'
         + '</div>'
-        + (item.subject ? '<div class="fw-semibold text-white" style="font-size:0.85rem">' + esc(item.subject) + '</div>' : '')
-        + (item.sender ? '<div class="text-white-50" style="font-size:0.7rem">From: ' + esc(item.sender) + '</div>' : '')
-        + (item.body ? '<div class="text-white-50 mt-1" style="font-size:0.8rem;line-height:1.4">' + esc(item.body) + '</div>' : '')
+        + (previewShort ? '<div class="text-white-50" style="font-size:0.8rem;line-height:1.4">' + esc(previewShort) + '</div>' : '')
+        + '<div class="mt-2"><a href="#" class="text-info" style="font-size:0.72rem;text-decoration:none" onclick="event.preventDefault(); openEmailViewer(' + (item.id ?? 'null') + ')">View full email →</a></div>'
         + '</div>';
+}
+
+function openEmailViewer(id) {
+    const item = _emailCache[id];
+    if (!item) return;
+
+    const subj = item.subject || '(no subject)';
+    const time = new Date(item.created_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const dirLabel = item.direction === 'inbound' ? 'From applicant' : 'To applicant';
+    const meta = dirLabel + ' · ' + (item.sender || '') + ' · ' + time;
+
+    document.getElementById('emailViewerSubject').textContent = subj;
+    document.getElementById('emailViewerMeta').textContent = meta;
+
+    const frame = document.getElementById('emailViewerFrame');
+    const body = item.body || '';
+    // If it's plain text, wrap it in a simple HTML shell so the iframe styles consistently.
+    const isHtml = /<[a-z][\s\S]*?>/i.test(body);
+    const srcdoc = isHtml
+        ? body
+        : '<!DOCTYPE html><html><body style="font-family:-apple-system,Helvetica,Arial,sans-serif;padding:24px;color:#222;font-size:15px;line-height:1.6;white-space:pre-wrap">'
+            + body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</body></html>';
+    frame.srcdoc = srcdoc;
+
+    new bootstrap.Modal(document.getElementById('emailViewerModal')).show();
 }
 
 function renderInternalLog(items) {
@@ -567,6 +671,116 @@ function renderSMSBubble(item) {
         + '<div class="text-white" style="font-size:0.85rem;line-height:1.5">' + esc(item.body) + '</div>'
         + '<div class="mt-1" style="font-size:0.65rem;color:rgba(255,255,255,0.3)">' + time + statusIcon + '</div>'
         + '</div></div>';
+}
+
+// ── Email composer ─────────────────────────────────────────────────────────
+//
+// The composer modal sends via /api/admin-api.php?action=send_email.
+// Subject auto-fills with "Re: {last outbound subject}" when a thread exists,
+// otherwise "{Lead name} — The Eleanor". From is always info@eleanorbk.com;
+// Reply-To is set server-side to the logged-in broker.
+
+let _currentBroker = null;
+
+async function loadCurrentBroker() {
+    if (_currentBroker) return _currentBroker;
+    try {
+        const res = await fetch(API + '?action=get_my_profile');
+        const data = await res.json();
+        if (data && !data.error) _currentBroker = data;
+    } catch (e) { /* non-fatal */ }
+    return _currentBroker;
+}
+
+function setupEmailComposer(lead) {
+    const composeBox = document.getElementById('emailComposeBox');
+    const noEmailMsg = document.getElementById('noEmailMessage');
+
+    if (lead && lead.email) {
+        composeBox.style.display = 'block';
+        noEmailMsg.style.display = 'none';
+    } else {
+        composeBox.style.display = 'none';
+        if (noEmailMsg) noEmailMsg.style.display = 'block';
+    }
+}
+
+async function openEmailComposer() {
+    const leadEmail = document.getElementById('currentLeadEmail').value;
+    if (!leadEmail) return;
+
+    const lead = currentTimelineData && currentTimelineData.lead;
+    const leadName = (lead && lead.name) ? lead.name : '';
+
+    // Default subject: Re: {last outbound subject} if a prior thread exists,
+    // else "{Lead name} — The Eleanor".
+    let defaultSubject = leadName ? leadName + ' — The Eleanor' : 'The Eleanor';
+    const emailItems = (currentTimelineData && currentTimelineData.timeline || [])
+        .filter(it => classifyTimelineItem(it) === 'email')
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    if (emailItems.length && emailItems[0].subject) {
+        const last = emailItems[0].subject;
+        defaultSubject = /^\s*re:/i.test(last) ? last : 'Re: ' + last;
+    }
+
+    const broker = await loadCurrentBroker();
+    const brokerEmail = (broker && broker.email) || '';
+
+    document.getElementById('emailComposeTo').value = leadEmail;
+    document.getElementById('emailComposeSubject').value = defaultSubject;
+    document.getElementById('emailComposeBody').value = '';
+    document.getElementById('emailComposeReplyTo').textContent = brokerEmail || '(your account email)';
+    const statusEl = document.getElementById('emailComposeStatus');
+    statusEl.style.display = 'none';
+    statusEl.textContent = '';
+
+    new bootstrap.Modal(document.getElementById('emailComposeModal')).show();
+}
+
+async function sendEmailFromComposer() {
+    const to = document.getElementById('emailComposeTo').value.trim();
+    const subject = document.getElementById('emailComposeSubject').value.trim();
+    const body = document.getElementById('emailComposeBody').value.trim();
+    const statusEl = document.getElementById('emailComposeStatus');
+    const btn = document.getElementById('emailComposeSendBtn');
+
+    if (!to || !subject || !body) {
+        statusEl.className = 'small text-danger';
+        statusEl.textContent = 'Subject and message are required.';
+        statusEl.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending…';
+    statusEl.style.display = 'none';
+
+    try {
+        const res = await fetch(API + '?action=send_email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead_email: to, subject, body })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('emailComposeModal')).hide();
+            // Refresh the timeline so the new email appears in the Email column.
+            const email = document.getElementById('currentLeadEmail').value;
+            if (email) showCommTimeline(email, true);
+        } else {
+            statusEl.className = 'small text-danger';
+            statusEl.textContent = data.error || 'Send failed.';
+            statusEl.style.display = 'block';
+        }
+    } catch (e) {
+        statusEl.className = 'small text-danger';
+        statusEl.textContent = 'Network error. Try again.';
+        statusEl.style.display = 'block';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
 }
 
 // ── SMS Reply Box ──
