@@ -427,11 +427,23 @@ endif;
                             </div>
                         </div>
                     </div>
+                    <!-- 3: The Kitchen — lightbox only, no grid tile -->
+                    <div class="swiper-slide">
+                        <div class="portfolio-slide">
+                            <div class="slide-image"><img src="img/slider-pics/kitchen.jpg" alt="The Eleanor Kitchen"></div>
+                            <div class="slide-content">
+                                <h3>The Kitchen</h3>
+                                <div class="slide-divider"></div>
+                                <p>The kind of kitchen that pulls everyone in. Cook with a view of the skyline, host without ever feeling stuck behind the island, and let the rest of the room stay part of the conversation.</p>
+                                <a href="#waitlist" class="slide-button" data-lightbox-close>Join the Waitlist</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="swiper-button-prev"></div>
-                <div class="swiper-button-next"></div>
+                <button type="button" class="lrg-nav lrg-nav--prev" aria-label="Previous slide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2L4 7L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button type="button" class="lrg-nav lrg-nav--next" aria-label="Next slide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 2L10 7L5 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
-            <div class="lrg-lightbox__counter" aria-live="polite">1 of 3</div>
+            <div class="lrg-lightbox__counter" aria-live="polite">1 of 4</div>
         </div>
       </div>
 
@@ -488,8 +500,8 @@ endif;
                         </div>
                     </div>
                 </div>
-                <div class="swiper-button-prev"></div>
-                <div class="swiper-button-next"></div>
+                <button type="button" class="lrg-nav lrg-nav--prev" aria-label="Previous slide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2L4 7L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button type="button" class="lrg-nav lrg-nav--next" aria-label="Next slide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 2L10 7L5 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
             <div class="lrg-lightbox__counter" aria-live="polite">1 of 3</div>
         </div>
@@ -584,8 +596,8 @@ endif;
                         </div>
                     </div>
                 </div>
-                <div class="swiper-button-prev"></div>
-                <div class="swiper-button-next"></div>
+                <button type="button" class="lrg-nav lrg-nav--prev" aria-label="Previous slide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2L4 7L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button type="button" class="lrg-nav lrg-nav--next" aria-label="Next slide"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 2L10 7L5 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
             <div class="lrg-lightbox__counter" aria-live="polite">1 of 6</div>
         </div>

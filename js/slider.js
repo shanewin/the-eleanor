@@ -20,22 +20,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const slider = new Swiper(swiperEl, {
             direction: 'horizontal',
-            loop: totalSlides > 1,
+            // `loop` + `effect: fade` breaks the prev nav button in Swiper.
+            // `rewind` gives the same wrap-around UX and works correctly with fade.
+            rewind: totalSlides > 1,
             speed: 600,
-            navigation: {
-                nextEl: `#lrg-lightbox-${cat} .swiper-button-next`,
-                prevEl: `#lrg-lightbox-${cat} .swiper-button-prev`,
-            },
+            // Navigation wired manually below — Swiper's built-in nav has been
+            // unreliable here with fade + rewind, so we drive slidePrev/Next ourselves.
             effect: 'fade',
             fadeEffect: { crossFade: true },
-            // Keyboard wired manually below so only the open lightbox responds.
             keyboard: { enabled: false },
             on: {
                 slideChange: function () {
-                    updateCounter(this.realIndex);
+                    updateCounter(this.activeIndex);
                 }
             }
         });
+
+        // Custom nav buttons — fully owned by us, not touched by Swiper.
+        const prevBtn = lightbox.querySelector('.lrg-nav--prev');
+        const nextBtn = lightbox.querySelector('.lrg-nav--next');
+        if (prevBtn) {
+            prevBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                slider.slidePrev();
+            });
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                slider.slideNext();
+            });
+        }
 
         sliders[cat] = { lightbox, slider, updateCounter };
     });
@@ -52,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         requestAnimationFrame(() => {
             slider.update();
-            slider.slideToLoop(index, 0);
+            slider.slideTo(index, 0);
             updateCounter(index);
         });
     };

@@ -520,9 +520,11 @@
     justify-content: center;
 }
 
-/* Lightbox nav arrows — glass pill on image, matches counter/close pill language */
-.lrg-lightbox .swiper-button-prev,
-.lrg-lightbox .swiper-button-next {
+/* Lightbox nav buttons — custom (not Swiper's), glass pill matching counter/close */
+.lrg-nav {
+    position: absolute;
+    top: 32%;
+    transform: translateY(-50%);
     width: 54px;
     height: 54px;
     background: rgba(0, 0, 0, 0.45);
@@ -531,34 +533,33 @@
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-    top: 32%;
-    transform: translateY(-50%);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 25;
     transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    opacity: 1;
+    padding: 0;
 }
 
-.lrg-lightbox .swiper-button-prev {
+.lrg-nav--prev {
     left: 20px;
 }
 
-.lrg-lightbox .swiper-button-next {
+.lrg-nav--next {
     right: 20px;
 }
 
-.lrg-lightbox .swiper-button-prev:hover,
-.lrg-lightbox .swiper-button-next:hover {
+.lrg-nav:hover {
     background: rgba(0, 0, 0, 0.65);
     border-color: rgba(255, 255, 255, 0.45);
     transform: translateY(-50%) scale(1.06);
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
 }
 
-.lrg-lightbox .swiper-button-prev:after,
-.lrg-lightbox .swiper-button-next:after {
-    font-size: 1.5rem;
-    font-weight: 400;
-    color: #fff;
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+.lrg-nav svg {
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
 }
 
 /* Lock body scroll when lightbox is open */
@@ -566,8 +567,14 @@ body.lrg-lightbox-open {
     overflow: hidden;
 }
 
-/* Hide the floating page section-nav while a lightbox is open */
-body.lrg-lightbox-open .section-nav {
+/* Hide page chrome (section-nav chevrons + vertical MENU label and its parent column)
+   while a lightbox is open. The .vertical-nav parent is a fixed 110px column on the
+   left that intercepts clicks on the prev nav button — must be hidden, not just the
+   .menu-trigger child. */
+body.lrg-lightbox-open .section-nav,
+body.lrg-lightbox-open .vertical-nav,
+body.lrg-lightbox-open .menu-trigger,
+body.lrg-lightbox-open .menu-trigger-mobile {
     display: none;
 }
 
@@ -718,8 +725,7 @@ body.lrg-lightbox-open .section-nav {
         width: 40px;
     }
 
-    .lrg-lightbox .swiper-button-prev,
-    .lrg-lightbox .swiper-button-next {
+    .lrg-nav {
         width: 44px;
         height: 44px;
     }
@@ -784,19 +790,16 @@ body.lrg-lightbox-open .section-nav {
         max-width: 320px;
     }
 
-    .lrg-lightbox .swiper-button-prev {
+    .lrg-nav {
         top: 30%;
+    }
+
+    .lrg-nav--prev {
         left: 8px;
     }
 
-    .lrg-lightbox .swiper-button-next {
-        top: 30%;
+    .lrg-nav--next {
         right: 8px;
-    }
-
-    .lrg-lightbox .swiper-button-prev:after,
-    .lrg-lightbox .swiper-button-next:after {
-        font-size: 1.6rem;
     }
 }
 
