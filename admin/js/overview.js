@@ -110,7 +110,7 @@ function renderOverviewTable(leads) {
         const engagementLabel = '<span style="font-size:0.8rem;" class="fw-semibold">' + activityLabel + '</span>';
 
         // Grade pill
-        const gradeClass = lead.grade.score >= 80 ? 'elite' : '';
+        const gradeClass = lead.grade.gradeClass;
 
         // Assigned column
         const escapedLeadEmail = esc(lead.email || '').replace(/'/g, "\\'");
@@ -290,7 +290,7 @@ function renderLeadProfile(intel, logs, container, isPanel) {
 
     // Build the layout
     let html = closeBtn
-        + '<div class="score-circle ' + (totalScore >= 80 ? 'score-high' : '') + '">'
+        + '<div class="score-circle ' + esc(gradeInfo.gradeClass) + '">'
         + '<div class="score-val">' + esc(grade) + '</div>'
         + '<div class="score-label">Grade</div></div>'
         + '<img src="' + esc(primaryAvatar) + '" class="profile-avatar" onerror="this.src=\'' + esc(fallbackAvatar) + '\'">'

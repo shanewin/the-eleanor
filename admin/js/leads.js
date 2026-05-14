@@ -96,7 +96,7 @@ function renderLeadsTable() {
         const engagementLabel = '<span style="font-size:0.8rem;" class="fw-semibold">' + activityLabel + '</span>';
 
         // Grade
-        const gradeClass = lead.grade.score >= 80 ? 'elite' : '';
+        const gradeClass = lead.grade.gradeClass;
 
         // Assigned column
         const escapedLeadEmail = esc(lead.email || '').replace(/'/g, "\\'");

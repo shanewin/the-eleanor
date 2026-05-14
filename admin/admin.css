@@ -257,6 +257,37 @@ th.sortable.active { color: #6366f1; }
     border-color: rgba(99,102,241,0.4);
     background: rgba(99,102,241,0.08);
 }
+.score-circle.grade-a-plus,
+.score-circle.grade-a {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.4);
+}
+.score-circle.grade-a-plus .score-val,
+.score-circle.grade-a .score-val { color: #86efac; }
+.score-circle.grade-b-plus,
+.score-circle.grade-b {
+    background: rgba(59,130,246,0.08);
+    border-color: rgba(59,130,246,0.4);
+}
+.score-circle.grade-b-plus .score-val,
+.score-circle.grade-b .score-val { color: #93c5fd; }
+.score-circle.grade-c-plus,
+.score-circle.grade-c {
+    background: rgba(234,179,8,0.08);
+    border-color: rgba(234,179,8,0.4);
+}
+.score-circle.grade-c-plus .score-val,
+.score-circle.grade-c .score-val { color: #fde047; }
+.score-circle.grade-d {
+    background: rgba(249,115,22,0.08);
+    border-color: rgba(249,115,22,0.4);
+}
+.score-circle.grade-d .score-val { color: #fdba74; }
+.score-circle.grade-f {
+    background: rgba(239,68,68,0.08);
+    border-color: rgba(239,68,68,0.4);
+}
+.score-circle.grade-f .score-val { color: #fca5a5; }
 .score-val { font-size: 1.4rem; font-weight: 700; color: #fff; }
 .score-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); }
 
