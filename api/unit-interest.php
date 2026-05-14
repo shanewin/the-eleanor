@@ -53,4 +53,17 @@ processForm([
             $f['message'],
         ]);
     },
+
+    'display_fields' => function (array $f) {
+        return [
+            'Unit'         => $f['unit'],
+            'Name'         => trim($f['firstName'] . ' ' . $f['lastName']),
+            'Email'        => $f['email'],
+            'Phone'        => $f['phone'],
+            'Move-in Date' => $f['moveInDate'],
+            'Budget'       => $f['budget'],
+            'Heard via'    => $f['hearAboutUs'],
+            'Message'      => $f['message'],
+        ];
+    },
 ]);

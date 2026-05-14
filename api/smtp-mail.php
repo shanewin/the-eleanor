@@ -177,6 +177,138 @@ function getOwnerEmails(): array {
 }
 
 /**
+ * Aggregate the tracking activity for a lead into a flat summary suitable for
+ * embedding in an email. Joins waitlist_submissions / unit_inquiries /
+ * mailing_list rows by email to collect their tracking_ids, then aggregates
+ * activity_logs across all of those sessions.
+ *
+ * Always returns the full key set so callers don't need to defensively
+ * isset()-check — keys map to empty values when no data exists.
+ */
+function getLeadEngagementSummary(string $email): array {
+    global $sb;
+
+    $summary = [
+        'has_data'      => false,
+        'session_count' => 0,
+        'total_seconds' => 0,
+        'first_seen'    => null,
+        'last_seen'     => null,
+        'device'        => null,
+        'browser_os'    => null,
+        'top_sections'  => [],
+        'top_clicks'    => [],
+    ];
+
+    if ($email === '') return $summary;
+
+    $trackingIds = [];
+    foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {
+        $rows = $sb->select($table, 'tracking_id', ['email=eq.' . urlencode($email)]);
+        foreach ($rows as $r) {
+            if (!empty($r['tracking_id'])) $trackingIds[] = $r['tracking_id'];
+        }
+    }
+    $trackingIds = array_values(array_unique($trackingIds));
+    if (empty($trackingIds)) return $summary;
+
+    $idList = '(' . implode(',', $trackingIds) . ')';
+    $logs = $sb->select('activity_logs', 'event_type,event_name,event_data,created_at',
+        ['session_id=in.' . $idList],
+        'created_at.asc'
+    );
+
+    if (empty($logs)) return $summary;
+
+    $sections = [];
+    $clicks   = [];
+    $totalSec = 0;
+    $firstTs  = null;
+    $lastTs   = null;
+
+    foreach ($logs as $log) {
+        $ts = $log['created_at'] ?? null;
+        if ($ts) {
+            if ($firstTs === null || $ts < $firstTs) $firstTs = $ts;
+            if ($lastTs  === null || $ts > $lastTs)  $lastTs  = $ts;
+        }
+
+        $data = is_string($log['event_data']) ? json_decode($log['event_data'], true) : $log['event_data'];
+
+        if ($log['event_type'] === 'visibility' && $log['event_name'] === 'section_leave' && is_array($data)) {
+            $sec = trim((string) ($data['section'] ?? ''));
+            $sec = $sec !== '' ? $sec : 'Unknown';
+            $secs = (int) round((float) ($data['secondsSpent'] ?? 0));
+            if ($secs > 0) {
+                if (!isset($sections[$sec])) $sections[$sec] = 0;
+                $sections[$sec] += $secs;
+                $totalSec += $secs;
+            }
+        }
+
+        if ($log['event_type'] === 'click' && $log['event_name'] === 'button_click' && is_array($data)) {
+            $txt = trim((string) ($data['text'] ?? ''));
+            if ($txt !== '') {
+                if (!isset($clicks[$txt])) $clicks[$txt] = 0;
+                $clicks[$txt]++;
+            }
+        }
+    }
+
+    arsort($sections);
+    arsort($clicks);
+
+    $topSections = [];
+    foreach (array_slice($sections, 0, 5, true) as $name => $secs) {
+        $topSections[] = ['name' => $name, 'seconds' => $secs];
+    }
+    $topClicks = [];
+    foreach (array_slice($clicks, 0, 5, true) as $text => $count) {
+        $topClicks[] = ['text' => $text, 'count' => $count];
+    }
+
+    $device = null;
+    $browserOs = null;
+    $sessionRows = $sb->select('tracking_sessions', 'id,user_agent', ['id=in.' . $idList]);
+    if (!empty($sessionRows)) {
+        $ua = $sessionRows[count($sessionRows) - 1]['user_agent'] ?? '';
+        if ($ua !== '') {
+            if (stripos($ua, 'iPhone') !== false || stripos($ua, 'Android') !== false || stripos($ua, 'Mobile') !== false) {
+                $device = 'Mobile';
+            } elseif (stripos($ua, 'iPad') !== false || stripos($ua, 'Tablet') !== false) {
+                $device = 'Tablet';
+            } else {
+                $device = 'Desktop';
+            }
+            $browser = stripos($ua, 'Edg/')      !== false ? 'Edge'
+                     : (stripos($ua, 'Chrome/')  !== false ? 'Chrome'
+                     : (stripos($ua, 'Firefox/') !== false ? 'Firefox'
+                     : (stripos($ua, 'Safari/')  !== false ? 'Safari' : null)));
+            $os = stripos($ua, 'Mac OS X')   !== false ? 'macOS'
+                : (stripos($ua, 'Windows')   !== false ? 'Windows'
+                : (stripos($ua, 'iPhone OS') !== false ? 'iOS'
+                : (stripos($ua, 'iPad')      !== false ? 'iPadOS'
+                : (stripos($ua, 'Android')   !== false ? 'Android'
+                : (stripos($ua, 'Linux')     !== false ? 'Linux' : null)))));
+            if ($browser || $os) {
+                $browserOs = trim(implode(' / ', array_filter([$browser, $os])));
+            }
+        }
+    }
+
+    $summary['has_data']      = true;
+    $summary['session_count'] = count($trackingIds);
+    $summary['total_seconds'] = $totalSec;
+    $summary['first_seen']    = $firstTs;
+    $summary['last_seen']     = $lastTs;
+    $summary['device']        = $device;
+    $summary['browser_os']    = $browserOs;
+    $summary['top_sections']  = $topSections;
+    $summary['top_clicks']    = $topClicks;
+    return $summary;
+}
+
+/**
  * Email-notify owners + the assigned broker when a tour is scheduled,
  * rescheduled, or cancelled. Also logs each send into communications so the
  * lead's timeline reflects it.

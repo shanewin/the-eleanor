@@ -57,4 +57,17 @@ Message:
 {$f['message']}
 EOD;
     },
+
+    'display_fields' => function (array $f) {
+        return [
+            'Name'         => trim($f['firstName'] . ' ' . $f['lastName']),
+            'Email'        => $f['email'],
+            'Phone'        => $f['phone'],
+            'Move-in Date' => $f['moveInDate'],
+            'Budget'       => $f['budget'],
+            'Unit Type'    => $f['unitType'],
+            'Heard via'    => $f['hearAboutUs'],
+            'Message'      => $f['message'],
+        ];
+    },
 ]);

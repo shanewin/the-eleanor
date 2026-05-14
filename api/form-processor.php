@@ -187,6 +187,7 @@ function processForm(array $config): void {
         $subject = str_replace('{' . $k . '}', $v, $subject);
     }
     $body         = ($config['email_body'])($fields);
+    $displayFields = isset($config['display_fields']) ? ($config['display_fields'])($fields) : [];
     $notifyEmails = getNotificationEmails();
     $enrichArgs   = isset($config['enrich_args'])
         ? ($config['enrich_args'])($fields)
@@ -212,6 +213,7 @@ function processForm(array $config): void {
                 'fields'          => $fields,
                 'subject'         => $subject,
                 'body'            => $body,
+                'display_fields'  => $displayFields,
                 'notify_emails'   => $notifyEmails,
                 'enrich_args'     => $enrichArgs,
                 'is_mailing_list' => $table === 'mailing_list',
