@@ -728,6 +728,11 @@ function enrichLead($email, $firstName = null, $lastName = null, $phone = null) 
 function sendEnrichmentEmail($email, $firstName, $lastName, $person) {
     global $sb;
 
+    // Owner master toggle — disable from the Automation tab.
+    if (function_exists('isAutomationEnabled') && !isAutomationEnabled('enrichment_email_enabled')) {
+        return;
+    }
+
     // Get tracking IDs for this email from all submission tables
     $trackingIds = [];
     foreach (['waitlist_submissions', 'unit_inquiries', 'mailing_list'] as $table) {

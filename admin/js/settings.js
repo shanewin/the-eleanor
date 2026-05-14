@@ -5,8 +5,16 @@ async function loadSettings() {
         const res = await fetch('/api/admin-api.php?action=get_settings');
         const settings = await res.json();
 
-        // SMS settings
-        document.getElementById('smsEnabled').checked = (settings.sms_enabled === 'on');
+        // Automation tab — master switches
+        // Default to 'on' when the key is missing in DB so the UI matches what
+        // the PHP gates do.
+        document.getElementById('autoSmsEnabled').checked                = (settings.sms_enabled                !== 'off');
+        document.getElementById('autoApplicantEmailEnabled').checked     = (settings.applicant_email_enabled    !== 'off');
+        document.getElementById('autoEnrichmentEmailEnabled').checked    = (settings.enrichment_email_enabled   !== 'off');
+        document.getElementById('autoOwnerNotificationEnabled').checked  = (settings.owner_notification_enabled !== 'off');
+        document.getElementById('applicantEmailInstructions').value      = settings.applicant_email_instructions || '';
+
+        // SMS tab — schedule only (master toggle lives in Automation now)
         document.getElementById('smsWindowStart').value = settings.sms_window_start || '09:00';
         document.getElementById('smsWindowEnd').value = settings.sms_window_end || '19:00';
         document.getElementById('smsCampaignStart').value = settings.sms_campaign_start || '';
@@ -77,7 +85,6 @@ async function saveSMSSettings() {
     });
 
     const payload = {
-        sms_enabled: document.getElementById('smsEnabled').checked ? 'on' : 'off',
         sms_window_start: document.getElementById('smsWindowStart').value,
         sms_window_end: document.getElementById('smsWindowEnd').value,
         sms_active_days: activeDays.join(','),
@@ -105,6 +112,50 @@ async function saveSMSSettings() {
     }
     statusEl.style.display = 'block';
     setTimeout(() => statusEl.style.display = 'none', 3000);
+}
+
+async function saveAutomationSettings() {
+    const statusEl = document.getElementById('automationSettingsStatus');
+    const payload = {
+        sms_enabled:                 document.getElementById('autoSmsEnabled').checked                ? 'on' : 'off',
+        applicant_email_enabled:     document.getElementById('autoApplicantEmailEnabled').checked     ? 'on' : 'off',
+        enrichment_email_enabled:    document.getElementById('autoEnrichmentEmailEnabled').checked    ? 'on' : 'off',
+        owner_notification_enabled:  document.getElementById('autoOwnerNotificationEnabled').checked  ? 'on' : 'off',
+        applicant_email_instructions: document.getElementById('applicantEmailInstructions').value.trim()
+    };
+
+    try {
+        const res = await fetch('/api/admin-api.php?action=save_settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            statusEl.className = 'small mb-3 text-success';
+            statusEl.textContent = 'Automation settings saved.';
+        } else {
+            statusEl.className = 'small mb-3 text-danger';
+            statusEl.textContent = data.error || 'Failed to save automation settings.';
+        }
+    } catch (e) {
+        statusEl.className = 'small mb-3 text-danger';
+        statusEl.textContent = 'Network error. Please try again.';
+    }
+    statusEl.style.display = 'block';
+    setTimeout(() => statusEl.style.display = 'none', 3000);
+}
+
+async function loadSuppressionCount() {
+    const el = document.getElementById('suppressionCount');
+    if (!el) return;
+    try {
+        const res = await fetch('/api/admin-api.php?action=get_suppression_count');
+        const data = await res.json();
+        el.textContent = (data && typeof data.count === 'number') ? data.count : '0';
+    } catch (e) {
+        el.textContent = '—';
+    }
 }
 
 async function saveAISettings() {
@@ -160,6 +211,9 @@ function showSettingsTab(tab, event) {
     if (tab === 'jobs') {
         loadCronJobs();
         loadLeadJobs();
+    }
+    if (tab === 'automation') {
+        loadSuppressionCount();
     }
 }
 
@@ -357,11 +411,12 @@ document.addEventListener('DOMContentLoaded', function() {
     loadOwnerRecipients();
     loadLeadJobs();
     loadCronJobs();
+    loadSuppressionCount();
 
     // Deep-link support: /admin/settings.php#jobs opens the Jobs tab.
     // Used by cron-failure notifications in the bell dropdown.
     const hash = (window.location.hash || '').replace('#', '');
-    const validTabs = ['general', 'sms', 'ai', 'integrations', 'jobs'];
+    const validTabs = ['general', 'automation', 'sms', 'ai', 'integrations', 'jobs'];
     if (hash && validTabs.includes(hash)) {
         showSettingsTab(hash, null);
     }

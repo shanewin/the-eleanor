@@ -27,6 +27,7 @@ switch ($action) {
     case 'analytics': getAnalytics(); break;
     case 'get_settings': getSettings(); break;
     case 'save_settings': saveSettings(); break;
+    case 'get_suppression_count': getSuppressionCount(); break;
     case 'get_sms_status': getSmsStatus(); break;
     case 'set_sms_override': setSmsOverride(); break;
     case 'get_brokers': getBrokers(); break;
@@ -729,6 +730,12 @@ function saveSettings() {
     }
 
     echo json_encode(['success' => true]);
+}
+
+function getSuppressionCount() {
+    global $sb;
+    $rows = $sb->select('email_suppressions', 'email');
+    echo json_encode(['count' => is_array($rows) ? count($rows) : 0]);
 }
 
 function getSmsStatus() {

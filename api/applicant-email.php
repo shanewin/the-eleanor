@@ -39,6 +39,11 @@ function sendApplicantEmail(array $payload, string $leadEmail): bool {
         return false;
     }
 
+    // Owner master toggle — disable from the Automation tab.
+    if (!isAutomationEnabled('applicant_email_enabled')) {
+        return false;
+    }
+
     // Honor suppression list.
     $suppressed = $sb->selectOne('email_suppressions', 'email', ['email=eq.' . urlencode($leadEmail)]);
     if ($suppressed) {
@@ -129,6 +134,9 @@ function generateApplicantOpener(string $firstName, string $formType, string $un
     if ($unit !== '')   $context .= "Unit they're interested in: $unit\n";
     if ($moveIn !== '') $context .= "Target move-in: $moveIn\n";
 
+    $settings = getAutomationSettings();
+    $extraInstructions = trim($settings['applicant_email_instructions'] ?? '');
+
     $userPrompt = "Write a warm 2-line opener for a luxury rental follow-up email from The Eleanor "
         . "(a brand-new luxury building in Boerum Hill, Brooklyn).\n\n"
         . "Context:\n" . $context . "\n"
@@ -137,8 +145,14 @@ function generateApplicantOpener(string $firstName, string $formType, string $un
         . "- Line 2 is ONE sentence, max 22 words. Reference the unit if known, or the waitlist otherwise.\n"
         . "- No exclamation marks. No emojis. No 'I hope this finds you well.'\n"
         . "- Evoke a feeling, not a feature list — don't mention oak flooring, stone surfaces, square footage, etc.\n"
-        . "- Sound like a real leasing agent, not a chatbot.\n\n"
-        . "Respond with ONLY valid JSON in this exact shape:\n"
+        . "- Sound like a real leasing agent, not a chatbot.\n";
+
+    if ($extraInstructions !== '') {
+        $userPrompt .= "\nADDITIONAL INSTRUCTIONS FROM THE LEASING TEAM (follow these when relevant):\n"
+            . $extraInstructions . "\n";
+    }
+
+    $userPrompt .= "\nRespond with ONLY valid JSON in this exact shape:\n"
         . '{"greeting": "...", "personal_line": "..."}';
 
     $payload = [

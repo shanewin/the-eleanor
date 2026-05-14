@@ -1,7 +1,7 @@
 <?php
 /**
  * SMTP Email Sender via direct socket connection.
- * Uses SSL connection to smtp.hostinger.com:465.
+ * Uses SSL connection to smtp.gmail.com:465 (authenticated as leasing@eleanor.nyc).
  */
 
 function smtpSend($to, $subject, $body, $replyTo = null, $isHtml = false, $extraHeaders = []) {
@@ -27,7 +27,7 @@ function smtpSend($to, $subject, $body, $replyTo = null, $isHtml = false, $extra
     $greeting = smtpRead($socket);
 
     // EHLO
-    fwrite($socket, "EHLO eleanorbk.com\r\n");
+    fwrite($socket, "EHLO eleanor.nyc\r\n");
     smtpRead($socket); // Read full multi-line EHLO response
 
     // AUTH LOGIN
@@ -110,6 +110,53 @@ function smtpRead($socket) {
         }
     }
     return $response;
+}
+
+/**
+ * Read the owner-controlled automation toggles from the settings table.
+ * Cached for 60 seconds. Missing keys default to 'on' so the system stays
+ * safe when first deployed (before the owner has saved anything).
+ *
+ * Keys read:
+ *   sms_enabled                  — gate for the welcome SMS step
+ *   applicant_email_enabled      — gate for the applicant welcome email
+ *   enrichment_email_enabled     — gate for the AI intelligence report
+ *   owner_notification_enabled   — gate for the "new lead" email to owners
+ *   applicant_email_instructions — optional Claude steer for the email opener
+ */
+function getAutomationSettings(): array {
+    global $sb;
+    static $cache = null;
+    static $cachedAt = 0;
+
+    if ($cache !== null && (time() - $cachedAt) < 60) {
+        return $cache;
+    }
+
+    $defaults = [
+        'sms_enabled'                  => 'on',
+        'applicant_email_enabled'      => 'on',
+        'enrichment_email_enabled'     => 'on',
+        'owner_notification_enabled'   => 'on',
+        'applicant_email_instructions' => '',
+    ];
+
+    $rows = $sb->select('settings', 'key,value', [
+        'key=in.(' . implode(',', array_keys($defaults)) . ')',
+    ]);
+    $found = [];
+    foreach ($rows as $r) {
+        if (isset($r['key'])) $found[$r['key']] = $r['value'];
+    }
+
+    $cache = array_merge($defaults, $found);
+    $cachedAt = time();
+    return $cache;
+}
+
+function isAutomationEnabled(string $key): bool {
+    $s = getAutomationSettings();
+    return ($s[$key] ?? 'on') === 'on';
 }
 
 /**

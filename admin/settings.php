@@ -16,6 +16,11 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link text-white-50" href="#" data-settings-tab="automation" onclick="showSettingsTab('automation', event)">
+                        <i class="bi bi-lightning-charge me-1"></i>Automation
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link text-white-50" href="#" data-settings-tab="sms" onclick="showSettingsTab('sms', event)">
                         <i class="bi bi-chat-left-text me-1"></i>SMS
                     </a>
@@ -52,19 +57,100 @@ if (!isOwner()) { echo '<div class="alert alert-danger">Access denied. Owner onl
                         </div>
                     </div>
 
+                    <!-- ═══ Automation Tab ═══ -->
+                    <div class="settings-tab-pane" id="settingsTab-automation" style="display:none">
+                        <div class="card bg-body-tertiary border-0 mb-4">
+                            <div class="card-body p-4">
+                                <h5 class="fw-semibold mb-1">Outbound automation</h5>
+                                <p class="text-white-50 small mb-3">Master switches for each channel that fires after a form submission. Turning one off means nothing is sent on that channel — the lead still appears in the dashboard.</p>
+                                <hr class="border-secondary my-3">
+
+                                <!-- Welcome SMS -->
+                                <div class="d-flex justify-content-between align-items-start py-3 border-bottom border-secondary border-opacity-25">
+                                    <div class="me-3">
+                                        <div class="fw-semibold text-white mb-1">Welcome SMS to applicants</div>
+                                        <div class="text-white-50 small">Telnyx + Claude conversational SMS that follows up after every form submission and can book tours.</div>
+                                    </div>
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" type="checkbox" id="autoSmsEnabled" style="width:3rem;height:1.5rem;cursor:pointer">
+                                    </div>
+                                </div>
+
+                                <!-- Applicant welcome email -->
+                                <div class="d-flex justify-content-between align-items-start py-3 border-bottom border-secondary border-opacity-25">
+                                    <div class="me-3">
+                                        <div class="fw-semibold text-white mb-1">Welcome email to applicants</div>
+                                        <div class="text-white-50 small">Personalized email with a Book a Showing CTA, sent right after submission. Independent of SMS — owners can run either, both, or neither.</div>
+                                    </div>
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" type="checkbox" id="autoApplicantEmailEnabled" style="width:3rem;height:1.5rem;cursor:pointer">
+                                    </div>
+                                </div>
+
+                                <!-- Enrichment report -->
+                                <div class="d-flex justify-content-between align-items-start py-3 border-bottom border-secondary border-opacity-25">
+                                    <div class="me-3">
+                                        <div class="fw-semibold text-white mb-1">AI enrichment report to owners</div>
+                                        <div class="text-white-50 small">Apollo + PDL intelligence report emailed to owners with title, company, behavior, and LinkedIn data on the lead.</div>
+                                    </div>
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" type="checkbox" id="autoEnrichmentEmailEnabled" style="width:3rem;height:1.5rem;cursor:pointer">
+                                    </div>
+                                </div>
+
+                                <!-- Owner notification -->
+                                <div class="d-flex justify-content-between align-items-start py-3">
+                                    <div class="me-3">
+                                        <div class="fw-semibold text-white mb-1">New lead notification to owners</div>
+                                        <div class="text-white-50 small">Basic "you have a new lead" email with the form data. <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Off means new leads only show up in the dashboard, not in your inbox.</span></div>
+                                    </div>
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" type="checkbox" id="autoOwnerNotificationEnabled" style="width:3rem;height:1.5rem;cursor:pointer">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card bg-body-tertiary border-0 mb-4">
+                            <div class="card-body p-4">
+                                <h5 class="fw-semibold mb-1">Email personalization</h5>
+                                <p class="text-white-50 small mb-3">Custom guidance for the AI-written opener in the applicant welcome email. Mirrors the SMS welcome instructions.</p>
+                                <hr class="border-secondary my-3">
+
+                                <div class="mb-3">
+                                    <label class="form-label small text-white-50" for="applicantEmailInstructions">Email opener instructions</label>
+                                    <textarea class="form-control form-control-sm bg-dark border-secondary text-white" id="applicantEmailInstructions" rows="3" maxlength="1000"
+                                        placeholder="Optional. E.g. 'Mention we're offering a free month on select units' or 'Reference our rooftop terrace for waitlist leads.'"></textarea>
+                                    <div class="form-text text-white-50 small">Leave blank for the default warm leasing-agent tone.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card bg-body-tertiary border-0 mb-4">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="fw-semibold mb-1">Unsubscribe list</h5>
+                                        <p class="text-white-50 small mb-0">Applicants who clicked the unsubscribe link. They won't receive future welcome emails.</p>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-semibold text-white" style="font-size:1.5rem" id="suppressionCount">—</div>
+                                        <div class="text-white-50 small">unsubscribed</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="automationSettingsStatus" class="small mb-3" style="display:none"></div>
+                        <button class="btn btn-primary" onclick="saveAutomationSettings()">Save Automation Settings</button>
+                    </div>
+
                     <!-- ═══ SMS Tab ═══ -->
                     <div class="settings-tab-pane" id="settingsTab-sms" style="display:none">
                         <div class="card bg-body-tertiary border-0 mb-4">
                             <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div>
-                                        <h5 class="fw-semibold mb-1">SMS Auto Follow-up</h5>
-                                        <p class="text-white-50 small mb-0">AI-powered conversational SMS that engages leads and books tours.</p>
-                                    </div>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="smsEnabled" style="width:3rem;height:1.5rem;cursor:pointer">
-                                    </div>
-                                </div>
+                                <h5 class="fw-semibold mb-1">SMS Schedule</h5>
+                                <p class="text-white-50 small mb-3">When the SMS auto-reply is allowed to send. Master on/off lives in the <a href="#" onclick="showSettingsTab('automation', event)" class="text-info">Automation tab</a>.</p>
 
                                 <div id="smsSettingsBody">
                                     <hr class="border-secondary my-3">

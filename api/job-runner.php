@@ -62,8 +62,9 @@ function runLeadProcessingJob(int $jobId): bool {
     $done    = $job['steps_done'] ?? [];
     $errors  = [];
 
-    // Step 1: notification email(s) to the leasing team
-    if (!in_array('notify_email', $done, true)) {
+    // Step 1: notification email(s) to the leasing team (owner master toggle)
+    $skipOwnerNotify = !isAutomationEnabled('owner_notification_enabled');
+    if (!$skipOwnerNotify && !in_array('notify_email', $done, true)) {
         try {
             sendLeadNotificationEmails($payload, $job['lead_email']);
             $done[] = 'notify_email';
@@ -74,6 +75,8 @@ function runLeadProcessingJob(int $jobId): bool {
             $errors[] = 'notify_email: ' . $e->getMessage();
             error_log("Lead job $jobId notify_email failed: " . $e->getMessage());
         }
+    } elseif ($skipOwnerNotify && !in_array('notify_email', $done, true)) {
+        $done[] = 'notify_email';
     }
 
     // Step 2: enrichment (PDL / Apollo / LinkedIn / Anthropic cascade)
