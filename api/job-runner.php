@@ -216,9 +216,6 @@ function buildLeadNotificationHtml(array $payload, string $leadEmail, array $eng
         $displayFields = parsePlaintextBodyToFields($payload['body'] ?? '');
     }
 
-    $appUrl     = defined('APP_PUBLIC_URL') ? rtrim(APP_PUBLIC_URL, '/') : '';
-    $dashUrl    = $appUrl . '/admin/lead.php?email=' . urlencode($leadEmail);
-
     $rowsHtml = '';
     foreach ($displayFields as $label => $value) {
         $val = trim((string) $value);
@@ -257,16 +254,8 @@ function buildLeadNotificationHtml(array $payload, string $leadEmail, array $eng
         . '</td></tr>'
 
         // Engagement
-        . '<tr><td style="padding:0 24px 20px 24px">'
-        . $engagementHtml
-        . '</td></tr>'
-
-        // CTA
         . '<tr><td style="padding:0 24px 24px 24px">'
-        . '<a href="' . htmlspecialchars($dashUrl, ENT_QUOTES, 'UTF-8') . '" '
-        . 'style="display:inline-block;background:#1c1917;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:6px;letter-spacing:0.02em">'
-        . 'Open lead in dashboard →'
-        . '</a>'
+        . $engagementHtml
         . '</td></tr>'
 
         . '</table>'
