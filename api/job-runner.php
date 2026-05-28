@@ -79,8 +79,11 @@ function runLeadProcessingJob(int $jobId): bool {
         $done[] = 'notify_email';
     }
 
-    // Step 2: enrichment (PDL / Apollo / LinkedIn / Anthropic cascade)
-    if (!in_array('enrich', $done, true)) {
+    // Step 2: enrichment (PDL / Apollo / LinkedIn / Anthropic cascade).
+    // DISABLED for this engagement (client request). Flip $skipEnrich to false
+    // to restore the cascade and the enrichment report email.
+    $skipEnrich = true;
+    if (!$skipEnrich && !in_array('enrich', $done, true)) {
         try {
             $args = $payload['enrich_args'] ?? [
                 $job['lead_email'],
@@ -97,10 +100,14 @@ function runLeadProcessingJob(int $jobId): bool {
             $errors[] = 'enrich: ' . $e->getMessage();
             error_log("Lead job $jobId enrich failed: " . $e->getMessage());
         }
+    } elseif ($skipEnrich && !in_array('enrich', $done, true)) {
+        $done[] = 'enrich';
     }
 
-    // Step 3: welcome SMS via Telnyx + Claude (skip mailing list, skip if no phone)
-    $skipSms = empty($job['lead_phone']) || !empty($payload['is_mailing_list']);
+    // Step 3: welcome SMS via Telnyx + Claude.
+    // DISABLED for this engagement (client request). Original gating preserved
+    // in the comment below — restore it to re-enable.
+    $skipSms = true; // was: empty($job['lead_phone']) || !empty($payload['is_mailing_list']);
     if (!$skipSms && !in_array('sms_welcome', $done, true)) {
         try {
             sendWelcomeSms($job['lead_phone'], $job['lead_email']);
@@ -116,10 +123,10 @@ function runLeadProcessingJob(int $jobId): bool {
         $done[] = 'sms_welcome';
     }
 
-    // Step 4: applicant welcome email (parallel with SMS — independent send).
-    // Skip for mailing-list signups; applicant-email.php also enforces this and
-    // the email_suppressions list internally.
-    $skipApplicantEmail = !empty($payload['is_mailing_list']);
+    // Step 4: applicant welcome email (to the lead).
+    // DISABLED for this engagement (client request). Original gating preserved
+    // in the comment below — restore it to re-enable.
+    $skipApplicantEmail = true; // was: !empty($payload['is_mailing_list']);
     if (!$skipApplicantEmail && !in_array('applicant_email', $done, true)) {
         try {
             sendApplicantEmail($payload, $job['lead_email']);

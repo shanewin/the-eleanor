@@ -34,18 +34,12 @@ function clean(string $field): string {
 }
 
 /**
- * Get notification email addresses from settings table.
- * Falls back to NOTIFICATION_EMAIL constant if settings unavailable.
+ * Lead-alert recipients. Hardcoded to the two leasing addresses for this
+ * engagement — intentionally independent of the brokers table and Supabase,
+ * so alerts still send even during a database outage.
  */
 function getNotificationEmails(): array {
-    require_once __DIR__ . '/smtp-mail.php';
-    $owners = getOwnerEmails();
-    if (!empty($owners)) return $owners;
-    // Fallback: NOTIFICATION_EMAIL constant if no owners exist yet
-    if (defined('NOTIFICATION_EMAIL') && NOTIFICATION_EMAIL) {
-        return array_filter(array_map('trim', explode(',', NOTIFICATION_EMAIL)));
-    }
-    return [];
+    return ['leasing@eleanor.nyc', 'shanewin@gmail.com'];
 }
 
 /**
