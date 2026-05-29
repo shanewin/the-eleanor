@@ -132,6 +132,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return normalized;
       });
 
+      // "Live" column gate: hide any row explicitly marked "No" in the sheet.
+      // Blank / anything other than "No" stays visible.
+      units = units.filter((u) => String(u.live ?? '').trim().toLowerCase() !== 'no');
+
       initializePriceSliders();
       attachFilterListeners();
       filteredUnits = [...units];
