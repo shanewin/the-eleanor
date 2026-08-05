@@ -5,6 +5,13 @@
  */
 require_once __DIR__ . '/config.php';
 
+// Claude model used across the SMS AI, enrichment, and summary features.
+// Defined here (not config.php) so it deploys with the repo. config.php may
+// define it first to pin a different model per environment.
+if (!defined('CLAUDE_MODEL')) {
+    define('CLAUDE_MODEL', 'claude-opus-5');
+}
+
 class Supabase {
     private $url;
     private $key;

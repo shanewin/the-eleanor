@@ -98,8 +98,9 @@ function generateJustification($email, $insights, $grade, $score, $logs) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-        'model' => 'claude-3-haiku-20240307',
-        'max_tokens' => 250,
+        'model' => CLAUDE_MODEL,
+        'max_tokens' => 2000,
+        'output_config' => ['effort' => 'low'],
         'messages' => [
             ['role' => 'user', 'content' => $prompt]
         ]
@@ -120,7 +121,15 @@ function generateJustification($email, $insights, $grade, $score, $logs) {
     }
 
     $resData = json_decode($response, true);
-    $summary = trim($resData['content'][0]['text'] ?? '');
+
+    // Take the first text block — a thinking block can precede it.
+    $summary = '';
+    foreach ($resData['content'] ?? [] as $block) {
+        if (($block['type'] ?? '') === 'text' && trim($block['text'] ?? '') !== '') {
+            $summary = trim($block['text']);
+            break;
+        }
+    }
 
     // 4. Update Database
     $sb->update('lead_enrichment', ['ai_summary' => $summary], ['email=eq.' . urlencode($email)]);

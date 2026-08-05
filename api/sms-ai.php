@@ -64,12 +64,15 @@ function generateAIResponse($leadPhone, $inboundText) {
     $tools = getCalendarToolDefinitions();
 
     // 6. Call Claude API with tool use loop
+    // max_tokens covers thinking + reply, so it needs far more headroom than the
+    // ~2-sentence text we actually want; brevity is enforced by the prompt.
     $payload = [
-        'model'      => 'claude-sonnet-4-20250514',
-        'max_tokens' => 300,
-        'system'     => $systemPrompt,
-        'tools'      => $tools,
-        'messages'   => $messages
+        'model'         => CLAUDE_MODEL,
+        'max_tokens'    => 2000,
+        'output_config' => ['effort' => 'low'],
+        'system'        => $systemPrompt,
+        'tools'         => $tools,
+        'messages'      => $messages
     ];
 
     $reply = null;
@@ -623,10 +626,11 @@ function generateInitialMessage($leadPhone, $leadEmail) {
     ]);
 
     $payload = [
-        'model'      => 'claude-sonnet-4-20250514',
-        'max_tokens' => 250,
-        'system'     => $systemPrompt,
-        'messages'   => [
+        'model'         => CLAUDE_MODEL,
+        'max_tokens'    => 2000,
+        'output_config' => ['effort' => 'low'],
+        'system'        => $systemPrompt,
+        'messages'      => [
             ['role' => 'user', 'content' => $userPrompt]
         ]
     ];
@@ -643,7 +647,15 @@ function generateInitialMessage($leadPhone, $leadEmail) {
     }
 
     $data = json_decode($response, true);
-    return $data['content'][0]['text'] ?? null;
+
+    // Take the first text block — a thinking block can precede it.
+    foreach ($data['content'] ?? [] as $block) {
+        if (($block['type'] ?? '') === 'text' && trim($block['text'] ?? '') !== '') {
+            return $block['text'];
+        }
+    }
+    error_log('Claude AI initial SMS returned no text block: ' . substr($response, 0, 500));
+    return null;
 }
 
 /**
@@ -689,10 +701,11 @@ function generateFollowupMessage($leadPhone, $attemptNumber = 1) {
     }
 
     $payload = [
-        'model'      => 'claude-sonnet-4-20250514',
-        'max_tokens' => 200,
-        'system'     => $systemPrompt,
-        'messages'   => $messages
+        'model'         => CLAUDE_MODEL,
+        'max_tokens'    => 2000,
+        'output_config' => ['effort' => 'low'],
+        'system'        => $systemPrompt,
+        'messages'      => $messages
     ];
 
     $response = callClaudeAPI($payload);
