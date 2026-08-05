@@ -82,7 +82,7 @@ function runLeadProcessingJob(int $jobId): bool {
     // Step 2: enrichment (PDL / Apollo / LinkedIn / Anthropic cascade).
     // DISABLED for this engagement (client request). Flip $skipEnrich to false
     // to restore the cascade and the enrichment report email.
-    $skipEnrich = true;
+    $skipEnrich = false;
     if (!$skipEnrich && !in_array('enrich', $done, true)) {
         try {
             $args = $payload['enrich_args'] ?? [
@@ -107,7 +107,7 @@ function runLeadProcessingJob(int $jobId): bool {
     // Step 3: welcome SMS via Telnyx + Claude.
     // DISABLED for this engagement (client request). Original gating preserved
     // in the comment below — restore it to re-enable.
-    $skipSms = true; // was: empty($job['lead_phone']) || !empty($payload['is_mailing_list']);
+    $skipSms = empty($job['lead_phone']) || !empty($payload['is_mailing_list']);
     if (!$skipSms && !in_array('sms_welcome', $done, true)) {
         try {
             sendWelcomeSms($job['lead_phone'], $job['lead_email']);
@@ -126,7 +126,7 @@ function runLeadProcessingJob(int $jobId): bool {
     // Step 4: applicant welcome email (to the lead).
     // DISABLED for this engagement (client request). Original gating preserved
     // in the comment below — restore it to re-enable.
-    $skipApplicantEmail = true; // was: !empty($payload['is_mailing_list']);
+    $skipApplicantEmail = !empty($payload['is_mailing_list']);
     if (!$skipApplicantEmail && !in_array('applicant_email', $done, true)) {
         try {
             sendApplicantEmail($payload, $job['lead_email']);
